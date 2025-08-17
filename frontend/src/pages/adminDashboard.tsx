@@ -13,8 +13,10 @@ import { StudentManagement } from "../components/StudentManagment";
 import { TeacherManagement } from "../components/TeacherManagment";
 import AdminSidebar from "../components/AdminSidebar";
 import { FeeManagement } from "../components/FeeManagment";
-import axios from "axios";
 import FeeStructure from "../components/FeeStructure";
+import StudentDiscount from "../components/StudentDiscount";
+import axios from "axios";
+import { Toaster } from "sonner";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -59,6 +61,10 @@ export default function AdminDashboard() {
         return <FeeManagement students={students} />;
       case "feeStructure":
         return <FeeStructure />;
+      case "studentDiscount":
+        return (
+          <StudentDiscount students={students} setStudents={setStudents} />
+        );
       default:
         return (
           <div className="space-y-6">
@@ -168,6 +174,7 @@ export default function AdminDashboard() {
       <main className="ml-72 py-6 pr-6">
         <div className="px-4 py-6 sm:px-0">{renderContent()}</div>
       </main>
+      <Toaster position="top-right" richColors />
     </div>
   );
 }

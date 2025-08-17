@@ -629,12 +629,18 @@ export function FeeManagement({ students }: FeeManagementProps) {
     } catch (error) {
       console.error("Error submitting fee payment:", error);
 
-      if (error.response) {
-        console.error("Response data:", error.response.data);
-        console.error("Response status:", error.response.status);
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as any).response === "object"
+      ) {
+        const response = (error as any).response;
+        console.error("Response data:", response.data);
+        console.error("Response status:", response.status);
 
-        if (error.response.data && error.response.data.message) {
-          alert(`Failed to submit fee payment: ${error.response.data.message}`);
+        if (response.data && response.data.message) {
+          alert(`Failed to submit fee payment: ${response.data.message}`);
         } else {
           alert(
             "Failed to submit fee payment. Please check the console for details."
@@ -812,7 +818,13 @@ Falcon House School Administration
       }
     } catch (error) {
       console.error("Error in sendFeeReminder:", error);
-      alert(`Error sending WhatsApp reminder: ${error.message}`);
+      alert(
+        `Error sending WhatsApp reminder: ${
+          typeof error === "object" && error !== null && "message" in error
+            ? (error as { message?: string }).message
+            : String(error)
+        }`
+      );
     }
   };
 

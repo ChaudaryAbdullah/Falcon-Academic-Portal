@@ -24,7 +24,7 @@ import {
 } from "./ui/table";
 import { Badge } from "./ui/badge";
 import { Pencil, Trash2, Plus, Save, X, Table2 } from "lucide-react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import axios from "axios";
 const BACKEND = import.meta.env.VITE_BACKEND; // your backend URL
 
@@ -417,7 +417,6 @@ export default function FeeStructure() {
           </Card>
         </TabsContent>
       </Tabs>
-      <Toaster position="top-right" richColors />
     </div>
   );
 }
