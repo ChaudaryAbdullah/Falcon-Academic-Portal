@@ -242,14 +242,14 @@ export function StudentManagement({
   const filteredStudents = students.filter((student) => {
     // Search filter
     const matchesSearch =
+      student.rollNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.fatherName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.fatherCnic.includes(searchTerm) ||
-      student.rollNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.motherName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.fPhoneNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.mPhoneNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.motherCnic.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.fPhoneNumber.includes(searchTerm) ||
+      student.mPhoneNumber.includes(searchTerm) ||
+      student.fatherCnic.includes(searchTerm) ||
+      student.motherCnic.includes(searchTerm) ||
       student.bform.includes(searchTerm);
 
     // Field filters
@@ -341,25 +341,51 @@ export function StudentManagement({
                   </div>
                   <div className="space-y-2 mb-5">
                     <Label htmlFor="class">Class</Label>
-                    <Input
+                    <select
                       id="class"
                       value={formData.class}
                       onChange={(e) =>
                         handleInputChange("class", e.target.value)
                       }
                       required
-                    />
+                      className="border border-gray-250 shadow-xs rounded-lg px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">-- Select Class --</option>
+                      <option value="Pre Nursery">Pre Nursery</option>
+                      <option value="Nursery">Nursery</option>
+                      <option value="Prep">Prep</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                      <option value="6">6</option>
+                      <option value="7">7</option>
+                      <option value="8">8</option>
+                      <option value="9">9</option>
+                      <option value="10">10</option>
+                    </select>
                   </div>
+
                   <div className="space-y-2 mb-5">
                     <Label htmlFor="section">Section</Label>
-                    <Input
+                    <select
                       id="section"
                       value={formData.section}
                       onChange={(e) =>
                         handleInputChange("section", e.target.value)
                       }
                       required
-                    />
+                      className="border border-gray-250 shadow-xs rounded-lg px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">-- Select a section --</option>
+                      <option value="red">Red</option>
+                      <option value="blue">Blue</option>
+                      <option value="pink">Pink</option>
+                      <option value="green">Green</option>
+                      <option value="yellow">Yellow</option>
+                      <option value="white">White</option>
+                    </select>
                   </div>
 
                   <div className="space-y-2">

@@ -2,47 +2,82 @@ import mongoose from "mongoose";
 
 const feeSchema = mongoose.Schema(
   {
-    // Link to the student who is paying this fee
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Student",
       required: true,
-      unique: true, // One fee record per student per month
     },
-
-    // Fee Period
     month: {
       type: String,
       required: true,
-      unique: true, // One record per month
     },
     year: {
       type: String,
       required: true,
     },
-
-    // Fee Components
     tutionFee: {
       type: Number,
       required: true,
+      default: 0,
     },
     examFee: {
       type: Number,
       required: true,
-      unique: true, // If each exam fee record is unique
+      default: 0,
     },
     paperFund: {
       type: Number,
       required: true,
+      default: 0,
     },
     miscFee: {
       type: Number,
       required: true,
+      default: 0,
+    },
+    totalAmount: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    dueDate: {
+      type: Date,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "paid", "overdue"],
+      default: "pending",
+    },
+    generatedDate: {
+      type: Date,
+      default: Date.now,
+    },
+    sentToWhatsApp: {
+      type: Boolean,
+      default: false,
+    },
+    paidDate: {
+      type: Date,
+      default: null,
     },
   },
   {
-    timestamps: true, // createdAt & updatedAt
+    timestamps: true,
   }
 );
+
+// Ensure one fee record per student per month
+feeSchema.index({ studentId: 1, month: 1, year: 1 }, { unique: true });
+
+// Pre-save middleware to calculate total amount
+feeSchema.pre("save", function (next) {
+  this.totalAmount =
+    (this.tutionFee || 0) +
+    (this.examFee || 0) +
+    (this.paperFund || 0) +
+    (this.miscFee || 0);
+  next();
+});
 
 export const Fee = mongoose.model("Fee", feeSchema);

@@ -1,5 +1,5 @@
 "use client";
-
+import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import {
   LayoutDashboard,
@@ -8,6 +8,7 @@ import {
   LogOut,
   BookOpen,
   Receipt,
+  LucideReceiptText,
 } from "lucide-react";
 
 interface AdminSidebarProps {
@@ -19,6 +20,7 @@ export default function AdminSidebar({
   activeTab,
   setActiveTab,
 }: AdminSidebarProps) {
+  const navigate = useNavigate();
   const sidebarItems = [
     {
       icon: <LayoutDashboard className="w-4 h-4 mr-3" />,
@@ -34,6 +36,11 @@ export default function AdminSidebar({
       icon: <Users className="w-4 h-4 mr-3" />,
       label: "Teachers",
       value: "teachers",
+    },
+    {
+      icon: <LucideReceiptText className="w-4 h-4 mr-3" />,
+      label: "Fee Structure",
+      value: "feeStructure",
     },
     {
       icon: <Receipt className="w-4 h-4 mr-3" />,
@@ -84,8 +91,7 @@ export default function AdminSidebar({
           variant="ghost"
           className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
           onClick={() => {
-            // Handle logout logic here
-            console.log("Logout clicked");
+            navigate("/login");
           }}
         >
           <LogOut className="w-4 h-4 mr-3" />
