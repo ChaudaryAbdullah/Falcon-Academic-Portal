@@ -14,6 +14,7 @@ import { TeacherManagement } from "../components/TeacherManagment";
 import AdminSidebar from "../components/AdminSidebar";
 import { FeeManagement } from "../components/FeeManagment";
 import axios from "axios";
+import FeeStructure from "../components/FeeStructure";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -56,6 +57,8 @@ export default function AdminDashboard() {
         );
       case "fees":
         return <FeeManagement students={students} />;
+      case "feeStructure":
+        return <FeeStructure />;
       default:
         return (
           <div className="space-y-6">

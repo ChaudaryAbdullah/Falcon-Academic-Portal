@@ -8,6 +8,7 @@ import dotenv from "dotenv";
 import studentRoutes from "./routes/studentRoutes.js";
 import feeRoutes from "./routes/feeRoutes.js";
 import teacherRoutes from "./routes/teacherRoutes.js";
+import feeStructureRoutes from "./routes/feeStructureRoutes.js";
 
 dotenv.config();
 const FRONTEND = process.env.FRONTEND;
@@ -20,7 +21,7 @@ app.use(
   cors({
     origin: FRONTEND,
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type"],
   })
 );
@@ -51,6 +52,7 @@ app.use(
 app.use("/api/students", studentRoutes);
 app.use("/api/fees", feeRoutes);
 app.use("/api/teachers", teacherRoutes);
+app.use("/api/fee-structures", feeStructureRoutes);
 
 app.get("/", (req, res) => {
   res.send("Welcome to Falcon Academic Portal API!");
