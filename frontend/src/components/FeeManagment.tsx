@@ -38,8 +38,6 @@ import {
   AlertTriangle,
   Filter,
   X,
-  Percent,
-  DollarSign,
 } from "lucide-react";
 import { Textarea } from "./ui/textarea";
 import { Checkbox } from "./ui/checkbox";
@@ -137,30 +135,11 @@ export function FeeManagement({ students }: FeeManagementProps) {
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [whatsappFilter, setWhatsappFilter] = useState<string>("all");
 
-  // Discount management states
-  const [discountStudent, setDiscountStudent] = useState<string>("");
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
-  const [discountStudentSearch, setDiscountStudentSearch] = useState("");
-  const [showDiscountDropdown, setShowDiscountDropdown] = useState(false);
-
   const filteredStudents = students.filter(
     (student) =>
       student.studentName.toLowerCase().includes(studentSearch.toLowerCase()) ||
       student.rollNumber.toLowerCase().includes(studentSearch.toLowerCase()) ||
       student.fatherName.toLowerCase().includes(studentSearch.toLowerCase())
-  );
-
-  const filteredDiscountStudents = students.filter(
-    (student) =>
-      student.studentName
-        .toLowerCase()
-        .includes(discountStudentSearch.toLowerCase()) ||
-      student.rollNumber
-        .toLowerCase()
-        .includes(discountStudentSearch.toLowerCase()) ||
-      student.fatherName
-        .toLowerCase()
-        .includes(discountStudentSearch.toLowerCase())
   );
 
   // Fetch data on component mount
@@ -376,85 +355,10 @@ export function FeeManagement({ students }: FeeManagementProps) {
     setLateFees({});
   };
 
-  const handleDiscountStudentSelect = (student: Student) => {
-    setDiscountStudent(student._id);
-    setDiscountStudentSearch(`${student.studentName} - ${student.rollNumber}`);
-    setShowDiscountDropdown(false);
-
-    // Load existing discount if any
-    const existingDiscount = getStudentDiscount(student._id);
-    setDiscountAmount(existingDiscount);
-  };
-
   const handleSearchChange = (value: string) => {
     setStudentSearch(value);
     setSelectedStudent("");
     setShowStudentDropdown(value.length > 0);
-  };
-
-  const handleDiscountSearchChange = (value: string) => {
-    setDiscountStudentSearch(value);
-    setDiscountStudent("");
-    setShowDiscountDropdown(value.length > 0);
-  };
-
-  // Save or update student discount
-  const saveStudentDiscount = async () => {
-    if (!discountStudent || discountAmount < 0) {
-      alert("Please select a student and enter a valid discount amount.");
-      return;
-    }
-
-    try {
-      await axios.post(
-        `${BACKEND}/api/student-discounts`,
-        {
-          studentId: discountStudent,
-          discount: discountAmount,
-        },
-        { withCredentials: true }
-      );
-
-      // Refresh discounts list
-      const discountsRes = await axios.get(`${BACKEND}/api/student-discounts`, {
-        withCredentials: true,
-      });
-      setStudentDiscounts(discountsRes.data);
-
-      // Reset form
-      setDiscountStudent("");
-      setDiscountStudentSearch("");
-      setDiscountAmount(0);
-
-      alert("Student discount saved successfully!");
-    } catch (error) {
-      console.error("Error saving discount:", error);
-      alert("Failed to save discount. Please try again.");
-    }
-  };
-
-  // Delete student discount
-  const deleteStudentDiscount = async (discountId: string) => {
-    if (!confirm("Are you sure you want to delete this discount?")) {
-      return;
-    }
-
-    try {
-      await axios.delete(`${BACKEND}/api/student-discounts/${discountId}`, {
-        withCredentials: true,
-      });
-
-      // Refresh discounts list
-      const discountsRes = await axios.get(`${BACKEND}/api/student-discounts`, {
-        withCredentials: true,
-      });
-      setStudentDiscounts(discountsRes.data);
-
-      alert("Student discount deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting discount:", error);
-      alert("Failed to delete discount. Please try again.");
-    }
   };
 
   const generateFeeChallan = async (
