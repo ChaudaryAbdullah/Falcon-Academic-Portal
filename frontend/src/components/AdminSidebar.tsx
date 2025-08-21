@@ -56,7 +56,7 @@ export default function AdminSidebar({
   ];
 
   return (
-    <div className="fixed left-2 top-6 h-[70%] w-64 bg-white border-r rounded-xl border-gray-200 flex flex-col shadow-xl">
+    <div className="fixed left-3 top-6 h-[70%] w-64 bg-white border-r rounded-xl border-gray-200 flex flex-col shadow-xl">
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center gap-3">

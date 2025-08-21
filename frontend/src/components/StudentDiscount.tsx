@@ -50,6 +50,7 @@ export default function StudentDiscountPage({
     useState<StudentDiscount | null>(null);
   const [discounts, setDiscounts] = useState<StudentDiscount[]>([]);
   const [tabValue, setTabValue] = useState("add-discount");
+  const [discountSearch, setDiscountSearch] = useState("");
 
   // Fetch all discounts
   useEffect(() => {
@@ -71,6 +72,19 @@ export default function StudentDiscountPage({
       student.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student._id.includes(searchQuery) ||
       student.rollNumber.includes(searchQuery)
+  );
+
+  const filteredDiscounts = discounts.filter(
+    (d) =>
+      d.studentId?.studentName
+        ?.toLowerCase()
+        .includes(discountSearch.toLowerCase()) ||
+      d.studentId?.fatherName
+        ?.toLowerCase()
+        .includes(discountSearch.toLowerCase()) ||
+      d.studentId?.rollNumber?.includes(discountSearch) ||
+      d.studentId?._id?.includes(discountSearch) ||
+      d.discount.toString().includes(discountSearch)
   );
 
   const handleStudentSelect = (student: Student) => {
@@ -253,9 +267,20 @@ export default function StudentDiscountPage({
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* 🔍 Search Bar */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search discounts by name, roll number, father, or ID..."
+                  value={discountSearch}
+                  onChange={(e) => setDiscountSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
               <div className="space-y-4">
-                {discounts.length > 0 ? (
-                  discounts.map((discount) => (
+                {filteredDiscounts.length > 0 ? (
+                  filteredDiscounts.map((discount) => (
                     <Card
                       key={discount._id}
                       className="border-l-4 border-l-green-500"
@@ -271,11 +296,15 @@ export default function StudentDiscountPage({
                                 {discount.studentId.studentName}
                               </h3>
                               <p className="text-sm text-gray-600">
+                                Roll Number: {discount.studentId.rollNumber}
+                              </p>
+                              <p className="text-sm text-gray-600">
                                 Father: {discount.studentId.fatherName}
                               </p>
                               <p className="text-sm text-gray-600">
                                 Class: {discount.studentId.class}
                               </p>
+
                               <div className="flex items-center gap-2 mt-1">
                                 <Phone className="w-3 h-3 text-gray-400" />
                                 <span className="text-xs text-gray-500">

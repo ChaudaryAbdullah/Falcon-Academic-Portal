@@ -1,5 +1,7 @@
 import { Fee } from "../models/fee.js";
+import { StudentDiscount } from "../models/studentDiscount.js";
 import mongoose from "mongoose";
+
 // Create Fee Record
 export const createFee = async (req, res) => {
   try {
@@ -37,6 +39,8 @@ export const getFees = async (req, res) => {
       paperFund: fee.paperFund,
       examFee: fee.examFee,
       miscFee: fee.miscFee,
+      arrears: fee.arrears,
+      discount: fee.discount,
       totalAmount: fee.totalAmount,
       dueDate: fee.dueDate?.toISOString().split("T")[0] || "",
       status: fee.status,
@@ -45,6 +49,153 @@ export const getFees = async (req, res) => {
     }));
 
     res.status(200).json({ success: true, data: transformedFees });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Calculate arrears for a student
+const calculateArrears = async (studentId, currentMonth, currentYear) => {
+  try {
+    // Find all unpaid fees for this student
+    const unpaidFees = await Fee.find({
+      studentId: studentId,
+      status: { $in: ["pending", "overdue"] },
+      $or: [
+        { year: { $lt: currentYear } },
+        {
+          year: currentYear,
+          month: {
+            $in: getMonthsBefore(currentMonth),
+          },
+        },
+      ],
+    });
+
+    // Calculate total arrears
+    const totalArrears = unpaidFees.reduce((sum, fee) => {
+      return sum + (fee.totalAmount - fee.discount);
+    }, 0);
+
+    return Math.max(0, totalArrears);
+  } catch (error) {
+    console.error("Error calculating arrears:", error);
+    return 0;
+  }
+};
+
+// Helper function to get months before current month
+const getMonthsBefore = (currentMonth) => {
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const currentIndex = months.indexOf(currentMonth);
+  return months.slice(0, currentIndex);
+};
+
+// Get student discount
+const getStudentDiscount = async (studentId) => {
+  try {
+    const discountRecord = await StudentDiscount.findOne({ studentId });
+    return discountRecord ? discountRecord.discount : 0;
+  } catch (error) {
+    console.error("Error fetching student discount:", error);
+    return 0;
+  }
+};
+
+// Generate Bulk Fee Challans with Discounts and Arrears
+export const generateBulkFees = async (req, res) => {
+  try {
+    const { challans } = req.body;
+
+    if (!challans || !Array.isArray(challans) || challans.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No challans provided",
+      });
+    }
+
+    const createdChallans = [];
+    const errors = [];
+
+    for (const challanData of challans) {
+      try {
+        // Check if challan already exists
+        const existingChallan = await Fee.findOne({
+          studentId: challanData.studentId._id,
+          month: challanData.month,
+          year: challanData.year,
+        });
+
+        if (existingChallan) {
+          errors.push({
+            studentId: challanData.studentId._id,
+            message: `Fee challan already exists for ${challanData.month} ${challanData.year}`,
+          });
+          continue;
+        }
+
+        // Calculate arrears for this student
+        const arrears = await calculateArrears(
+          challanData.studentId._id,
+          challanData.month,
+          challanData.year
+        );
+
+        // Get student discount
+        const discount = await getStudentDiscount(challanData.studentId._id);
+
+        // Create new fee challan with arrears and discount
+        const feeData = {
+          studentId: challanData.studentId._id,
+          month: challanData.month,
+          year: challanData.year,
+          tutionFee: challanData.tutionFee || 0,
+          paperFund: challanData.paperFund || 0,
+          examFee: challanData.examFee || 0,
+          miscFee: challanData.miscFee || 0,
+          arrears: arrears,
+          discount: discount,
+          dueDate: new Date(challanData.dueDate),
+          status: challanData.status || "pending",
+          generatedDate: new Date(challanData.generatedDate || new Date()),
+          sentToWhatsApp: challanData.sentToWhatsApp || false,
+        };
+
+        const newFee = await Fee.create(feeData);
+        const populatedFee = await Fee.findById(newFee._id).populate(
+          "studentId",
+          "studentName fatherName fPhoneNumber rollNumber"
+        );
+
+        createdChallans.push(populatedFee);
+      } catch (error) {
+        errors.push({
+          studentId: challanData.studentId?._id || "unknown",
+          message: error.message,
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Generated ${createdChallans.length} fee challans`,
+      data: createdChallans,
+      errors: errors.length > 0 ? errors : undefined,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -120,79 +271,6 @@ export const getFeeByStudentId = async (req, res) => {
     res.status(200).json({ success: true, data: fees });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
-  }
-};
-
-// Generate Bulk Fee Challans
-export const generateBulkFees = async (req, res) => {
-  try {
-    const { challans } = req.body;
-
-    if (!challans || !Array.isArray(challans) || challans.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No challans provided",
-      });
-    }
-
-    const createdChallans = [];
-    const errors = [];
-
-    for (const challanData of challans) {
-      try {
-        // Check if challan already exists
-        const existingChallan = await Fee.findOne({
-          studentId: challanData.studentId._id,
-          month: challanData.month,
-          year: challanData.year,
-        });
-
-        if (existingChallan) {
-          errors.push({
-            studentId: challanData.studentId._id,
-            message: `Fee challan already exists for ${challanData.month} ${challanData.year}`,
-          });
-          continue;
-        }
-
-        // Create new fee challan
-        const feeData = {
-          studentId: challanData.studentId._id,
-          month: challanData.month,
-          year: challanData.year,
-          tutionFee: challanData.tutionFee || 0,
-          paperFund: challanData.paperFund || 0,
-          examFee: challanData.examFee || 0,
-          miscFee: challanData.miscFee || 0,
-          dueDate: new Date(challanData.dueDate),
-          status: challanData.status || "pending",
-          generatedDate: new Date(challanData.generatedDate || new Date()),
-          sentToWhatsApp: challanData.sentToWhatsApp || false,
-        };
-
-        const newFee = await Fee.create(feeData);
-        const populatedFee = await Fee.findById(newFee._id).populate(
-          "studentId",
-          "studentName fatherName fPhoneNumber rollNumber"
-        );
-
-        createdChallans.push(populatedFee);
-      } catch (error) {
-        errors.push({
-          studentId: challanData.studentId?._id || "unknown",
-          message: error.message,
-        });
-      }
-    }
-
-    res.status(201).json({
-      success: true,
-      message: `Generated ${createdChallans.length} fee challans`,
-      data: createdChallans,
-      errors: errors.length > 0 ? errors : undefined,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
   }
 };
 

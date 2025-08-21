@@ -32,7 +32,7 @@ function App() {
             element={<StudentAttendancePage />}
           ></Route>{" "}
           <Route path="/student/marks" element={<StudentMarksPage />}></Route>
-          <Route path="/admin/dashboard" element={<AdminDashboard />}></Route>
+          <Route path="/admin" element={<AdminDashboard />}></Route>
         </Routes>
       </Router>
     </>

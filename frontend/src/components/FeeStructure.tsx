@@ -236,7 +236,7 @@ export default function FeeStructure() {
                       className="border border-gray-250 shadow-xs rounded-lg px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">-- Select Class --</option>
-                      <option value="Pre Nursery">Pre Nursery</option>
+                      <option value="Play">Play</option>
                       <option value="Nursery">Nursery</option>
                       <option value="Prep">Prep</option>
                       <option value="1">1</option>

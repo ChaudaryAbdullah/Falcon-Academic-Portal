@@ -35,6 +35,16 @@ const feeSchema = mongoose.Schema(
       required: true,
       default: 0,
     },
+    arrears: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    discount: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
     totalAmount: {
       type: Number,
       required: true,
@@ -70,13 +80,21 @@ const feeSchema = mongoose.Schema(
 // Ensure one fee record per student per month
 feeSchema.index({ studentId: 1, month: 1, year: 1 }, { unique: true });
 
-// Pre-save middleware to calculate total amount
+// Pre-save middleware to calculate total amount including arrears and discount
 feeSchema.pre("save", function (next) {
-  this.totalAmount =
+  // Calculate base fees
+  const baseFees =
     (this.tutionFee || 0) +
     (this.examFee || 0) +
     (this.paperFund || 0) +
     (this.miscFee || 0);
+
+  // Add arrears and subtract discount
+  this.totalAmount = baseFees + (this.arrears || 0) - (this.discount || 0);
+
+  // Ensure total amount is never negative
+  this.totalAmount = Math.max(0, this.totalAmount);
+
   next();
 });
 

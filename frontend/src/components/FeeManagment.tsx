@@ -38,6 +38,8 @@ import {
   AlertTriangle,
   Filter,
   X,
+  Percent,
+  DollarSign,
 } from "lucide-react";
 import { Textarea } from "./ui/textarea";
 import { Checkbox } from "./ui/checkbox";
@@ -56,7 +58,7 @@ interface Student {
   motherName: string;
   motherOccupation: string;
   rollNumber: string;
-  class?: string; // Add class information
+  class?: string;
 }
 
 interface ClassFeeStructure {
@@ -65,6 +67,16 @@ interface ClassFeeStructure {
   paperFund: number;
   examFee: number;
   miscFee: number;
+}
+
+interface StudentDiscount {
+  _id: string;
+  studentId: {
+    _id: string;
+    studentName: string;
+    rollNumber: string;
+  };
+  discount: number;
 }
 
 interface FeeChallan {
@@ -83,6 +95,8 @@ interface FeeChallan {
   examFee: number;
   miscFee: number;
   totalAmount: number;
+  arrears: number;
+  discount: number;
   dueDate: string;
   status: "pending" | "paid" | "overdue";
   generatedDate: string;
@@ -95,18 +109,12 @@ interface FeeManagementProps {
 
 export function FeeManagement({ students }: FeeManagementProps) {
   const [challans, setChallans] = useState<FeeChallan[]>([]);
+  const [studentDiscounts, setStudentDiscounts] = useState<StudentDiscount[]>(
+    []
+  );
   const [selectedStudent, setSelectedStudent] = useState<string>("");
   const [studentSearch, setStudentSearch] = useState("");
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
-  const [feeData, setFeeData] = useState({
-    month: "",
-    year: new Date().getFullYear().toString(),
-    tutionFee: 0,
-    paperFund: 0,
-    examFee: 0,
-    miscFee: 0,
-    dueDate: "",
-  });
   const [searchTerm, setSearchTerm] = useState("");
   const [whatsappMessage, setWhatsappMessage] = useState("");
   const [feeStructure, setFeeStructure] = useState<ClassFeeStructure[]>();
@@ -123,11 +131,17 @@ export function FeeManagement({ students }: FeeManagementProps) {
   const [lateFees, setLateFees] = useState<{ [key: string]: number }>({});
   const [showLateFeeInput, setShowLateFeeInput] = useState(false);
 
-  // New filter states
+  // Filter states
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [monthFilter, setMonthFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [whatsappFilter, setWhatsappFilter] = useState<string>("all");
+
+  // Discount management states
+  const [discountStudent, setDiscountStudent] = useState<string>("");
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [discountStudentSearch, setDiscountStudentSearch] = useState("");
+  const [showDiscountDropdown, setShowDiscountDropdown] = useState(false);
 
   const filteredStudents = students.filter(
     (student) =>
@@ -136,16 +150,45 @@ export function FeeManagement({ students }: FeeManagementProps) {
       student.fatherName.toLowerCase().includes(studentSearch.toLowerCase())
   );
 
+  const filteredDiscountStudents = students.filter(
+    (student) =>
+      student.studentName
+        .toLowerCase()
+        .includes(discountStudentSearch.toLowerCase()) ||
+      student.rollNumber
+        .toLowerCase()
+        .includes(discountStudentSearch.toLowerCase()) ||
+      student.fatherName
+        .toLowerCase()
+        .includes(discountStudentSearch.toLowerCase())
+  );
+
+  // Fetch data on component mount
   useEffect(() => {
-    const fetchFeeStructure = async () => {
-      const res = await axios.get(`${BACKEND}/api/fee-structures`, {
-        withCredentials: true,
-      });
-      console.log(res.data);
-      setFeeStructure(res.data);
-      console.log(feeStructure);
+    const fetchData = async () => {
+      try {
+        // Fetch fee structure
+        const feeStructureRes = await axios.get(
+          `${BACKEND}/api/fee-structures`,
+          {
+            withCredentials: true,
+          }
+        );
+        setFeeStructure(feeStructureRes.data);
+
+        // Fetch student discounts
+        const discountsRes = await axios.get(
+          `${BACKEND}/api/student-discounts`,
+          {
+            withCredentials: true,
+          }
+        );
+        setStudentDiscounts(discountsRes.data);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
     };
-    fetchFeeStructure();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -154,13 +197,9 @@ export function FeeManagement({ students }: FeeManagementProps) {
         const res = await axios.get(`${BACKEND}/api/fees`, {
           withCredentials: true,
         });
-        console.log(res.data.data);
 
-        // Update overdue statuses locally first
         const updatedChallans = updateOverdueStatuses(res.data.data);
         setChallans(updatedChallans);
-
-        // Then sync with backend if any changes were made
         syncOverdueStatusesWithBackend(updatedChallans);
       } catch (error) {
         console.error("Error fetching fees:", error);
@@ -169,18 +208,72 @@ export function FeeManagement({ students }: FeeManagementProps) {
     fetchFee();
   }, []);
 
-  // Function to check and update overdue statuses
+  // Calculate arrears for a student
+  const calculateArrears = (
+    studentId: string,
+    currentMonth: string,
+    currentYear: string
+  ): number => {
+    const months = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+
+    const currentMonthIndex = months.indexOf(currentMonth);
+    const currentYearNum = parseInt(currentYear);
+
+    let totalArrears = 0;
+
+    // Find unpaid fees before current month/year
+    challans.forEach((challan) => {
+      if (
+        challan.studentId._id === studentId &&
+        (challan.status === "pending" || challan.status === "overdue")
+      ) {
+        const challanYear = parseInt(challan.year);
+        const challanMonthIndex = months.indexOf(challan.month);
+
+        // Check if this challan is from before the current month/year
+        if (
+          challanYear < currentYearNum ||
+          (challanYear === currentYearNum &&
+            challanMonthIndex < currentMonthIndex)
+        ) {
+          totalArrears += challan.totalAmount;
+        }
+      }
+    });
+
+    return totalArrears;
+  };
+
+  // Get student discount
+  const getStudentDiscount = (studentId: string): number => {
+    const discountRecord = studentDiscounts.find(
+      (d) => d.studentId._id === studentId
+    );
+    return discountRecord ? discountRecord.discount : 0;
+  };
+
   const updateOverdueStatuses = (challansData: FeeChallan[]) => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
+    today.setHours(0, 0, 0, 0);
 
     return challansData.map((challan) => {
-      // Only update if currently pending and has a due date
       if (challan.status === "pending" && challan.dueDate) {
         const dueDate = new Date(challan.dueDate);
         dueDate.setHours(0, 0, 0, 0);
 
-        // If due date has passed, mark as overdue
         if (dueDate < today) {
           return {
             ...challan,
@@ -192,12 +285,10 @@ export function FeeManagement({ students }: FeeManagementProps) {
     });
   };
 
-  // Function to sync overdue statuses with backend
   const syncOverdueStatusesWithBackend = async (
     updatedChallans: FeeChallan[]
   ) => {
     try {
-      // Find challans that were updated to overdue
       const overdueChallans = updatedChallans.filter((challan, index) => {
         const originalChallan = challans[index];
         return (
@@ -208,13 +299,7 @@ export function FeeManagement({ students }: FeeManagementProps) {
       });
 
       if (overdueChallans.length > 0) {
-        console.log(
-          `Updating ${overdueChallans.length} challans to overdue status`
-        );
-
-        // Update backend with overdue statuses
         const feeIdsToUpdate = overdueChallans.map((c) => c.id);
-
         await axios.patch(
           `${BACKEND}/api/fees/bulk-update`,
           {
@@ -223,84 +308,50 @@ export function FeeManagement({ students }: FeeManagementProps) {
           },
           { withCredentials: true }
         );
-
-        console.log("Successfully updated overdue statuses in backend");
       }
     } catch (error) {
       console.error("Error syncing overdue statuses with backend:", error);
-      // Don't show alert to user as this is a background operation
     }
   };
 
-  // Auto-check for overdue fees every 5 minutes
   useEffect(() => {
     const checkOverdueInterval = setInterval(() => {
       setChallans((prevChallans) => {
         const updatedChallans = updateOverdueStatuses(prevChallans);
-
-        // Check if any changes were made
         const hasChanges = updatedChallans.some(
           (challan, index) => challan.status !== prevChallans[index]?.status
         );
 
         if (hasChanges) {
-          console.log("Auto-updating overdue statuses...");
           syncOverdueStatusesWithBackend(updatedChallans);
           return updatedChallans;
         }
-
         return prevChallans;
       });
-    }, 5 * 60 * 1000); // Check every 5 minutes
+    }, 5 * 60 * 1000);
 
     return () => clearInterval(checkOverdueInterval);
   }, []);
 
-  // Manual function to check and update overdue statuses (can be called by a button)
-  const manualCheckOverdue = async () => {
-    try {
-      const updatedChallans = updateOverdueStatuses(challans);
-      const hasChanges = updatedChallans.some(
-        (challan, index) => challan.status !== challans[index]?.status
-      );
-
-      if (hasChanges) {
-        setChallans(updatedChallans);
-        await syncOverdueStatusesWithBackend(updatedChallans);
-
-        const overdueCount = updatedChallans.filter(
-          (c) => c.status === "overdue"
-        ).length;
-        alert(`Status updated! Found ${overdueCount} overdue fee(s).`);
-      } else {
-        alert("All fee statuses are up to date.");
-      }
-    } catch (error) {
-      console.error("Error checking overdue statuses:", error);
-      alert("Error updating overdue statuses. Please try again.");
-    }
-  };
-
-  // Get pending fees for a specific student
   const getPendingFeesForStudent = (studentId: string) => {
-    return challans.filter(
-      (challan) =>
-        challan.studentId._id === studentId &&
-        (challan.status === "pending" || challan.status === "overdue")
-    );
-  };
+    return challans
+      .filter(
+        (challan) =>
+          challan.studentId._id === studentId &&
+          (challan.status === "pending" || challan.status === "overdue")
+      )
+      .map((challan) => ({
+        ...challan,
 
-  // Update pending fees when student is selected
+        displayAmount: challan.totalAmount - challan.arrears,
+      }));
+  };
   useEffect(() => {
     if (selectedStudent) {
       const pending = getPendingFeesForStudent(selectedStudent);
       setPendingFees(pending);
-
-      // Check if any pending fees are overdue and show late fee input
       const hasOverdueFees = pending.some((fee) => fee.status === "overdue");
       setShowLateFeeInput(hasOverdueFees);
-
-      // Initialize late fees object for overdue fees
       const initialLateFees: { [key: string]: number } = {};
       pending.forEach((fee) => {
         if (fee.status === "overdue") {
@@ -321,16 +372,89 @@ export function FeeManagement({ students }: FeeManagementProps) {
       `${student.studentName} - ${student.fatherName} (ID: ${student._id})`
     );
     setShowStudentDropdown(false);
-
-    // Clear any previous selections when switching students
     setSelectedPendingFees([]);
     setLateFees({});
+  };
+
+  const handleDiscountStudentSelect = (student: Student) => {
+    setDiscountStudent(student._id);
+    setDiscountStudentSearch(`${student.studentName} - ${student.rollNumber}`);
+    setShowDiscountDropdown(false);
+
+    // Load existing discount if any
+    const existingDiscount = getStudentDiscount(student._id);
+    setDiscountAmount(existingDiscount);
   };
 
   const handleSearchChange = (value: string) => {
     setStudentSearch(value);
     setSelectedStudent("");
     setShowStudentDropdown(value.length > 0);
+  };
+
+  const handleDiscountSearchChange = (value: string) => {
+    setDiscountStudentSearch(value);
+    setDiscountStudent("");
+    setShowDiscountDropdown(value.length > 0);
+  };
+
+  // Save or update student discount
+  const saveStudentDiscount = async () => {
+    if (!discountStudent || discountAmount < 0) {
+      alert("Please select a student and enter a valid discount amount.");
+      return;
+    }
+
+    try {
+      await axios.post(
+        `${BACKEND}/api/student-discounts`,
+        {
+          studentId: discountStudent,
+          discount: discountAmount,
+        },
+        { withCredentials: true }
+      );
+
+      // Refresh discounts list
+      const discountsRes = await axios.get(`${BACKEND}/api/student-discounts`, {
+        withCredentials: true,
+      });
+      setStudentDiscounts(discountsRes.data);
+
+      // Reset form
+      setDiscountStudent("");
+      setDiscountStudentSearch("");
+      setDiscountAmount(0);
+
+      alert("Student discount saved successfully!");
+    } catch (error) {
+      console.error("Error saving discount:", error);
+      alert("Failed to save discount. Please try again.");
+    }
+  };
+
+  // Delete student discount
+  const deleteStudentDiscount = async (discountId: string) => {
+    if (!confirm("Are you sure you want to delete this discount?")) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${BACKEND}/api/student-discounts/${discountId}`, {
+        withCredentials: true,
+      });
+
+      // Refresh discounts list
+      const discountsRes = await axios.get(`${BACKEND}/api/student-discounts`, {
+        withCredentials: true,
+      });
+      setStudentDiscounts(discountsRes.data);
+
+      alert("Student discount deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting discount:", error);
+      alert("Failed to delete discount. Please try again.");
+    }
   };
 
   const generateFeeChallan = async (
@@ -359,13 +483,26 @@ export function FeeManagement({ students }: FeeManagementProps) {
         return;
       }
 
+      // Calculate arrears for this student
+      const arrears = calculateArrears(studentId, month, year);
+
+      // Get student discount
+      const discount = getStudentDiscount(studentId);
+
       // Set due date to 10th of the month
       const dueDate = `${year}-${String(
         new Date(`${month} 1, ${year}`).getMonth() + 1
       ).padStart(2, "0")}-10`;
 
+      const baseFees =
+        classFee.tutionFee +
+        classFee.paperFund +
+        classFee.examFee +
+        classFee.miscFee;
+      const totalAmount = Math.max(0, baseFees + arrears - discount);
+
       const newChallan: FeeChallan = {
-        id: `${studentId}-${month}-${year}`, // This will be replaced by MongoDB _id
+        id: `${studentId}-${month}-${year}`,
         studentId: {
           _id: student._id,
           rollNumber: student.rollNumber,
@@ -379,11 +516,9 @@ export function FeeManagement({ students }: FeeManagementProps) {
         paperFund: classFee.paperFund,
         examFee: classFee.examFee,
         miscFee: classFee.miscFee,
-        totalAmount:
-          classFee.tutionFee +
-          classFee.paperFund +
-          classFee.examFee +
-          classFee.miscFee,
+        arrears: arrears,
+        discount: discount,
+        totalAmount: totalAmount,
         dueDate,
         status: "pending",
         generatedDate: new Date().toISOString().split("T")[0],
@@ -462,7 +597,6 @@ export function FeeManagement({ students }: FeeManagementProps) {
   };
 
   const downloadFeeChallanPDF = (challan: FeeChallan) => {
-    // Create a simple PDF-like content
     const pdfContent = `
 <!DOCTYPE html>
 <html>
@@ -477,6 +611,8 @@ export function FeeManagement({ students }: FeeManagementProps) {
         .fee-details th { background-color: #f2f2f2; }
         .total { font-weight: bold; font-size: 18px; }
         .footer { margin-top: 30px; text-align: center; font-size: 12px; }
+        .arrears { color: #e74c3c; }
+        .discount { color: #27ae60; }
     </style>
 </head>
 <body>
@@ -515,14 +651,27 @@ export function FeeManagement({ students }: FeeManagementProps) {
             <td>Miscellaneous Fee</td>
             <td>${challan.miscFee || 0}</td>
         </tr>
+        ${
+          challan.arrears > 0
+            ? `
+        <tr class="arrears">
+            <td><strong>Previous Arrears</strong></td>
+            <td><strong>+${challan.arrears}</strong></td>
+        </tr>`
+            : ""
+        }
+        ${
+          challan.discount > 0
+            ? `
+        <tr class="discount">
+            <td><strong>Discount</strong></td>
+            <td><strong>-${challan.discount}</strong></td>
+        </tr>`
+            : ""
+        }
         <tr class="total">
             <td>Total Amount</td>
-            <td>Rs. ${
-              (Number(challan.paperFund) || 0) +
-              (Number(challan.examFee) || 0) +
-              (Number(challan.miscFee) || 0) +
-              (Number(challan.tutionFee) || 0)
-            }</td>
+            <td>Rs. ${challan.totalAmount}</td>
         </tr>
     </table>
 
@@ -552,37 +701,30 @@ export function FeeManagement({ students }: FeeManagementProps) {
     }
 
     try {
-      console.log("Selected pending fees:", selectedPendingFees);
-      console.log("Late fees:", lateFees);
-
       // Check if any fees have late fees that need to be updated first
       const feesWithLateFees = selectedPendingFees.filter(
         (feeId) => lateFees[feeId] && lateFees[feeId] > 0
       );
 
-      // Step 1: Update late fees if any exist
+      // Update late fees if any exist
       if (feesWithLateFees.length > 0) {
-        // Update each fee with late fee individually using the existing updateFee route
         for (const feeId of feesWithLateFees) {
           const fee = challans.find((c) => c.id === feeId);
           if (!fee) continue;
 
           const lateFee = lateFees[feeId];
-
-          // Use the existing updateFee route (PUT/PATCH /api/fees/:id)
           await axios.put(
             `${BACKEND}/api/fees/${feeId}`,
             {
               ...fee,
               miscFee: fee.miscFee + lateFee,
-              // Don't update totalAmount - let the pre-save middleware handle it
             },
             { withCredentials: true }
           );
         }
       }
 
-      // Step 2: Update all selected fees to "paid" status using bulk update
+      // Update all selected fees to "paid" status using bulk update
       const updateResponse = await axios.patch(
         `${BACKEND}/api/fees/bulk-update`,
         {
@@ -593,7 +735,7 @@ export function FeeManagement({ students }: FeeManagementProps) {
       );
 
       if (updateResponse.status === 200) {
-        // Refresh the fees list to get the latest data
+        // Refresh the fees list
         const fetchResponse = await axios.get(`${BACKEND}/api/fees`, {
           withCredentials: true,
         });
@@ -628,35 +770,12 @@ export function FeeManagement({ students }: FeeManagementProps) {
       }
     } catch (error) {
       console.error("Error submitting fee payment:", error);
-
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as any).response === "object"
-      ) {
-        const response = (error as any).response;
-        console.error("Response data:", response.data);
-        console.error("Response status:", response.status);
-
-        if (response.data && response.data.message) {
-          alert(`Failed to submit fee payment: ${response.data.message}`);
-        } else {
-          alert(
-            "Failed to submit fee payment. Please check the console for details."
-          );
-        }
-      } else {
-        alert("Failed to submit fee payment. Please try again.");
-      }
+      alert("Failed to submit fee payment. Please try again.");
     }
   };
 
   const sendFeeReminder = async (challan: FeeChallan) => {
     try {
-      // Validate phone number exists
-      console.log(students);
-      console.log(challan.studentId);
       if (!challan.studentId.fPhoneNumber) {
         alert(
           `Phone number not available for ${challan.studentId.studentName}. Please update the student's phone number first.`
@@ -664,21 +783,17 @@ export function FeeManagement({ students }: FeeManagementProps) {
         return;
       }
 
-      // Clean and format phone number
       let phoneNumber = challan.studentId.fPhoneNumber
         .toString()
         .replace(/[\s-]/g, "");
 
-      // Remove any non-digit characters except +
       phoneNumber = phoneNumber.replace(/[^\d+]/g, "");
 
-      // Handle Pakistani phone number formatting
       if (phoneNumber.startsWith("+92")) {
-        phoneNumber = phoneNumber.substring(1); // Remove the + sign
+        phoneNumber = phoneNumber.substring(1);
       } else if (phoneNumber.startsWith("0")) {
-        phoneNumber = "92" + phoneNumber.substring(1); // Replace 0 with 92
+        phoneNumber = "92" + phoneNumber.substring(1);
       } else if (!phoneNumber.startsWith("92")) {
-        // If it doesn't start with 92, assume it's a local number starting with 3
         if (phoneNumber.startsWith("3")) {
           phoneNumber = "92" + phoneNumber;
         } else {
@@ -689,7 +804,6 @@ export function FeeManagement({ students }: FeeManagementProps) {
         }
       }
 
-      // Validate phone number length (Pakistani mobile numbers should be 13 digits with country code)
       if (phoneNumber.length < 12 || phoneNumber.length > 13) {
         alert(
           `Invalid phone number length for ${challan.studentId.studentName}: ${challan.studentId.fPhoneNumber}`
@@ -697,7 +811,6 @@ export function FeeManagement({ students }: FeeManagementProps) {
         return;
       }
 
-      // Format due date
       let dueDate = challan.dueDate;
       if (!dueDate) {
         const today = new Date();
@@ -729,18 +842,16 @@ export function FeeManagement({ students }: FeeManagementProps) {
         }
       }
 
-      // Format due date for display
       let formattedDueDate = dueDate;
       try {
         if (dueDate) {
           const dateObj = new Date(dueDate);
-          formattedDueDate = dateObj.toLocaleDateString("en-GB"); // DD/MM/YYYY format
+          formattedDueDate = dateObj.toLocaleDateString("en-GB");
         }
       } catch (error) {
         console.error("Error formatting due date:", error);
       }
 
-      // Create WhatsApp message
       const message =
         whatsappMessage ||
         `
@@ -750,33 +861,29 @@ Dear ${challan.studentId.fatherName || "Parent"},
 
 This is a reminder for ${challan.studentId.studentName}'s fee:
 
-📚 *Student Details:*
+Student Details:
 • Name: ${challan.studentId.studentName}
 • Roll Number: ${challan.studentId.rollNumber || "N/A"}
 
-📅 *Fee Details:*
+Fee Details:
 • Month: ${challan.month} ${challan.year}
 • Due Date: ${formattedDueDate}
 
-💰 *Fee Breakdown:*
+Fee Breakdown:
 • Tuition Fee: Rs. ${Number(challan.tutionFee) || 0}
 • Paper Fund: Rs. ${Number(challan.paperFund) || 0}
 • Exam Fee: Rs. ${Number(challan.examFee) || 0}
 • Miscellaneous Fee: Rs. ${Number(challan.miscFee) || 0}
+${challan.arrears > 0 ? `• Previous Arrears: Rs. ${challan.arrears}` : ""}
+${challan.discount > 0 ? `• Discount: Rs. -${challan.discount}` : ""}
 
-💳 *Total Amount: Rs. ${
-          challan.totalAmount ||
-          (Number(challan.tutionFee) || 0) +
-            (Number(challan.paperFund) || 0) +
-            (Number(challan.examFee) || 0) +
-            (Number(challan.miscFee) || 0)
-        }*
+Total Amount: Rs. ${challan.totalAmount}
 
 ${
   challan.status === "paid"
-    ? "✅ Thank you for your payment!"
+    ? "Thank you for your payment!"
     : challan.status === "overdue"
-    ? "⚠️ This payment is overdue. Please pay as soon as possible to avoid additional charges."
+    ? "This payment is overdue. Please pay as soon as possible to avoid additional charges."
     : "Please pay before the due date to avoid late fees."
 }
 
@@ -784,29 +891,19 @@ Best regards,
 Falcon House School Administration
     `.trim();
 
-      // Create WhatsApp URL
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
         message
       )}`;
 
-      console.log("Opening WhatsApp with:", {
-        phoneNumber,
-        originalPhone: challan.studentId.fPhoneNumber,
-        studentName: challan.studentId.studentName,
-      });
-
-      // Open WhatsApp
       window.open(whatsappUrl, "_blank");
 
       try {
-        // Update WhatsApp status in database
         await axios.patch(
           `${BACKEND}/api/fees/${challan.id}/whatsapp`,
           { sentToWhatsApp: true },
           { withCredentials: true }
         );
 
-        // Update local state
         setChallans((prevChallans) =>
           prevChallans.map((c) =>
             c.id === challan.id ? { ...c, sentToWhatsApp: true } : c
@@ -814,23 +911,15 @@ Falcon House School Administration
         );
       } catch (error) {
         console.error("Error updating WhatsApp status:", error);
-        // Don't show alert for this error as WhatsApp was still sent
       }
     } catch (error) {
       console.error("Error in sendFeeReminder:", error);
-      alert(
-        `Error sending WhatsApp reminder: ${
-          typeof error === "object" && error !== null && "message" in error
-            ? (error as { message?: string }).message
-            : String(error)
-        }`
-      );
+      alert("Error sending WhatsApp reminder. Please try again.");
     }
   };
 
   // Enhanced filtering logic
   const filteredChallans = challans.filter((challan) => {
-    // Text search
     const matchesSearch =
       challan.studentId.studentName
         .toLowerCase()
@@ -843,17 +932,10 @@ Falcon House School Administration
         ?.toLowerCase()
         .includes(searchTerm.toLowerCase());
 
-    // Status filter
     const matchesStatus =
       statusFilter === "all" || challan.status === statusFilter;
-
-    // Month filter
     const matchesMonth = monthFilter === "all" || challan.month === monthFilter;
-
-    // Year filter
     const matchesYear = yearFilter === "all" || challan.year === yearFilter;
-
-    // WhatsApp filter
     const matchesWhatsApp =
       whatsappFilter === "all" ||
       (whatsappFilter === "sent" && challan.sentToWhatsApp) ||
@@ -868,11 +950,9 @@ Falcon House School Administration
     );
   });
 
-  // Get unique months and years for filter options
   const uniqueMonths = Array.from(new Set(challans.map((c) => c.month)));
   const uniqueYears = Array.from(new Set(challans.map((c) => c.year)));
 
-  // Clear all filters
   const clearAllFilters = () => {
     setStatusFilter("all");
     setMonthFilter("all");
@@ -881,7 +961,6 @@ Falcon House School Administration
     setSearchTerm("");
   };
 
-  // Count active filters
   const activeFiltersCount = [
     statusFilter !== "all",
     monthFilter !== "all",
@@ -910,8 +989,8 @@ Falcon House School Administration
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Fee Management</h1>
         <p className="text-muted-foreground">
-          Generate fee challans, submit payments, and send notifications to
-          parents via WhatsApp
+          Generate fee challans with discounts and arrears, submit payments, and
+          send notifications
         </p>
       </div>
 
@@ -928,8 +1007,8 @@ Falcon House School Administration
             <CardHeader>
               <CardTitle>Generate Fee Challans</CardTitle>
               <CardDescription>
-                Generate fee challans for students based on their class fee
-                structure
+                Generate fee challans with automatic discount and arrears
+                calculation
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1063,6 +1142,26 @@ Falcon House School Administration
                   </div>
                 )}
 
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-800 mb-2">
+                    Automatic Calculations:
+                  </h4>
+                  <ul className="text-sm text-blue-700 space-y-1">
+                    <li>
+                      • <strong>Discounts:</strong> Individual student discounts
+                      will be automatically applied
+                    </li>
+                    <li>
+                      • <strong>Arrears:</strong> Any unpaid fees from previous
+                      months will be added automatically
+                    </li>
+                    <li>
+                      • <strong>Total Amount:</strong> Base fees + Arrears -
+                      Discount
+                    </li>
+                  </ul>
+                </div>
+
                 <Button
                   onClick={handleGenerateFees}
                   className="w-full"
@@ -1086,12 +1185,11 @@ Falcon House School Administration
             <CardHeader>
               <CardTitle>Submit Fee Payment</CardTitle>
               <CardDescription>
-                Submit payment for already generated fee challans only
+                Submit payment for generated fee challans
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Student Selection */}
                 <div className="space-y-2 relative">
                   <Label htmlFor="student">Search Student</Label>
                   <div className="relative">
@@ -1133,7 +1231,6 @@ Falcon House School Administration
                   )}
                 </div>
 
-                {/* Display Generated Fee Challans for Selected Student */}
                 {selectedStudent && (
                   <div className="space-y-4">
                     <div className="border rounded-lg p-4 bg-blue-50">
@@ -1200,7 +1297,12 @@ Falcon House School Administration
                                   {getStatusBadge(fee.status)}
                                   <div className="text-lg font-bold text-green-600 mt-1">
                                     Rs.{" "}
-                                    {fee.totalAmount + (lateFees[fee.id] || 0)}
+                                    {fee.tutionFee +
+                                      fee.paperFund +
+                                      fee.examFee +
+                                      fee.miscFee -
+                                      fee.discount +
+                                      (lateFees[fee.id] || 0)}
                                     {lateFees[fee.id] > 0 && (
                                       <span className="text-sm text-red-600 block">
                                         (+ Rs. {lateFees[fee.id]} late fee)
@@ -1210,7 +1312,7 @@ Falcon House School Administration
                                 </div>
                               </div>
 
-                              {/* Fee Breakdown */}
+                              {/* Enhanced Fee Breakdown */}
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                                 <div className="bg-gray-50 p-2 rounded">
                                   <div className="font-medium text-gray-600">
@@ -1245,6 +1347,47 @@ Falcon House School Administration
                                   </div>
                                 </div>
                               </div>
+
+                              {/* Additional Fee Information */}
+                              {(fee.arrears > 0 || fee.discount > 0) && (
+                                <div className="mt-3 pt-3 border-t">
+                                  <div className="grid grid-cols-2 gap-3 text-sm">
+                                    {fee.arrears > 0 && (
+                                      <div className="bg-red-50 p-2 rounded border border-red-200">
+                                        <div className="font-medium text-red-700">
+                                          Previous Arrears
+                                        </div>
+                                        <div className="font-semibold text-red-800">
+                                          + Rs. {fee.arrears}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {fee.discount > 0 && (
+                                      <div className="mt-3 pt-3 border-t">
+                                        <div className="grid grid-cols-1 gap-3 text-sm">
+                                          <div className="bg-green-50 p-2 rounded border border-green-200">
+                                            <div className="font-medium text-green-700">
+                                              Discount Applied
+                                            </div>
+                                            <div className="font-semibold text-green-800">
+                                              - Rs. {fee.discount}
+                                            </div>
+                                          </div>
+                                          {/* Note about arrears */}
+                                          <div className="bg-blue-50 p-2 rounded border border-blue-200">
+                                            <div className="text-xs text-blue-700">
+                                              <strong>Note:</strong> This shows
+                                              individual month fees. Previous
+                                              unpaid amounts are shown as
+                                              separate entries above.
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
 
                               {/* Late Fee Input for Overdue Fees */}
                               {fee.status === "overdue" && (
@@ -1288,7 +1431,7 @@ Falcon House School Administration
                                     </span>
                                   </div>
                                   <p className="text-xs text-red-600 mt-1">
-                                    💡 Due date was {fee.dueDate}. This fee is{" "}
+                                    Due date was {fee.dueDate}. This fee is{" "}
                                     {Math.ceil(
                                       (new Date().getTime() -
                                         new Date(fee.dueDate).getTime()) /
@@ -1303,9 +1446,9 @@ Falcon House School Administration
 
                           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                             <p className="text-sm text-yellow-800">
-                              💡 <strong>Note:</strong> Select the challans
-                              above that you want to mark as paid. You can
-                              select multiple months at once.
+                              <strong>Note:</strong> Select the challans above
+                              that you want to mark as paid. You can select
+                              multiple months at once.
                             </p>
                           </div>
                         </div>
@@ -1332,6 +1475,11 @@ Falcon House School Administration
                               >
                                 <span className="text-sm">
                                   {fee.month} {fee.year}
+                                  {fee.discount > 0 && (
+                                    <span className="text-green-600 ml-1">
+                                      (- Rs. {fee.discount} discount)
+                                    </span>
+                                  )}
                                   {lateFees[fee.id] > 0 && (
                                     <span className="text-red-600 ml-1">
                                       (+ Rs. {lateFees[fee.id]} late fee)
@@ -1340,7 +1488,12 @@ Falcon House School Administration
                                 </span>
                                 <span className="font-semibold">
                                   Rs.{" "}
-                                  {fee.totalAmount + (lateFees[fee.id] || 0)}
+                                  {fee.tutionFee +
+                                    fee.paperFund +
+                                    fee.examFee +
+                                    fee.miscFee -
+                                    fee.discount +
+                                    (lateFees[fee.id] || 0)}
                                 </span>
                               </div>
                             ))}
@@ -1357,7 +1510,11 @@ Falcon House School Administration
                                   .reduce(
                                     (sum, fee) =>
                                       sum +
-                                      fee.totalAmount +
+                                      (fee.tutionFee +
+                                        fee.paperFund +
+                                        fee.examFee +
+                                        fee.miscFee -
+                                        fee.discount) +
                                       (lateFees[fee.id] || 0),
                                     0
                                   )}
@@ -1398,7 +1555,13 @@ Falcon House School Administration
                             )
                             .reduce(
                               (sum, fee) =>
-                                sum + fee.totalAmount + (lateFees[fee.id] || 0),
+                                sum +
+                                (fee.tutionFee +
+                                  fee.paperFund +
+                                  fee.examFee +
+                                  fee.miscFee -
+                                  fee.discount) +
+                                (lateFees[fee.id] || 0),
                               0
                             )}
                         </span>
@@ -1431,10 +1594,10 @@ Falcon House School Administration
                 Fee Records ({filteredChallans.length} of {challans.length})
               </CardTitle>
               <CardDescription>
-                View and manage all fee payment records
+                View and manage all fee payment records with discounts and
+                arrears
               </CardDescription>
 
-              {/* Auto-Update Status Button */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Search className="h-4 w-4 text-muted-foreground" />
@@ -1445,15 +1608,6 @@ Falcon House School Administration
                     className="max-w-sm"
                   />
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={manualCheckOverdue}
-                  className="flex items-center gap-2"
-                >
-                  <AlertTriangle className="h-4 w-4" />
-                  Check Overdue
-                </Button>
               </div>
 
               {/* Filter Controls */}
@@ -1482,7 +1636,6 @@ Falcon House School Administration
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  {/* Status Filter */}
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">
                       Status
@@ -1503,7 +1656,6 @@ Falcon House School Administration
                     </Select>
                   </div>
 
-                  {/* Month Filter */}
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">
                       Month
@@ -1523,7 +1675,6 @@ Falcon House School Administration
                     </Select>
                   </div>
 
-                  {/* Year Filter */}
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">
                       Year
@@ -1546,7 +1697,6 @@ Falcon House School Administration
                     </Select>
                   </div>
 
-                  {/* WhatsApp Filter */}
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">
                       WhatsApp
@@ -1566,70 +1716,6 @@ Falcon House School Administration
                     </Select>
                   </div>
                 </div>
-
-                {/* Quick Filter Buttons */}
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    variant={statusFilter === "pending" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() =>
-                      setStatusFilter(
-                        statusFilter === "pending" ? "all" : "pending"
-                      )
-                    }
-                    className="h-7 text-xs"
-                  >
-                    Pending Fees
-                  </Button>
-                  <Button
-                    variant={statusFilter === "paid" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() =>
-                      setStatusFilter(statusFilter === "paid" ? "all" : "paid")
-                    }
-                    className="h-7 text-xs"
-                  >
-                    Paid Fees
-                  </Button>
-                  <Button
-                    variant={statusFilter === "overdue" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() =>
-                      setStatusFilter(
-                        statusFilter === "overdue" ? "all" : "overdue"
-                      )
-                    }
-                    className="h-7 text-xs"
-                  >
-                    Overdue Fees
-                  </Button>
-                  <Button
-                    variant={
-                      whatsappFilter === "not_sent" ? "default" : "outline"
-                    }
-                    size="sm"
-                    onClick={() =>
-                      setWhatsappFilter(
-                        whatsappFilter === "not_sent" ? "all" : "not_sent"
-                      )
-                    }
-                    className="h-7 text-xs"
-                  >
-                    Not Reminded
-                  </Button>
-                </div>
-
-                {/* Filter Summary */}
-                {filteredChallans.length !== challans.length && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm text-blue-800">
-                      📊 Showing <strong>{filteredChallans.length}</strong> of{" "}
-                      <strong>{challans.length}</strong> fee records
-                      {activeFiltersCount > 0 &&
-                        ` with ${activeFiltersCount} filter(s) applied`}
-                    </p>
-                  </div>
-                )}
               </div>
             </CardHeader>
 
@@ -1642,6 +1728,9 @@ Falcon House School Administration
                       <TableHead>Father</TableHead>
                       <TableHead>Roll Number</TableHead>
                       <TableHead>Month/Year</TableHead>
+                      <TableHead>Base Amount</TableHead>
+                      <TableHead>Arrears</TableHead>
+                      <TableHead>Discount</TableHead>
                       <TableHead>Total Amount</TableHead>
                       <TableHead>Due Date</TableHead>
                       <TableHead>Status</TableHead>
@@ -1653,7 +1742,7 @@ Falcon House School Administration
                     {filteredChallans.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={9}
+                          colSpan={12}
                           className="text-center text-muted-foreground py-8"
                         >
                           {activeFiltersCount > 0 || searchTerm ? (
@@ -1686,10 +1775,31 @@ Falcon House School Administration
                           </TableCell>
                           <TableCell>
                             Rs.{" "}
-                            {(Number(challan.examFee) || 0) +
-                              (Number(challan.miscFee) || 0) +
-                              (Number(challan.tutionFee) || 0) +
-                              (Number(challan.paperFund) || 0)}
+                            {(Number(challan.tutionFee) || 0) +
+                              (Number(challan.paperFund) || 0) +
+                              (Number(challan.examFee) || 0) +
+                              (Number(challan.miscFee) || 0)}
+                          </TableCell>
+                          <TableCell>
+                            {challan.arrears > 0 ? (
+                              <span className="text-red-600 font-semibold">
+                                +Rs. {challan.arrears}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {challan.discount > 0 ? (
+                              <span className="text-green-600 font-semibold">
+                                -Rs. {challan.discount}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                            Rs. {challan.totalAmount}
                           </TableCell>
                           <TableCell>{challan.dueDate}</TableCell>
                           <TableCell>
@@ -1755,12 +1865,13 @@ Falcon House School Administration
                     placeholder="Enter custom WhatsApp reminder message template..."
                     value={whatsappMessage}
                     onChange={(e) => setWhatsappMessage(e.target.value)}
-                    rows={10}
+                    rows={12}
                   />
                   <p className="text-sm text-muted-foreground">
-                    Leave empty to use default template. Available variables:
-                    Student name, father name, fees breakdown, total amount, due
-                    date, payment status.
+                    Leave empty to use default template. The template will
+                    automatically include: student name, father name, fees
+                    breakdown, arrears, discounts, total amount, due date, and
+                    payment status.
                   </p>
                 </div>
                 <Button
@@ -1833,13 +1944,6 @@ Falcon House School Administration
                     </div>
                   ))}
                 </div>
-                <Button
-                  onClick={() => setFeeStructure(feeStructure)}
-                  variant="outline"
-                  className="mt-4"
-                >
-                  Reset to Default Fee Structure
-                </Button>
               </div>
             </CardContent>
           </Card>
