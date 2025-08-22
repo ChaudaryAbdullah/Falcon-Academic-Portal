@@ -21,7 +21,7 @@ interface Student {
   motherName: string;
   motherOccupation: string;
   rollNumber: string;
-  class?: string;
+  class: string;
 }
 
 interface ClassFeeStructure {
@@ -50,6 +50,7 @@ interface FeeChallan {
     studentName: string;
     fatherName: string;
     fPhoneNumber: string;
+    class: string;
   };
   month: string;
   year: string;

@@ -10,6 +10,7 @@ import {
   Receipt,
   LucideReceiptText,
   Percent,
+  BarChart3,
 } from "lucide-react";
 
 interface AdminSidebarProps {
@@ -52,6 +53,11 @@ export default function AdminSidebar({
       icon: <Percent className="w-4 h-4 mr-3" />,
       label: "Student Discount",
       value: "studentDiscount",
+    },
+    {
+      icon: <BarChart3 className="w-4 h-4 mr-3" />,
+      label: "Fee Reports",
+      value: "fee-reports",
     },
   ];
 

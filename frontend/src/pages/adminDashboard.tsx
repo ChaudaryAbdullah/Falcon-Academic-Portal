@@ -17,6 +17,7 @@ import FeeStructure from "../components/FeeStructure";
 import StudentDiscount from "../components/StudentDiscount";
 import axios from "axios";
 import { Toaster } from "sonner";
+import FeeReports from "../components/FeeReports";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -124,6 +125,8 @@ export default function AdminDashboard() {
         return (
           <StudentDiscount students={students} setStudents={setStudents} />
         );
+      case "fee-reports":
+        return <FeeReports />;
       default:
         return (
           <div className="space-y-6">

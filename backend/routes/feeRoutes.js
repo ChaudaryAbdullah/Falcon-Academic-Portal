@@ -9,6 +9,10 @@ import {
   generateBulkFees,
   bulkUpdateFeeStatus,
   updateWhatsAppStatus,
+  // New report endpoints
+  getClassSectionReport,
+  getStudentReport,
+  getSummaryReport,
 } from "../controllers/feeController.js";
 
 const router = express.Router();
@@ -29,5 +33,10 @@ router.patch("/bulk-update", bulkUpdateFeeStatus);
 
 // WhatsApp status update
 router.patch("/:feeId/whatsapp", updateWhatsAppStatus);
+
+// Report routes
+router.get("/reports/class-section", getClassSectionReport);
+router.get("/reports/student/:studentId", getStudentReport);
+router.get("/reports/summary", getSummaryReport);
 
 export default router;

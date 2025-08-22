@@ -40,6 +40,7 @@ interface FeeChallan {
     studentName: string;
     fatherName: string;
     fPhoneNumber: string;
+    class: string;
   };
   month: string;
   year: string;
@@ -389,35 +390,33 @@ export function SubmitPaymentTab({
                           <div className="mt-3 pt-3 border-t">
                             <div className="grid grid-cols-2 gap-3 text-sm">
                               {fee.arrears > 0 && (
-                                <div className="bg-red-50 p-2 rounded border border-red-200">
-                                  <div className="font-medium text-red-700">
-                                    Previous Arrears
+                                <div className="grid grid-cols-1 gap-3 text-sm">
+                                  <div className="bg-red-50 p-2 rounded border border-red-200">
+                                    <div className="font-medium text-red-700">
+                                      Previous Arrears
+                                    </div>
+                                    <div className="font-semibold text-red-800">
+                                      Rs. {fee.arrears}
+                                    </div>
                                   </div>
-                                  <div className="font-semibold text-red-800">
-                                    + Rs. {fee.arrears}
+                                  {/* Note about arrears */}
+                                  <div className="bg-blue-50 p-2 rounded border border-blue-200">
+                                    <div className="text-xs text-blue-700">
+                                      <strong>Note:</strong> This shows
+                                      individual month fees. Previous unpaid
+                                      amounts are shown as separate entries
+                                      below.
+                                    </div>
                                   </div>
                                 </div>
                               )}
                               {fee.discount > 0 && (
-                                <div className="mt-3 pt-3 border-t">
-                                  <div className="grid grid-cols-1 gap-3 text-sm">
-                                    <div className="bg-green-50 p-2 rounded border border-green-200">
-                                      <div className="font-medium text-green-700">
-                                        Discount Applied
-                                      </div>
-                                      <div className="font-semibold text-green-800">
-                                        - Rs. {fee.discount}
-                                      </div>
-                                    </div>
-                                    {/* Note about arrears */}
-                                    <div className="bg-blue-50 p-2 rounded border border-blue-200">
-                                      <div className="text-xs text-blue-700">
-                                        <strong>Note:</strong> This shows
-                                        individual month fees. Previous unpaid
-                                        amounts are shown as separate entries
-                                        above.
-                                      </div>
-                                    </div>
+                                <div className="bg-green-50 p-2 rounded border border-green-200">
+                                  <div className="font-medium text-green-700">
+                                    Discount Applied
+                                  </div>
+                                  <div className="font-semibold text-green-800">
+                                    Rs. {fee.discount}
                                   </div>
                                 </div>
                               )}

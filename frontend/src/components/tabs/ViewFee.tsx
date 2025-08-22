@@ -39,6 +39,7 @@ interface FeeChallan {
     studentName: string;
     fatherName: string;
     fPhoneNumber: string;
+    class: string;
   };
   month: string;
   year: string;
@@ -247,6 +248,7 @@ Falcon House School Administration
         <p><strong>Student Name:</strong> ${challan.studentId.studentName}</p>
         <p><strong>Father Name:</strong> ${challan.studentId.fatherName}</p>
         <p><strong>Roll Number:</strong> ${challan.studentId.rollNumber}</p>
+        <p><strong>Class:</strong> ${challan.studentId.class}</p>
         <p><strong>Month/Year:</strong> ${challan.month} ${challan.year}</p>
         <p><strong>Due Date:</strong> ${challan.dueDate}</p>
         <p><strong>Challan ID:</strong> ${challan.id}</p>
@@ -287,7 +289,7 @@ Falcon House School Administration
             ? `
         <tr class="discount">
             <td><strong>Discount</strong></td>
-            <td><strong>-${challan.discount}</strong></td>
+            <td><strong>${challan.discount}</strong></td>
         </tr>`
             : ""
         }
@@ -326,7 +328,8 @@ Falcon House School Administration
       challan.month.toLowerCase().includes(searchTerm.toLowerCase()) ||
       challan.studentId.rollNumber
         ?.toLowerCase()
-        .includes(searchTerm.toLowerCase());
+        .includes(searchTerm.toLowerCase()) ||
+      challan.studentId.class?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
       statusFilter === "all" || challan.status === statusFilter;
@@ -501,6 +504,7 @@ Falcon House School Administration
                 <TableHead>Student</TableHead>
                 <TableHead>Father</TableHead>
                 <TableHead>Roll Number</TableHead>
+                <TableHead>Class</TableHead>
                 <TableHead>Month/Year</TableHead>
                 <TableHead>Base Amount</TableHead>
                 <TableHead>Arrears</TableHead>
@@ -544,6 +548,7 @@ Falcon House School Administration
                     </TableCell>
                     <TableCell>{challan.studentId.fatherName}</TableCell>
                     <TableCell>{challan.studentId.rollNumber}</TableCell>
+                    <TableCell>{challan.studentId.class}</TableCell>
                     <TableCell>
                       {challan.month} {challan.year}
                     </TableCell>
