@@ -52,17 +52,18 @@ export const getFeeStructureById = async (req, res) => {
 // Update fee structure
 export const updateFeeStructure = async (req, res) => {
   try {
+    console.log(req.body);
     const feeStructure = await FeeStructure.findById(req.params.id);
 
     if (!feeStructure) {
       return res.status(404).json({ message: "Fee structure not found" });
     }
 
-    feeStructure.className = req.body.className || feeStructure.className;
-    feeStructure.tutionFee = req.body.tutionFee || feeStructure.tutionFee;
-    feeStructure.examFee = req.body.examFee || feeStructure.examFee;
-    feeStructure.paperFund = req.body.paperFund || feeStructure.paperFund;
-    feeStructure.miscFee = req.body.miscFee || feeStructure.miscFee;
+    feeStructure.className = req.body.className;
+    feeStructure.tutionFee = req.body.tutionFee;
+    feeStructure.examFee = req.body.examFee;
+    feeStructure.paperFund = req.body.paperFund;
+    feeStructure.miscFee = req.body.miscFee;
 
     const updatedFeeStructure = await feeStructure.save();
     res.json(updatedFeeStructure);

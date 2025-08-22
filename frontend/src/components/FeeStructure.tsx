@@ -24,7 +24,7 @@ import {
 } from "./ui/table";
 import { Badge } from "./ui/badge";
 import { Pencil, Trash2, Plus, Save, X, Table2 } from "lucide-react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import axios from "axios";
 const BACKEND = import.meta.env.VITE_BACKEND; // your backend URL
 
@@ -47,8 +47,16 @@ interface FeeStructureForm {
   miscFee: string;
 }
 
-export default function FeeStructure() {
-  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
+interface FeeStructureProps {
+  feeStructures: FeeStructure[];
+  setFeeStructures: (feeStuctures: FeeStructure[]) => void;
+}
+
+export default function FeeStructure({
+  feeStructures,
+  setFeeStructures,
+}: FeeStructureProps) {
+  // const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("list");
@@ -59,16 +67,6 @@ export default function FeeStructure() {
     paperFund: "",
     miscFee: "",
   });
-
-  // Mock data for demonstration
-  useEffect(() => {
-    const fetchFeeStructure = async () => {
-      const res = await axios.get(`${BACKEND}/api/fee-structures`);
-      console.log(res.data);
-      setFeeStructures(res.data);
-    };
-    fetchFeeStructure();
-  }, []);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -236,7 +234,7 @@ export default function FeeStructure() {
                       className="border border-gray-250 shadow-xs rounded-lg px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">-- Select Class --</option>
-                      <option value="Pre Nursery">Pre Nursery</option>
+                      <option value="Play">Play</option>
                       <option value="Nursery">Nursery</option>
                       <option value="Prep">Prep</option>
                       <option value="1">1</option>
@@ -417,7 +415,6 @@ export default function FeeStructure() {
           </Card>
         </TabsContent>
       </Tabs>
-      <Toaster position="top-right" richColors />
     </div>
   );
 }
