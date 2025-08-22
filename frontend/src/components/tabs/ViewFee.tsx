@@ -379,11 +379,32 @@ Falcon House School Administration
     }
   };
 
+  // Add inside your component
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50; // change as needed
+
+  // Calculate paginated challans
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentChallans = filteredChallans.slice(
+    indexOfFirstItem,
+    indexOfLastItem
+  );
+
+  const totalPages = Math.ceil(filteredChallans.length / itemsPerPage);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>
-          Fee Records ({filteredChallans.length} of {challans.length})
+          Fee Records ({indexOfFirstItem + 1} - {indexOfLastItem} of{" "}
+          {filteredChallans.length})
         </CardTitle>
         <CardDescription>
           View and manage all fee payment records with discounts and arrears
@@ -541,7 +562,7 @@ Falcon House School Administration
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredChallans.map((challan) => (
+                currentChallans.map((challan) => (
                   <TableRow key={challan.id}>
                     <TableCell className="font-medium">
                       {challan.studentId.studentName}
@@ -618,6 +639,30 @@ Falcon House School Administration
               )}
             </TableBody>
           </Table>
+          {filteredChallans.length > 0 && (
+            <div className="flex justify-center items-center space-x-2 mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => handlePageChange(currentPage - 1)}
+              >
+                Previous
+              </Button>
+
+              <span className="text-sm">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => handlePageChange(currentPage + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
