@@ -47,8 +47,16 @@ interface FeeStructureForm {
   miscFee: string;
 }
 
-export default function FeeStructure() {
-  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
+interface FeeStructureProps {
+  feeStructures: FeeStructure[];
+  setFeeStructures: (feeStuctures: FeeStructure[]) => void;
+}
+
+export default function FeeStructure({
+  feeStructures,
+  setFeeStructures,
+}: FeeStructureProps) {
+  // const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("list");
@@ -59,16 +67,6 @@ export default function FeeStructure() {
     paperFund: "",
     miscFee: "",
   });
-
-  // Mock data for demonstration
-  useEffect(() => {
-    const fetchFeeStructure = async () => {
-      const res = await axios.get(`${BACKEND}/api/fee-structures`);
-      console.log(res.data);
-      setFeeStructures(res.data);
-    };
-    fetchFeeStructure();
-  }, []);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>

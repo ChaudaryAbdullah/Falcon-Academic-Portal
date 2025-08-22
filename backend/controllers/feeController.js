@@ -1,5 +1,4 @@
 import { Fee } from "../models/fee.js";
-import { StudentDiscount } from "../models/studentDiscount.js";
 import mongoose from "mongoose";
 
 // Create Fee Record
@@ -54,68 +53,6 @@ export const getFees = async (req, res) => {
   }
 };
 
-// Calculate arrears for a student
-const calculateArrears = async (studentId, currentMonth, currentYear) => {
-  try {
-    // Find all unpaid fees for this student
-    const unpaidFees = await Fee.find({
-      studentId: studentId,
-      status: { $in: ["pending", "overdue"] },
-      $or: [
-        { year: { $lt: currentYear } },
-        {
-          year: currentYear,
-          month: {
-            $in: getMonthsBefore(currentMonth),
-          },
-        },
-      ],
-    });
-
-    // Calculate total arrears
-    const totalArrears = unpaidFees.reduce((sum, fee) => {
-      return sum + (fee.totalAmount - fee.discount);
-    }, 0);
-
-    return Math.max(0, totalArrears);
-  } catch (error) {
-    console.error("Error calculating arrears:", error);
-    return 0;
-  }
-};
-
-// Helper function to get months before current month
-const getMonthsBefore = (currentMonth) => {
-  const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
-
-  const currentIndex = months.indexOf(currentMonth);
-  return months.slice(0, currentIndex);
-};
-
-// Get student discount
-const getStudentDiscount = async (studentId) => {
-  try {
-    const discountRecord = await StudentDiscount.findOne({ studentId });
-    return discountRecord ? discountRecord.discount : 0;
-  } catch (error) {
-    console.error("Error fetching student discount:", error);
-    return 0;
-  }
-};
-
 // Generate Bulk Fee Challans with Discounts and Arrears
 export const generateBulkFees = async (req, res) => {
   try {
@@ -148,16 +85,6 @@ export const generateBulkFees = async (req, res) => {
           continue;
         }
 
-        // Calculate arrears for this student
-        const arrears = await calculateArrears(
-          challanData.studentId._id,
-          challanData.month,
-          challanData.year
-        );
-
-        // Get student discount
-        const discount = await getStudentDiscount(challanData.studentId._id);
-
         // Create new fee challan with arrears and discount
         const feeData = {
           studentId: challanData.studentId._id,
@@ -167,8 +94,8 @@ export const generateBulkFees = async (req, res) => {
           paperFund: challanData.paperFund || 0,
           examFee: challanData.examFee || 0,
           miscFee: challanData.miscFee || 0,
-          arrears: arrears,
-          discount: discount,
+          arrears: challanData.arrears || 0,
+          discount: challanData.discount || 0,
           dueDate: new Date(challanData.dueDate),
           status: challanData.status || "pending",
           generatedDate: new Date(challanData.generatedDate || new Date()),

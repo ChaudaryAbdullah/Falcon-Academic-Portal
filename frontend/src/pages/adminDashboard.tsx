@@ -24,6 +24,9 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [feeStructure, setFeeStructure] = useState([]);
+  const [studentDiscounts, setStudentDiscounts] = useState([]);
+  const [challans, setChallans] = useState([]);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -47,6 +50,48 @@ export default function AdminDashboard() {
     fetchTeachers();
   }, []);
 
+  // Fetch data on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch fee structure
+        const feeStructureRes = await axios.get(
+          `${BACKEND}/api/fee-structures`,
+          {
+            withCredentials: true,
+          }
+        );
+        setFeeStructure(feeStructureRes.data);
+
+        // Fetch student discounts
+        const discountsRes = await axios.get(
+          `${BACKEND}/api/student-discounts`,
+          {
+            withCredentials: true,
+          }
+        );
+        setStudentDiscounts(discountsRes.data);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    const fetchFee = async () => {
+      try {
+        const res = await axios.get(`${BACKEND}/api/fees`, {
+          withCredentials: true,
+        });
+        setChallans(res.data.data);
+      } catch (error) {
+        console.error("Error fetching fees:", error);
+      }
+    };
+    fetchFee();
+  }, []);
+
   const renderContent = () => {
     switch (activeTab) {
       case "students":
@@ -58,9 +103,23 @@ export default function AdminDashboard() {
           <TeacherManagement teachers={teachers} setTeachers={setTeachers} />
         );
       case "fees":
-        return <FeeManagement students={students} />;
+        return (
+          <FeeManagement
+            students={students}
+            feeStructure={feeStructure}
+            setFeeStructure={setFeeStructure}
+            studentDiscounts={studentDiscounts}
+            challans={challans}
+            setChallans={setChallans}
+          />
+        );
       case "feeStructure":
-        return <FeeStructure />;
+        return (
+          <FeeStructure
+            feeStructures={feeStructure}
+            setFeeStructures={setFeeStructure}
+          />
+        );
       case "studentDiscount":
         return (
           <StudentDiscount students={students} setStudents={setStudents} />

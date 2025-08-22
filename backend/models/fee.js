@@ -89,8 +89,8 @@ feeSchema.pre("save", function (next) {
     (this.paperFund || 0) +
     (this.miscFee || 0);
 
-  // Add arrears and subtract discount
-  this.totalAmount = baseFees + (this.arrears || 0) - (this.discount || 0);
+  // Subtract discount
+  this.totalAmount = baseFees - (this.discount || 0);
 
   // Ensure total amount is never negative
   this.totalAmount = Math.max(0, this.totalAmount);

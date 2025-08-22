@@ -103,19 +103,28 @@ interface FeeChallan {
 
 interface FeeManagementProps {
   students: Student[];
+  feeStructure: ClassFeeStructure[];
+  setFeeStructure: (feeStuctures: ClassFeeStructure[]) => void;
+  studentDiscounts: StudentDiscount[];
+  setStudentDiscounts: (studentDiscounts: StudentDiscount[]) => void;
+  challans: FeeChallan[];
+  setChallans: (challans: FeeChallan[]) => void;
 }
 
-export function FeeManagement({ students }: FeeManagementProps) {
-  const [challans, setChallans] = useState<FeeChallan[]>([]);
-  const [studentDiscounts, setStudentDiscounts] = useState<StudentDiscount[]>(
-    []
-  );
+export function FeeManagement({
+  students,
+  feeStructure,
+  setFeeStructure,
+  studentDiscounts,
+  challans,
+  setChallans,
+}: FeeManagementProps) {
+  // const [challans, setChallans] = useState<FeeChallan[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string>("");
   const [studentSearch, setStudentSearch] = useState("");
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [whatsappMessage, setWhatsappMessage] = useState("");
-  const [feeStructure, setFeeStructure] = useState<ClassFeeStructure[]>();
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedYear, setSelectedYear] = useState(
@@ -142,49 +151,10 @@ export function FeeManagement({ students }: FeeManagementProps) {
       student.fatherName.toLowerCase().includes(studentSearch.toLowerCase())
   );
 
-  // Fetch data on component mount
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch fee structure
-        const feeStructureRes = await axios.get(
-          `${BACKEND}/api/fee-structures`,
-          {
-            withCredentials: true,
-          }
-        );
-        setFeeStructure(feeStructureRes.data);
-
-        // Fetch student discounts
-        const discountsRes = await axios.get(
-          `${BACKEND}/api/student-discounts`,
-          {
-            withCredentials: true,
-          }
-        );
-        setStudentDiscounts(discountsRes.data);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    };
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    const fetchFee = async () => {
-      try {
-        const res = await axios.get(`${BACKEND}/api/fees`, {
-          withCredentials: true,
-        });
-
-        const updatedChallans = updateOverdueStatuses(res.data.data);
-        setChallans(updatedChallans);
-        syncOverdueStatusesWithBackend(updatedChallans);
-      } catch (error) {
-        console.error("Error fetching fees:", error);
-      }
-    };
-    fetchFee();
+    const updatedChallans = updateOverdueStatuses(challans);
+    setChallans(updatedChallans);
+    syncOverdueStatusesWithBackend(updatedChallans);
   }, []);
 
   // Calculate arrears for a student
@@ -307,7 +277,7 @@ export function FeeManagement({ students }: FeeManagementProps) {
         }
         return prevChallans;
       });
-    }, 5 * 60 * 1000);
+    }, 10 * 60 * 1000);
 
     return () => clearInterval(checkOverdueInterval);
   }, []);
@@ -560,7 +530,7 @@ export function FeeManagement({ students }: FeeManagementProps) {
             ? `
         <tr class="arrears">
             <td><strong>Previous Arrears</strong></td>
-            <td><strong>+${challan.arrears}</strong></td>
+            <td><strong>${challan.arrears}</strong></td>
         </tr>`
             : ""
         }
@@ -575,7 +545,7 @@ export function FeeManagement({ students }: FeeManagementProps) {
         }
         <tr class="total">
             <td>Total Amount</td>
-            <td>Rs. ${challan.totalAmount}</td>
+            <td>Rs. ${challan.totalAmount + challan.arrears}</td>
         </tr>
     </table>
 
@@ -781,7 +751,7 @@ Fee Breakdown:
 ${challan.arrears > 0 ? `• Previous Arrears: Rs. ${challan.arrears}` : ""}
 ${challan.discount > 0 ? `• Discount: Rs. -${challan.discount}` : ""}
 
-Total Amount: Rs. ${challan.totalAmount}
+Total Amount: Rs. ${challan.totalAmount + challan.arrears}
 
 ${
   challan.status === "paid"
@@ -808,7 +778,7 @@ Falcon House School Administration
           { withCredentials: true }
         );
 
-        setChallans((prevChallans) =>
+        setChallans((prevChallans: any[]) =>
           prevChallans.map((c) =>
             c.id === challan.id ? { ...c, sentToWhatsApp: true } : c
           )
@@ -1703,7 +1673,7 @@ Falcon House School Administration
                             )}
                           </TableCell>
                           <TableCell className="font-semibold">
-                            Rs. {challan.totalAmount}
+                            Rs. {challan.totalAmount + challan.arrears}
                           </TableCell>
                           <TableCell>{challan.dueDate}</TableCell>
                           <TableCell>
