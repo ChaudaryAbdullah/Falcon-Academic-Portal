@@ -13,6 +13,7 @@ import {
   getClassSectionReport,
   getStudentReport,
   getSummaryReport,
+  getAvailableYears,
 } from "../controllers/feeController.js";
 
 const router = express.Router();
@@ -33,6 +34,9 @@ router.patch("/bulk-update", bulkUpdateFeeStatus);
 
 // WhatsApp status update
 router.patch("/:feeId/whatsapp", updateWhatsAppStatus);
+
+//Get years from database
+router.get("/available-years", getAvailableYears);
 
 // Report routes
 router.get("/reports/class-section", getClassSectionReport);

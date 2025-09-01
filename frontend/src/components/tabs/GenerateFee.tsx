@@ -40,7 +40,6 @@ interface Student {
 interface ClassFeeStructure {
   className: string;
   tutionFee: number;
-  paperFund: number;
   examFee: number;
   miscFee: number;
 }
@@ -68,7 +67,6 @@ interface FeeChallan {
   month: string;
   year: string;
   tutionFee: number;
-  paperFund: number;
   examFee: number;
   miscFee: number;
   totalAmount: number;
@@ -222,11 +220,7 @@ export function GenerateFeeTab({
         new Date(`${month} 1, ${year}`).getMonth() + 1
       ).padStart(2, "0")}-10`;
 
-      const baseFees =
-        classFee.tutionFee +
-        classFee.paperFund +
-        classFee.examFee +
-        classFee.miscFee;
+      const baseFees = classFee.tutionFee + classFee.examFee + classFee.miscFee;
       const totalAmount = Math.max(0, baseFees + arrears - discount);
 
       const newChallan: FeeChallan = {
@@ -242,7 +236,6 @@ export function GenerateFeeTab({
         month,
         year,
         tutionFee: classFee.tutionFee,
-        paperFund: classFee.paperFund,
         examFee: classFee.examFee,
         miscFee: classFee.miscFee,
         arrears: arrears,

@@ -106,9 +106,12 @@ interface SummaryData {
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
-export default function FeeReports() {
+interface FeeReportProps {
+  students: Student[];
+}
+
+export default function FeeReports({ students }: FeeReportProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showStudentResults, setShowStudentResults] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -117,7 +120,18 @@ export default function FeeReports() {
     useState<StudentReportData | null>(null);
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
 
-  const [reportFilters, setReportFilters] = useState({});
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+
+  // Initialize reportFilters with default values
+  const [reportFilters, setReportFilters] = useState({
+    reportType: "all-students",
+    class: "",
+    section: "",
+    month: "all",
+    year: new Date().getFullYear().toString(),
+  });
 
   const months = [
     { value: "all", label: "All Months" },
@@ -135,21 +149,45 @@ export default function FeeReports() {
     { value: "December", label: "December" },
   ];
 
-  // Fetch students on component mount
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        const response = await axios.get(`${BACKEND}/api/students`, {
-          withCredentials: true,
-        });
-        setStudents(response.data.data || []);
-      } catch (error) {
-        console.error("Error fetching students:", error);
-        toast.error("Failed to load students");
-      }
-    };
-    fetchStudents();
-  }, []);
+  // Available classes based on your student model
+  const classes = [
+    { value: "Play", label: "Play" },
+    { value: "Nursery", label: "Nursery" },
+    { value: "Prep", label: "Prep" },
+    { value: "1", label: "Class 1" },
+    { value: "2", label: "Class 2" },
+    { value: "3", label: "Class 3" },
+    { value: "4", label: "Class 4" },
+    { value: "5", label: "Class 5" },
+    { value: "6", label: "Class 6" },
+    { value: "7", label: "Class 7" },
+    { value: "8", label: "Class 8" },
+    { value: "9", label: "Class 9" },
+    { value: "10", label: "Class 10" },
+  ];
+
+  // Available sections based on your student model
+  const sections = [
+    { value: "Red", label: "Red" },
+    { value: "Blue", label: "Blue" },
+    { value: "Pink", label: "Pink" },
+    { value: "Green", label: "Green" },
+    { value: "Yellow", label: "Yellow" },
+    { value: "White", label: "White" },
+  ];
+
+  // Generate years dynamically (current year + 3 previous years)
+  const generateYears = () => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let i = 0; i < 3; i++) {
+      const year = currentYear - i;
+      years.push({ value: year.toString(), label: year.toString() });
+    }
+    return years;
+  };
+
+  const years = generateYears();
 
   // Load summary data on component mount
   useEffect(() => {
@@ -169,7 +207,80 @@ export default function FeeReports() {
     loadStudentReport(student._id);
   };
 
+  // Calculate report summary totals
+  const getReportSummary = () => {
+    if (reportData.length === 0) {
+      return {
+        totalFee: 0,
+        totalCollected: 0,
+        totalRemaining: 0,
+        collectionPercentage: 0,
+      };
+    }
+
+    const totalFee = reportData.reduce(
+      (sum, record) => sum + (record.totalFee || 0),
+      0
+    );
+    const totalCollected = reportData.reduce(
+      (sum, record) => sum + (record.paidAmount || 0),
+      0
+    );
+    const totalRemaining = reportData.reduce(
+      (sum, record) => sum + (record.pendingAmount || 0),
+      0
+    );
+    const collectionPercentage =
+      totalFee > 0 ? Math.round((totalCollected / totalFee) * 100) : 0;
+
+    return {
+      totalFee,
+      totalCollected,
+      totalRemaining,
+      collectionPercentage,
+    };
+  };
+
+  // Pagination logic
+  const totalPages = Math.ceil(reportData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentData = reportData.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
+
   const generateReport = async () => {
+    // Validate required fields
+    if (!reportFilters.reportType || !reportFilters.year) {
+      toast.error("Please select report type and year");
+      return;
+    }
+
+    if (
+      reportFilters.reportType === "class-section" &&
+      (!reportFilters.class || !reportFilters.section)
+    ) {
+      toast.error(
+        "Please select both class and section for class-section report"
+      );
+      return;
+    }
+
+    if (reportFilters.reportType === "class-all" && !reportFilters.class) {
+      toast.error("Please select a class for class report");
+      return;
+    }
+
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -177,15 +288,29 @@ export default function FeeReports() {
         year: reportFilters.year,
       });
 
-      if (reportFilters.class) params.append("class", reportFilters.class);
+      // Add class parameter for class-specific reports
+      if (
+        reportFilters.class &&
+        (reportFilters.reportType === "class-section" ||
+          reportFilters.reportType === "class-all")
+      ) {
+        params.append("class", reportFilters.class);
+      }
+
+      // Add section parameter only for class-section reports
       if (
         reportFilters.section &&
         reportFilters.reportType === "class-section"
       ) {
         params.append("section", reportFilters.section);
       }
-      if (reportFilters.month !== "all")
+
+      // Add month parameter if not "all"
+      if (reportFilters.month && reportFilters.month !== "all") {
         params.append("month", reportFilters.month);
+      }
+
+      
 
       const response = await axios.get(
         `${BACKEND}/api/fees/reports/class-section?${params}`,
@@ -194,7 +319,9 @@ export default function FeeReports() {
         }
       );
 
+
       setReportData(response.data.data || []);
+      setCurrentPage(1); // Reset to first page when new report is generated
       toast.success("Report generated successfully");
     } catch (error) {
       console.error("Error generating report:", error);
@@ -244,28 +371,28 @@ export default function FeeReports() {
 
     const csvContent = [
       [
-        "Student ID",
-        "Name",
+        "Roll Number",
+        "Student Name",
         "Father Name",
         "Class",
         "Section",
         "Total Fee",
         "Paid Amount",
-        "Pending",
+        "Pending Amount",
         "Last Payment",
         "Status",
       ],
       ...reportData.map((record) => [
-        record.rollNumber,
-        record.studentName,
-        record.fatherName,
-        record.class,
-        record.section,
-        record.totalFee.toString(),
-        record.paidAmount.toString(),
-        record.pendingAmount.toString(),
+        record.rollNumber || "N/A",
+        record.studentName || "N/A",
+        record.fatherName || "N/A",
+        record.class || "N/A",
+        record.section || "N/A",
+        record.totalFee?.toString() || "0",
+        record.paidAmount?.toString() || "0",
+        record.pendingAmount?.toString() || "0",
         record.lastPayment || "N/A",
-        record.status,
+        record.status || "N/A",
       ]),
     ]
       .map((row) => row.join(","))
@@ -282,24 +409,6 @@ export default function FeeReports() {
     window.URL.revokeObjectURL(url);
 
     toast.success("Report exported successfully");
-  };
-
-  const getMonthName = (monthNum: string | number) => {
-    const monthNames = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ];
-    return monthNames[parseInt(monthNum.toString()) - 1] || monthNum;
   };
 
   return (
@@ -345,13 +454,13 @@ export default function FeeReports() {
                       <SelectValue placeholder="Select report type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="class-section">
-                        Class & Section
-                      </SelectItem>
+                      <SelectItem value="all-students">All Students</SelectItem>
                       <SelectItem value="class-all">
                         Class (All Sections)
                       </SelectItem>
-                      <SelectItem value="all-students">All Students</SelectItem>
+                      <SelectItem value="class-section">
+                        Class & Section
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -369,10 +478,11 @@ export default function FeeReports() {
                       <SelectValue placeholder="Select class" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="9">Class 9</SelectItem>
-                      <SelectItem value="10">Class 10</SelectItem>
-                      <SelectItem value="11">Class 11</SelectItem>
-                      <SelectItem value="12">Class 12</SelectItem>
+                      {classes.map((cls) => (
+                        <SelectItem key={cls.value} value={cls.value}>
+                          {cls.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -390,9 +500,11 @@ export default function FeeReports() {
                       <SelectValue placeholder="Select section" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="A">Section A</SelectItem>
-                      <SelectItem value="B">Section B</SelectItem>
-                      <SelectItem value="C">Section C</SelectItem>
+                      {sections.map((section) => (
+                        <SelectItem key={section.value} value={section.value}>
+                          {section.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -430,9 +542,11 @@ export default function FeeReports() {
                       <SelectValue placeholder="Select year" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="2024">2024</SelectItem>
-                      <SelectItem value="2025">2025</SelectItem>
-                      <SelectItem value="2023">2023</SelectItem>
+                      {years.map((year) => (
+                        <SelectItem key={year.value} value={year.value}>
+                          {year.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -464,57 +578,203 @@ export default function FeeReports() {
 
               {/* Report Results Table */}
               {reportData.length > 0 && (
-                <div className="border rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Roll No.</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Father Name</TableHead>
-                        <TableHead>Class</TableHead>
-                        <TableHead>Section</TableHead>
-                        <TableHead>Total Fee</TableHead>
-                        <TableHead>Paid Amount</TableHead>
-                        <TableHead>Pending</TableHead>
-                        <TableHead>Last Payment</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {reportData.map((record) => (
-                        <TableRow key={record._id}>
-                          <TableCell className="font-medium">
-                            {record.rollNumber}
-                          </TableCell>
-                          <TableCell>{record.studentName}</TableCell>
-                          <TableCell>{record.fatherName}</TableCell>
-                          <TableCell>{record.class}</TableCell>
-                          <TableCell>{record.section}</TableCell>
-                          <TableCell>
-                            Rs. {record.totalFee.toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            Rs. {record.paidAmount.toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            Rs. {record.pendingAmount.toLocaleString()}
-                          </TableCell>
-                          <TableCell>{record.lastPayment || "N/A"}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                record.pendingAmount === 0
-                                  ? "default"
-                                  : "destructive"
-                              }
-                            >
-                              {record.pendingAmount === 0 ? "Paid" : "Pending"}
-                            </Badge>
-                          </TableCell>
+                <div className="space-y-4">
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Roll No.</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Father Name</TableHead>
+                          <TableHead>Class</TableHead>
+                          <TableHead>Section</TableHead>
+                          <TableHead>Total Fee</TableHead>
+                          <TableHead>Paid Amount</TableHead>
+                          <TableHead>Pending</TableHead>
+                          <TableHead>Last Payment</TableHead>
+                          <TableHead>Status</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {currentData.map((record) => (
+                          <TableRow key={record._id}>
+                            <TableCell className="font-medium">
+                              {record.rollNumber || "N/A"}
+                            </TableCell>
+                            <TableCell>{record.studentName || "N/A"}</TableCell>
+                            <TableCell>{record.fatherName || "N/A"}</TableCell>
+                            <TableCell>{record.class || "N/A"}</TableCell>
+                            <TableCell>{record.section || "N/A"}</TableCell>
+                            <TableCell>
+                              Rs. {(record.totalFee || 0).toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              Rs. {(record.paidAmount || 0).toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              Rs. {(record.pendingAmount || 0).toLocaleString()}
+                            </TableCell>
+                            <TableCell>{record.lastPayment || "N/A"}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  (record.pendingAmount || 0) === 0
+                                    ? "default"
+                                    : "destructive"
+                                }
+                              >
+                                {(record.pendingAmount || 0) === 0
+                                  ? "Paid"
+                                  : "Pending"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground ">
+                        Showing {startIndex + 1} to{" "}
+                        {Math.min(endIndex, reportData.length)} of{" "}
+                        {reportData.length} entries
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handlePreviousPage}
+                          disabled={currentPage === 1}
+                        >
+                          Previous
+                        </Button>
+
+                        {/* Page numbers */}
+                        <div className="flex items-center space-x-1">
+                          {Array.from(
+                            { length: Math.min(5, totalPages) },
+                            (_, index) => {
+                              let pageNumber;
+                              if (totalPages <= 5) {
+                                pageNumber = index + 1;
+                              } else if (currentPage <= 3) {
+                                pageNumber = index + 1;
+                              } else if (currentPage >= totalPages - 2) {
+                                pageNumber = totalPages - 4 + index;
+                              } else {
+                                pageNumber = currentPage - 2 + index;
+                              }
+
+                              return (
+                                <Button
+                                  key={pageNumber}
+                                  variant={
+                                    currentPage === pageNumber
+                                      ? "default"
+                                      : "outline"
+                                  }
+                                  size="sm"
+                                  onClick={() => handlePageChange(pageNumber)}
+                                  className="w-8 h-8 p-0"
+                                  style={
+                                    currentPage === pageNumber
+                                      ? {
+                                          backgroundColor:
+                                            "rgba(17, 107, 251, 1)",
+                                        }
+                                      : undefined
+                                  }
+                                >
+                                  {pageNumber}
+                                </Button>
+                              );
+                            }
+                          )}
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleNextPage}
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Report Summary Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-8 h-8 text-blue-600" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              Total Fee
+                            </p>
+                            <p className="text-2xl font-bold text-blue-600">
+                              Rs. {getReportSummary().totalFee.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-8 h-8 text-green-600" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              Amount Collected
+                            </p>
+                            <p className="text-2xl font-bold text-green-600">
+                              Rs.{" "}
+                              {getReportSummary().totalCollected.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-8 h-8 text-red-600" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              Remaining Fee
+                            </p>
+                            <p className="text-2xl font-bold text-red-600">
+                              Rs.{" "}
+                              {getReportSummary().totalRemaining.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="w-8 h-8 text-purple-600" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              Collection Rate
+                            </p>
+                            <p className="text-2xl font-bold text-purple-600">
+                              {getReportSummary().collectionPercentage}%
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
               )}
 
@@ -548,7 +808,7 @@ export default function FeeReports() {
             <CardContent className="space-y-4">
               <div className="relative">
                 <Label htmlFor="studentSearch">Search Student</Label>
-                <div className="relative">
+                <div className="relative mt-2">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="studentSearch"

@@ -19,7 +19,7 @@ export const createFeeStructure = async (req, res) => {
       paperFund,
       miscFee,
     });
-    console.log(res);
+
     res.status(201).json(feeStructure);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -52,7 +52,6 @@ export const getFeeStructureById = async (req, res) => {
 // Update fee structure
 export const updateFeeStructure = async (req, res) => {
   try {
-    console.log(req.body);
     const feeStructure = await FeeStructure.findById(req.params.id);
 
     if (!feeStructure) {

@@ -4,6 +4,10 @@ import { Counter } from "./counter.js";
 
 const studentSchema = mongoose.Schema(
   {
+    img: {
+      data: Buffer,
+      contentType: String,
+    },
     rollNumber: {
       type: String,
       unique: true,

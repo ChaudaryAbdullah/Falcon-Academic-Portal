@@ -40,7 +40,7 @@ export const getFees = async (req, res) => {
       month: fee.month,
       year: fee.year,
       tutionFee: fee.tutionFee,
-      paperFund: fee.paperFund,
+
       examFee: fee.examFee,
       miscFee: fee.miscFee,
       arrears: fee.arrears,
@@ -97,7 +97,6 @@ export const generateBulkFees = async (req, res) => {
           month: challanData.month,
           year: challanData.year,
           tutionFee: challanData.tutionFee || 0,
-          paperFund: challanData.paperFund || 0,
           examFee: challanData.examFee || 0,
           miscFee: challanData.miscFee || 0,
           arrears: challanData.arrears || 0,
@@ -215,9 +214,6 @@ export const bulkUpdateFeeStatus = async (req, res) => {
   try {
     const { feeIds, status } = req.body;
 
-    console.log("Received feeIds:", feeIds);
-    console.log("Received status:", status);
-
     if (!feeIds || !Array.isArray(feeIds) || feeIds.length === 0) {
       return res.status(400).json({
         success: false,
@@ -249,9 +245,6 @@ export const bulkUpdateFeeStatus = async (req, res) => {
       }
     }
 
-    console.log("Valid ObjectIds:", validObjectIds);
-    console.log("Invalid IDs:", invalidIds);
-
     if (validObjectIds.length === 0) {
       return res.status(400).json({
         success: false,
@@ -275,8 +268,6 @@ export const bulkUpdateFeeStatus = async (req, res) => {
       { _id: { $in: validObjectIds } },
       { $set: updateData }
     );
-
-    console.log("Update result:", result);
 
     if (result.matchedCount === 0) {
       return res.status(404).json({
@@ -344,30 +335,14 @@ export const updateWhatsAppStatus = async (req, res) => {
 
 // NEW REPORT ENDPOINTS
 
-// Generate Class & Section Report
+// Generate Class & Section Report - FIXED VERSION
 export const getClassSectionReport = async (req, res) => {
   try {
     const { reportType, class: studentClass, section, month, year } = req.query;
 
-    let matchConditions = {};
-
-    // Build match conditions based on report type
-    if (reportType === "class-section" && studentClass && section) {
-      // We need to lookup students first to filter by class and section
-    } else if (reportType === "class-all" && studentClass) {
-      // Filter by class only
-    }
-    // For "all-students", no additional filters needed
-
-    // Add time filters
-    if (year && year !== "all") {
-      matchConditions.year = parseInt(year);
-    }
-    if (month && month !== "all") {
-      matchConditions.month = month;
-    }
-
+    // Build the aggregation pipeline
     const pipeline = [
+      // First, lookup student data
       {
         $lookup: {
           from: "students",
@@ -381,26 +356,34 @@ export const getClassSectionReport = async (req, res) => {
       },
     ];
 
-    // Add match conditions for student class and section
-    let studentMatchConditions = {};
+    // Build match conditions
+    let matchConditions = {};
 
+    // Add year filter
+    if (year && year !== "all") {
+      matchConditions.year = year.toString();
+    }
+
+    // Add month filter
+    if (month && month !== "all") {
+      matchConditions.month = month;
+    }
+
+    // Add class and section filters based on report type
     if (reportType === "class-section" && studentClass && section) {
-      studentMatchConditions["student.class"] = studentClass;
-      studentMatchConditions["student.section"] = section;
+      matchConditions["student.class"] = studentClass;
+      matchConditions["student.section"] = section;
     } else if (reportType === "class-all" && studentClass) {
-      studentMatchConditions["student.class"] = studentClass;
+      matchConditions["student.class"] = studentClass;
+    }
+    // For "all-students", no additional class/section filters
+
+    // Add match stage if we have conditions
+    if (Object.keys(matchConditions).length > 0) {
+      pipeline.push({ $match: matchConditions });
     }
 
-    // Combine all match conditions
-    const allMatchConditions = {
-      ...matchConditions,
-      ...studentMatchConditions,
-    };
-
-    if (Object.keys(allMatchConditions).length > 0) {
-      pipeline.push({ $match: allMatchConditions });
-    }
-
+    // Group by student to aggregate all their fee records
     pipeline.push(
       {
         $group: {
@@ -425,6 +408,7 @@ export const getClassSectionReport = async (req, res) => {
           records: { $push: "$$ROOT" },
         },
       },
+      // Project the final structure
       {
         $project: {
           _id: 1,
@@ -449,49 +433,53 @@ export const getClassSectionReport = async (req, res) => {
           },
         },
       },
+      // Sort results
       {
-        $sort: { class: 1, section: 1, studentName: 1 },
+        $sort: {
+          class: 1,
+          section: 1,
+          studentName: 1,
+        },
       }
     );
 
     const reportData = await Fee.aggregate(pipeline);
 
+    // Calculate summary statistics
+    const summary = {
+      totalStudents: reportData.length,
+      totalExpected: reportData.reduce(
+        (sum, record) => sum + (record.totalFee || 0),
+        0
+      ),
+      totalCollected: reportData.reduce(
+        (sum, record) => sum + (record.paidAmount || 0),
+        0
+      ),
+      totalPending: reportData.reduce(
+        (sum, record) => sum + (record.pendingAmount || 0),
+        0
+      ),
+    };
+
+    // Calculate collection percentage
+    summary.collectionPercentage =
+      summary.totalExpected > 0
+        ? Math.round((summary.totalCollected / summary.totalExpected) * 100)
+        : 0;
+
     res.status(200).json({
       success: true,
       data: reportData,
-      summary: {
-        totalStudents: reportData.length,
-        totalExpected: reportData.reduce(
-          (sum, record) => sum + record.totalFee,
-          0
-        ),
-        totalCollected: reportData.reduce(
-          (sum, record) => sum + record.paidAmount,
-          0
-        ),
-        totalPending: reportData.reduce(
-          (sum, record) => sum + record.pendingAmount,
-          0
-        ),
-        collectionPercentage:
-          reportData.length > 0
-            ? Math.round(
-                (reportData.reduce(
-                  (sum, record) => sum + record.paidAmount,
-                  0
-                ) /
-                  reportData.reduce(
-                    (sum, record) => sum + record.totalFee,
-                    0
-                  )) *
-                  100
-              )
-            : 0,
-      },
+      summary: summary,
     });
   } catch (error) {
     console.error("Error generating class section report:", error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
   }
 };
 
@@ -558,7 +546,7 @@ export const getSummaryReport = async (req, res) => {
 
     let matchConditions = {};
     if (year && year !== "all") {
-      matchConditions.year = parseInt(year);
+      matchConditions.year = year.toString();
     }
 
     const pipeline = [
@@ -706,5 +694,29 @@ export const getSummaryReport = async (req, res) => {
   } catch (error) {
     console.error("Error generating summary report:", error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get Available Years from Fee Records
+export const getAvailableYears = async (req, res) => {
+  try {
+    const years = await Fee.distinct("year");
+
+    // Sort years in descending order and ensure they're strings
+    const sortedYears = years
+      .filter((year) => year) // Remove any null/undefined values
+      .map((year) => year.toString())
+      .sort((a, b) => Number(b) - Number(a));
+
+    res.status(200).json({
+      success: true,
+      data: sortedYears,
+    });
+  } catch (error) {
+    console.error("Error fetching available years:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
