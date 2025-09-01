@@ -25,11 +25,7 @@ const feeSchema = mongoose.Schema(
       required: true,
       default: 0,
     },
-    paperFund: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
+
     miscFee: {
       type: Number,
       required: true,
@@ -86,7 +82,6 @@ feeSchema.pre("save", function (next) {
   const baseFees =
     (this.tutionFee || 0) +
     (this.examFee || 0) +
-    (this.paperFund || 0) +
     (this.miscFee || 0);
 
   // Subtract discount

@@ -18,6 +18,7 @@ import StudentDiscount from "../components/StudentDiscount";
 import axios from "axios";
 import { Toaster } from "sonner";
 import FeeReports from "../components/FeeReports";
+import { PaperFundManagement } from "../components/PaperFundManagement";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -28,14 +29,13 @@ export default function AdminDashboard() {
   const [feeStructure, setFeeStructure] = useState([]);
   const [studentDiscounts, setStudentDiscounts] = useState([]);
   const [challans, setChallans] = useState([]);
-
+  const [paperFundChallans, setPaperFundChallans] = useState([]);
   useEffect(() => {
     const fetchStudents = async () => {
       const res = await axios.get(`${BACKEND}/api/students`, {
         withCredentials: true,
       });
       setStudents(res.data.data);
-      console.log(students);
     };
     fetchStudents();
   }, []);
@@ -46,7 +46,6 @@ export default function AdminDashboard() {
         withCredentials: true,
       });
       setTeachers(res.data.data);
-      console.log(teachers);
     };
     fetchTeachers();
   }, []);
@@ -93,6 +92,20 @@ export default function AdminDashboard() {
     fetchFee();
   }, []);
 
+  useEffect(() => {
+    const fetchPaperFund = async () => {
+      try {
+        const res = await axios.get(`${BACKEND}/api/paperFund`, {
+          withCredentials: true,
+        });
+        setPaperFundChallans(res.data.data);
+      } catch (error) {
+        console.error("Error fetching fees:", error);
+      }
+    };
+    fetchPaperFund();
+  }, []);
+
   const renderContent = () => {
     switch (activeTab) {
       case "students":
@@ -114,6 +127,16 @@ export default function AdminDashboard() {
             setChallans={setChallans}
           />
         );
+      case "paperFund":
+        return (
+          <PaperFundManagement
+            students={students}
+            feeStructure={feeStructure}
+            setFeeStructure={setFeeStructure}
+            challans={paperFundChallans}
+            setChallans={setPaperFundChallans}
+          />
+        );
       case "feeStructure":
         return (
           <FeeStructure
@@ -122,11 +145,9 @@ export default function AdminDashboard() {
           />
         );
       case "studentDiscount":
-        return (
-          <StudentDiscount students={students} setStudents={setStudents} />
-        );
+        return <StudentDiscount students={students} />;
       case "fee-reports":
-        return <FeeReports />;
+        return <FeeReports students={students} />;
       default:
         return (
           <div className="space-y-6">

@@ -38,7 +38,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
-import { Plus, Search, Filter, X, Settings } from "lucide-react";
+import { Plus, Search, Filter, X, Settings, Upload, User } from "lucide-react";
 
 const BACKEND = import.meta.env.VITE_BACKEND; // your backend URL
 
@@ -61,6 +61,10 @@ interface Student {
   email: string;
   password: string;
   address: string;
+  img?: {
+    data: string;
+    contentType: string;
+  };
 }
 
 interface StudentManagementProps {
@@ -76,6 +80,7 @@ interface Filters {
 }
 
 interface ColumnVisibility {
+  image: boolean;
   rollNumber: boolean;
   studentName: boolean;
   class: boolean;
@@ -115,6 +120,13 @@ export function StudentManagement({
     email: "",
     password: "",
   });
+
+  // State for image handling
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const studentsPerPage = 30;
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<Filters>({
     class: "",
@@ -124,6 +136,7 @@ export function StudentManagement({
   });
   const [showFilters, setShowFilters] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
+    image: true,
     rollNumber: true,
     studentName: true,
     class: true,
@@ -140,19 +153,71 @@ export function StudentManagement({
     address: false,
   });
 
+  // Handle image file selection
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        alert("Please select a valid image file");
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Image size should be less than 5MB");
+        return;
+      }
+
+      setSelectedImage(file);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Clear image selection
+  const clearImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const preparedData = {
-      ...formData,
-      class: Number(formData.class), // convert to number
-      dob: new Date(formData.dob).toISOString(), // convert to ISO string (or Date object in backend)
-      rollNumber: "", // or remove this as backend auto-generates it
-    };
+
     try {
+      // Create FormData for multipart form submission
+      const formDataObj = new FormData();
+
+      // Append all form fields
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === "class") {
+          formDataObj.append(key, String(Number(value))); // convert to number then string
+        } else if (key === "dob") {
+          formDataObj.append(key, new Date(value).toISOString());
+        } else {
+          formDataObj.append(key, value);
+        }
+      });
+
+      // Append image if selected
+      if (selectedImage) {
+        formDataObj.append("image", selectedImage);
+      }
+
       // Send formData to backend API
       const response = await axios.post(
         `${BACKEND}/api/students`,
-        preparedData
+        formDataObj,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
 
       // Backend returns created student object
@@ -161,7 +226,7 @@ export function StudentManagement({
       // Update local state with newly created student
       setStudents([...students, createdStudent]);
 
-      // Reset form
+      // Reset form and image
       setFormData({
         rollNumber: "",
         studentName: "",
@@ -181,14 +246,23 @@ export function StudentManagement({
         email: "",
         password: "",
       });
+      clearImage();
     } catch (error) {
       console.error("Error adding student:", error);
-      alert("Failed to add student. Please try again.");
+      if (axios.isAxiosError(error) && error.response) {
+        alert(
+          `Failed to add student: ${
+            error.response.data.message || "Please try again."
+          }`
+        );
+      } else {
+        alert("Failed to add student. Please try again.");
+      }
     }
   };
 
   const handleInputChange = (
-    field: keyof Omit<Student, "id">,
+    field: keyof Omit<Student, "_id">,
     value: string
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -196,6 +270,8 @@ export function StudentManagement({
 
   const handleFilterChange = (field: keyof Filters, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
+    // Reset to page 1 when filters change
+    setCurrentPage(1);
   };
 
   const clearFilters = () => {
@@ -205,6 +281,7 @@ export function StudentManagement({
       fatherOccupation: "",
       motherOccupation: "",
     });
+    setCurrentPage(1);
   };
 
   const toggleColumnVisibility = (column: keyof ColumnVisibility) => {
@@ -215,6 +292,7 @@ export function StudentManagement({
   };
 
   const columnLabels: Record<keyof ColumnVisibility, string> = {
+    image: "Photo",
     rollNumber: "Roll Number",
     studentName: "Student Name",
     class: "Class",
@@ -231,46 +309,105 @@ export function StudentManagement({
     address: "Address",
   };
 
-  // Get unique values for filter dropdowns
+  // Function to get image URL for display
+  const getImageUrl = (student: Student) => {
+    if (student.img?.data) {
+      return `data:${student.img.contentType};base64,${student.img.data}`;
+    }
+    return null;
+  };
+
+  // Get unique values for filter dropdowns - with null safety
   const getUniqueValues = (field: keyof Student) => {
-    const values = students.map((student) => student[field]).filter(Boolean);
+    const values = students
+      .map((student) => student[field])
+      .filter((value) => value != null && value !== "")
+      .map(String); // Convert all to strings for consistency
     return [...new Set(values)].sort();
   };
 
   const activeFiltersCount = Object.values(filters).filter(Boolean).length;
 
+  // Safe string conversion and null checking for search
+  const safeToString = (value: any): string => {
+    if (value == null) return "";
+    return String(value);
+  };
+
   const filteredStudents = students.filter((student) => {
-    // Search filter
-    const matchesSearch =
-      student.rollNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.fatherName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.motherName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.fPhoneNumber.includes(searchTerm) ||
-      student.mPhoneNumber.includes(searchTerm) ||
-      student.fatherCnic.includes(searchTerm) ||
-      student.motherCnic.includes(searchTerm) ||
-      student.bform.includes(searchTerm);
+    try {
+      // Search filter with null safety
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch =
+        !searchTerm ||
+        [
+          student.rollNumber,
+          student.studentName,
+          student.fatherName,
+          student.motherName,
+          student.fPhoneNumber,
+          student.mPhoneNumber,
+          student.fatherCnic,
+          student.motherCnic,
+          student.bform,
+          student.address,
+          student.email,
+          student.fatherOccupation,
+          student.motherOccupation,
+        ].some((field) =>
+          safeToString(field).toLowerCase().includes(searchLower)
+        );
 
-    // Field filters
-    const matchesClass = !filters.class || student.class === filters.class;
-    const matchesSection =
-      !filters.section || student.section === filters.section;
-    const matchesFatherOccupation =
-      !filters.fatherOccupation ||
-      student.fatherOccupation === filters.fatherOccupation;
-    const matchesMotherOccupation =
-      !filters.motherOccupation ||
-      student.motherOccupation === filters.motherOccupation;
+      // Field filters with type-safe comparisons
+      const matchesClass =
+        !filters.class || safeToString(student.class) === filters.class;
+      const matchesSection =
+        !filters.section || safeToString(student.section) === filters.section;
+      const matchesFatherOccupation =
+        !filters.fatherOccupation ||
+        safeToString(student.fatherOccupation) === filters.fatherOccupation;
+      const matchesMotherOccupation =
+        !filters.motherOccupation ||
+        safeToString(student.motherOccupation) === filters.motherOccupation;
 
-    return (
-      matchesSearch &&
-      matchesClass &&
-      matchesSection &&
-      matchesFatherOccupation &&
-      matchesMotherOccupation
-    );
+      return (
+        matchesSearch &&
+        matchesClass &&
+        matchesSection &&
+        matchesFatherOccupation &&
+        matchesMotherOccupation
+      );
+    } catch (error) {
+      console.error("Error filtering student:", error, student);
+      return false;
+    }
   });
+
+  // Get current students with pagination bounds checking
+  const indexOfLastStudent = currentPage * studentsPerPage;
+  const indexOfFirstStudent = indexOfLastStudent - studentsPerPage;
+  const currentStudents = filteredStudents.slice(
+    indexOfFirstStudent,
+    indexOfLastStudent
+  );
+
+  // Total pages calculation with safety check
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredStudents.length / studentsPerPage)
+  );
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  // Handle search term change with page reset
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
 
   return (
     <div className="space-y-6">
@@ -295,6 +432,56 @@ export function StudentManagement({
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Image Upload Section */}
+                <div className="space-y-4 border border-dashed border-gray-300 rounded-lg p-4">
+                  <Label>Student Photo</Label>
+                  <div className="flex items-center space-x-4">
+                    {imagePreview ? (
+                      <div className="relative">
+                        <img
+                          src={imagePreview}
+                          alt="Student preview"
+                          className="w-24 h-24 object-cover rounded-lg border"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                          onClick={clearImage}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                        <User className="h-8 w-8 text-gray-400" />
+                      </div>
+                    )}
+
+                    <div className="flex-1">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                        id="imageUpload"
+                      />
+                      <Label htmlFor="imageUpload" className="cursor-pointer">
+                        <Button type="button" variant="outline" asChild>
+                          <span>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Choose Photo
+                          </span>
+                        </Button>
+                      </Label>
+                      <p className="text-sm text-gray-500 mt-1">
+                        PNG, JPG, GIF up to 5MB
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="studentName">Student Name</Label>
@@ -379,12 +566,12 @@ export function StudentManagement({
                       className="border border-gray-250 shadow-xs rounded-lg px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">-- Select a section --</option>
-                      <option value="red">Red</option>
-                      <option value="blue">Blue</option>
-                      <option value="pink">Pink</option>
-                      <option value="green">Green</option>
-                      <option value="yellow">Yellow</option>
-                      <option value="white">White</option>
+                      <option value="Red">Red</option>
+                      <option value="Blue">Blue</option>
+                      <option value="Pink">Pink</option>
+                      <option value="Green">Green</option>
+                      <option value="Yellow">Yellow</option>
+                      <option value="White">White</option>
                     </select>
                   </div>
 
@@ -514,7 +701,11 @@ export function StudentManagement({
           <Card>
             <CardHeader>
               <CardTitle>
-                Students List ({filteredStudents.length} of {students.length})
+                Students List ({indexOfFirstStudent + 1} -{" "}
+                {indexOfLastStudent > filteredStudents.length
+                  ? filteredStudents.length
+                  : indexOfLastStudent}{" "}
+                of {filteredStudents.length})
               </CardTitle>
               <CardDescription>
                 View and search all registered students
@@ -528,7 +719,7 @@ export function StudentManagement({
                     <Input
                       placeholder="Search students..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => handleSearchChange(e.target.value)}
                       className="max-w-sm"
                     />
                   </div>
@@ -598,7 +789,7 @@ export function StudentManagement({
                         <SelectContent>
                           <SelectItem value="all">All Classes</SelectItem>
                           {getUniqueValues("class").map((cls) => (
-                            <SelectItem key={cls} value={cls.toString()}>
+                            <SelectItem key={cls} value={cls}>
                               Class {cls}
                             </SelectItem>
                           ))}
@@ -814,7 +1005,7 @@ export function StudentManagement({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredStudents.length === 0 ? (
+                    {currentStudents.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={
@@ -829,77 +1020,119 @@ export function StudentManagement({
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredStudents.map((student) => (
+                      currentStudents.map((student) => (
                         <TableRow key={student._id}>
                           {columnVisibility.rollNumber && (
                             <TableCell className="font-medium">
-                              {student.rollNumber}
+                              {safeToString(student.rollNumber)}
                             </TableCell>
                           )}
                           {columnVisibility.studentName && (
                             <TableCell className="font-medium">
-                              {student.studentName}
+                              {safeToString(student.studentName)}
                             </TableCell>
                           )}
                           {columnVisibility.class && (
                             <TableCell>
                               <Badge variant="outline">
-                                Class {student.class}
+                                Class {safeToString(student.class)}
                               </Badge>
                             </TableCell>
                           )}
                           {columnVisibility.section && (
                             <TableCell>
-                              <Badge variant="outline">{student.section}</Badge>
-                            </TableCell>
-                          )}
-                          {columnVisibility.fatherName && (
-                            <TableCell>{student.fatherName}</TableCell>
-                          )}
-                          {columnVisibility.fatherCnic && (
-                            <TableCell>{student.fatherCnic}</TableCell>
-                          )}
-                          {columnVisibility.bform && (
-                            <TableCell>{student.bform}</TableCell>
-                          )}
-                          {columnVisibility.dob && (
-                            <TableCell>
-                              {new Date(student.dob).toLocaleDateString()}
-                            </TableCell>
-                          )}
-                          {columnVisibility.fPhoneNumber && (
-                            <TableCell>{student.fPhoneNumber}</TableCell>
-                          )}
-                          {columnVisibility.fatherOccupation && (
-                            <TableCell>
-                              <Badge variant="secondary">
-                                {student.fatherOccupation}
+                              <Badge variant="outline">
+                                {safeToString(student.section)}
                               </Badge>
                             </TableCell>
                           )}
+                          {columnVisibility.fatherName && (
+                            <TableCell>
+                              {safeToString(student.fatherName)}
+                            </TableCell>
+                          )}
+                          {columnVisibility.fatherCnic && (
+                            <TableCell>
+                              {safeToString(student.fatherCnic)}
+                            </TableCell>
+                          )}
+                          {columnVisibility.bform && (
+                            <TableCell>{safeToString(student.bform)}</TableCell>
+                          )}
+                          {columnVisibility.dob && (
+                            <TableCell>
+                              {student.dob
+                                ? new Date(student.dob).toLocaleDateString()
+                                : ""}
+                            </TableCell>
+                          )}
+                          {columnVisibility.fPhoneNumber && (
+                            <TableCell>
+                              {safeToString(student.fPhoneNumber)}
+                            </TableCell>
+                          )}
+                          {columnVisibility.fatherOccupation && (
+                            <TableCell>
+                              {student.fatherOccupation && (
+                                <Badge variant="secondary">
+                                  {safeToString(student.fatherOccupation)}
+                                </Badge>
+                              )}
+                            </TableCell>
+                          )}
                           {columnVisibility.motherName && (
-                            <TableCell>{student.motherName}</TableCell>
+                            <TableCell>
+                              {safeToString(student.motherName)}
+                            </TableCell>
                           )}
                           {columnVisibility.motherOccupation && (
                             <TableCell>
                               {student.motherOccupation && (
                                 <Badge variant="secondary">
-                                  {student.motherOccupation}
+                                  {safeToString(student.motherOccupation)}
                                 </Badge>
                               )}
                             </TableCell>
                           )}
                           {columnVisibility.mPhoneNumber && (
-                            <TableCell>{student.mPhoneNumber}</TableCell>
+                            <TableCell>
+                              {safeToString(student.mPhoneNumber)}
+                            </TableCell>
                           )}
                           {columnVisibility.address && (
-                            <TableCell>{student.address}</TableCell>
+                            <TableCell>
+                              {safeToString(student.address)}
+                            </TableCell>
                           )}
                         </TableRow>
                       ))
                     )}
                   </TableBody>
                 </Table>
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center items-center mt-4 space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Prev
+                    </Button>
+
+                    <span className="text-sm">
+                      Page {currentPage} of {totalPages}
+                    </span>
+
+                    <Button
+                      variant="outline"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

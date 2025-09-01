@@ -30,24 +30,14 @@ export default function AdminSidebar({
       value: "dashboard",
     },
     {
-      icon: <GraduationCap className="w-4 h-4 mr-3" />,
-      label: "Students",
-      value: "students",
-    },
-    {
       icon: <Users className="w-4 h-4 mr-3" />,
       label: "Teachers",
       value: "teachers",
     },
     {
-      icon: <LucideReceiptText className="w-4 h-4 mr-3" />,
-      label: "Fee Structure",
-      value: "feeStructure",
-    },
-    {
-      icon: <Receipt className="w-4 h-4 mr-3" />,
-      label: "Fee Management",
-      value: "fees",
+      icon: <GraduationCap className="w-4 h-4 mr-3" />,
+      label: "Students",
+      value: "students",
     },
     {
       icon: <Percent className="w-4 h-4 mr-3" />,
@@ -55,9 +45,24 @@ export default function AdminSidebar({
       value: "studentDiscount",
     },
     {
+      icon: <LucideReceiptText className="w-4 h-4 mr-3" />,
+      label: "Fee Structure",
+      value: "feeStructure",
+    },
+    {
       icon: <BarChart3 className="w-4 h-4 mr-3" />,
       label: "Fee Reports",
       value: "fee-reports",
+    },
+    {
+      icon: <Receipt className="w-4 h-4 mr-3" />,
+      label: "Fee Management",
+      value: "fees",
+    },
+    {
+      icon: <Receipt className="w-4 h-4 mr-3" />,
+      label: "Paper Fund Management",
+      value: "paperFund",
     },
   ];
 

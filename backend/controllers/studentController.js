@@ -1,21 +1,92 @@
 import { Student } from "../models/student.js";
 import bcrypt from "bcrypt";
+import multer from "multer";
+import path from "path";
 
-// Create Student
+// Configure multer for handling file uploads
+const storage = multer.memoryStorage(); // Store files in memory as Buffer
+
+const fileFilter = (req, file, cb) => {
+  // Check if the file is an image
+  if (file.mimetype.startsWith("image/")) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only image files are allowed!"), false);
+  }
+};
+
+export const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: fileFilter,
+});
+
+// Create Student with Image Upload
 export const createStudent = async (req, res) => {
   try {
-    console.log("Received create student request:", req.body);
+    // Handle empty email and password
     if (req.body.email === "" || req.body.email === null) {
       req.body.email = undefined;
     }
 
-    if (req.body.password === "") {
-      req.body.password = 12345678; // Treat empty string as null
+    if (req.body.password === "" || req.body.password === null) {
+      req.body.password = "12345678"; // Default password
     }
-    const student = await Student.create(req.body);
-    res.status(201).json({ success: true, data: student });
+
+    // Handle image upload
+    let imageData = null;
+    if (req.file) {
+      imageData = {
+        data: req.file.buffer,
+        contentType: req.file.mimetype,
+      };
+    }
+
+    // Create student data object
+    const studentData = {
+      ...req.body,
+      ...(imageData && { img: imageData }),
+    };
+
+    const student = await Student.create(studentData);
+
+    // Convert image buffer to base64 for response (if exists)
+    const responseStudent = student.toObject();
+    if (responseStudent.img && responseStudent.img.data) {
+      responseStudent.img.data = responseStudent.img.data.toString("base64");
+    }
+
+    res.status(201).json({ success: true, data: responseStudent });
   } catch (error) {
     console.error("Error creating student:", error);
+
+    // Handle multer errors
+    if (error instanceof multer.MulterError) {
+      if (error.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({
+          success: false,
+          message: "File size too large. Maximum size allowed is 5MB.",
+          errorType: "FILE_SIZE_ERROR",
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        errorType: "UPLOAD_ERROR",
+      });
+    }
+
+    // Handle custom file filter errors
+    if (error.message === "Only image files are allowed!") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Only image files are allowed. Please upload a valid image file.",
+        errorType: "INVALID_FILE_TYPE",
+      });
+    }
 
     // Duplicate key error
     if (error.code === 11000) {
@@ -53,17 +124,27 @@ export const createStudent = async (req, res) => {
   }
 };
 
-// Get All Students
+// Get All Students with Images
 export const getStudents = async (req, res) => {
   try {
     const students = await Student.find();
-    res.status(200).json({ success: true, data: students });
+
+    // Convert image buffers to base64 for all students
+    const studentsWithImages = students.map((student) => {
+      const studentObj = student.toObject();
+      if (studentObj.img && studentObj.img.data) {
+        studentObj.img.data = studentObj.img.data.toString("base64");
+      }
+      return studentObj;
+    });
+
+    res.status(200).json({ success: true, data: studentsWithImages });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Get Single Student
+// Get Single Student with Image
 export const getStudentById = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
@@ -72,16 +153,31 @@ export const getStudentById = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Student not found" });
     }
-    res.status(200).json({ success: true, data: student });
+
+    // Convert image buffer to base64
+    const studentObj = student.toObject();
+    if (studentObj.img && studentObj.img.data) {
+      studentObj.img.data = studentObj.img.data.toString("base64");
+    }
+
+    res.status(200).json({ success: true, data: studentObj });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Update Student
+// Update Student with Optional Image Upload
 export const updateStudent = async (req, res) => {
   try {
     let updateData = { ...req.body };
+
+    // Handle image upload if a new image is provided
+    if (req.file) {
+      updateData.img = {
+        data: req.file.buffer,
+        contentType: req.file.mimetype,
+      };
+    }
 
     // If password is being updated, hash it before saving
     if (updateData.password) {
@@ -100,8 +196,31 @@ export const updateStudent = async (req, res) => {
         .json({ success: false, message: "Student not found" });
     }
 
-    res.status(200).json({ success: true, data: student });
+    // Convert image buffer to base64 for response
+    const responseStudent = student.toObject();
+    if (responseStudent.img && responseStudent.img.data) {
+      responseStudent.img.data = responseStudent.img.data.toString("base64");
+    }
+
+    res.status(200).json({ success: true, data: responseStudent });
   } catch (error) {
+    // Handle multer errors
+    if (error instanceof multer.MulterError) {
+      if (error.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({
+          success: false,
+          message: "File size too large. Maximum size allowed is 5MB.",
+          errorType: "FILE_SIZE_ERROR",
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        errorType: "UPLOAD_ERROR",
+      });
+    }
+
+    // Handle duplicate key errors
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
       const value = error.keyValue[field];
@@ -130,6 +249,23 @@ export const deleteStudent = async (req, res) => {
     res
       .status(200)
       .json({ success: true, message: "Student deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get Student Image by ID (optional endpoint for serving images directly)
+export const getStudentImage = async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student || !student.img || !student.img.data) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Image not found" });
+    }
+
+    res.set("Content-Type", student.img.contentType);
+    res.send(student.img.data);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

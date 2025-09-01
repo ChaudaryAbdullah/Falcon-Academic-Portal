@@ -31,7 +31,7 @@ import { Search, Download, MessageCircle, Filter, X } from "lucide-react";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
-interface FeeChallan {
+interface PaperFundChallan {
   id: string;
   studentId: {
     _id: string;
@@ -42,40 +42,36 @@ interface FeeChallan {
     class: string;
     section: string;
   };
-  month: string;
   year: string;
-  tutionFee: number;
-  examFee: number;
-  miscFee: number;
-  totalAmount: number;
-  arrears: number;
-  discount: number;
+  paperFund: number;
   dueDate: string;
   status: "pending" | "paid" | "overdue";
   generatedDate: string;
   sentToWhatsApp: boolean;
+  paidDate?: string;
 }
 
-interface ViewRecordsTabProps {
-  challans: FeeChallan[];
-  setChallans: (challans: FeeChallan[]) => void;
+interface ViewPaperFundRecordsTabProps {
+  challans: PaperFundChallan[];
+  setChallans: (challans: PaperFundChallan[]) => void;
   whatsappMessage: string;
 }
 
-export function ViewRecordsTab({
+export function ViewPaperFundRecordsTab({
   challans,
   setChallans,
   whatsappMessage,
-}: ViewRecordsTabProps) {
+}: ViewPaperFundRecordsTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   // Filter states
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [monthFilter, setMonthFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [whatsappFilter, setWhatsappFilter] = useState<string>("all");
 
-  const sendFeeReminder = async (challan: FeeChallan) => {
+  const sendPaperFundReminder = async (challan: PaperFundChallan) => {
     try {
       if (!challan.studentId.fPhoneNumber) {
         alert(
@@ -113,36 +109,6 @@ export function ViewRecordsTab({
       }
 
       let dueDate = challan.dueDate;
-      if (!dueDate) {
-        const today = new Date();
-        const currentMonth = today.getMonth();
-        const currentYear = today.getFullYear();
-
-        if (challan.month && challan.year) {
-          try {
-            const challanDate = new Date(`${challan.month} 1, ${challan.year}`);
-            if (
-              challanDate.getMonth() === currentMonth &&
-              Number(challan.year) === currentYear
-            ) {
-              dueDate = `${currentYear}-${String(currentMonth + 1).padStart(
-                2,
-                "0"
-              )}-10`;
-            } else {
-              const tomorrow = new Date(today);
-              tomorrow.setDate(today.getDate() + 1);
-              dueDate = tomorrow.toISOString().split("T")[0];
-            }
-          } catch (error) {
-            console.error("Error parsing date:", error);
-            dueDate = new Date().toISOString().split("T")[0];
-          }
-        } else {
-          dueDate = new Date().toISOString().split("T")[0];
-        }
-      }
-
       let formattedDueDate = dueDate;
       try {
         if (dueDate) {
@@ -156,28 +122,21 @@ export function ViewRecordsTab({
       const message =
         whatsappMessage ||
         `
-*Fee Reminder - Falcon House School*
+*Paper Fund Reminder - Falcon House School*
 
 Dear ${challan.studentId.fatherName || "Parent"},
 
-This is a reminder for ${challan.studentId.studentName}'s fee:
+This is a reminder for ${challan.studentId.studentName}'s paper fund:
 
 Student Details:
 • Name: ${challan.studentId.studentName}
 • Roll Number: ${challan.studentId.rollNumber || "N/A"}
+• Class: ${challan.studentId.class || "N/A"}
 
-Fee Details:
-• Month: ${challan.month} ${challan.year}
+Paper Fund Details:
+• Academic Year: ${challan.year}
 • Due Date: ${formattedDueDate}
-
-Fee Breakdown:
-• Tuition Fee: Rs. ${Number(challan.tutionFee) || 0}
-• Exam Fee: Rs. ${Number(challan.examFee) || 0}
-• Miscellaneous Fee: Rs. ${Number(challan.miscFee) || 0}
-${challan.arrears > 0 ? `• Previous Arrears: Rs. ${challan.arrears}` : ""}
-${challan.discount > 0 ? `• Discount: Rs. -${challan.discount}` : ""}
-
-Total Amount: Rs. ${challan.totalAmount + challan.arrears}
+• Amount: Rs. ${challan.paperFund}
 
 ${
   challan.status === "paid"
@@ -198,32 +157,34 @@ Falcon House School Administration
       window.open(whatsappUrl, "_blank");
 
       try {
+        // Update the WhatsApp sent status (assuming similar endpoint exists)
         await axios.patch(
-          `${BACKEND}/api/fees/${challan.id}/whatsapp`,
+          `${BACKEND}/api/paperFund/${challan.id}/whatsapp`,
           { sentToWhatsApp: true },
           { withCredentials: true }
         );
 
-        setChallans((prevChallans: any[]) =>
+        setChallans((prevChallans: PaperFundChallan[]) =>
           prevChallans.map((c) =>
             c.id === challan.id ? { ...c, sentToWhatsApp: true } : c
           )
         );
       } catch (error) {
         console.error("Error updating WhatsApp status:", error);
+        // Continue without blocking the process
       }
     } catch (error) {
-      console.error("Error in sendFeeReminder:", error);
+      console.error("Error in sendPaperFundReminder:", error);
       alert("Error sending WhatsApp reminder. Please try again.");
     }
   };
 
-  const downloadFeeChallanPDF = (challan: FeeChallan) => {
+  const downloadPaperFundChallanPDF = (challan: PaperFundChallan) => {
     const pdfContent = `
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Fee Challan - ${challan.studentId.studentName}</title>
+    <title>Paper Fund Challan - ${challan.studentId.studentName}</title>
     <style>
         @page {
             size: 210mm 148.5mm; /* Half height of A4 (210mm x 148.5mm) */
@@ -235,7 +196,20 @@ Falcon House School Administration
             margin: 0; 
             padding: 0;
             width: 190mm; /* Content width allowing for margins */
-            font-size: 13px; 
+            font-size: 12px; 
+        }
+        
+        /* Force left alignment for print */
+        @media print {
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
         }
         
         .header { 
@@ -299,32 +273,13 @@ Falcon House School Administration
             margin: 3px 0;
         }
         
-        .arrears { 
-            color: #e74c3c; 
-        }
-        
-        .discount { 
-            color: #27ae60; 
-        }
-        
-        /* Force left alignment for print */
-        @media print {
-            html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            
-            body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-        }
+
     </style>
 </head>
 <body>
     <div class="header">
         <h1>FALCON House School</h1>
-        <h2>Fee Challan</h2>
+        <h2>Paper Fund Challan</h2>
     </div>
     
     <div class="challan-info">
@@ -334,8 +289,13 @@ Falcon House School Administration
         <p><strong>Class:</strong> ${challan.studentId.class} ${
       challan.studentId.section
     }</p>
-        <p><strong>Month/Year:</strong> ${challan.month} ${challan.year}</p>
+        <p><strong>Academic Year:</strong> ${challan.year}</p>
         <p><strong>Due Date:</strong> ${challan.dueDate}</p>
+        ${
+          challan.paidDate
+            ? `<p><strong>Paid Date:</strong> ${challan.paidDate}</p>`
+            : ""
+        }
     </div>
 
     <table class="fee-details">
@@ -344,38 +304,12 @@ Falcon House School Administration
             <th>Amount (Rs.)</th>
         </tr>
         <tr>
-            <td>Tuition Fee</td>
-            <td>${challan.tutionFee || 0}</td>
+            <td>Paper Fund</td>
+            <td>${challan.paperFund}</td>
         </tr>
-        <tr>
-            <td>Exam Fee</td>
-            <td>${challan.examFee || 0}</td>
-        </tr>
-        <tr>
-            <td>Miscellaneous Fee</td>
-            <td>${challan.miscFee || 0}</td>
-        </tr>
-        ${
-          challan.arrears > 0
-            ? `
-        <tr class="arrears">
-            <td><strong>Previous Arrears</strong></td>
-            <td><strong>${challan.arrears}</strong></td>
-        </tr>`
-            : ""
-        }
-        ${
-          challan.discount > 0
-            ? `
-        <tr class="discount">
-            <td><strong>Discount</strong></td>
-            <td><strong>${challan.discount}</strong></td>
-        </tr>`
-            : ""
-        }
         <tr class="total">
             <td>Total Amount</td>
-            <td>Rs. ${challan.totalAmount + challan.arrears}</td>
+            <td>Rs. ${challan.paperFund}</td>
         </tr>
     </table>
 
@@ -391,7 +325,7 @@ Falcon House School Administration
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `fee-challan-${challan.studentId.studentName}-${challan.month}-${challan.year}.html`;
+    link.download = `paper-fund-challan-${challan.studentId.studentName}-${challan.year}.html`;
     link.click();
     window.URL.revokeObjectURL(url);
   };
@@ -405,7 +339,7 @@ Falcon House School Administration
       challan.studentId.fatherName
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      challan.month.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      challan.year.toLowerCase().includes(searchTerm.toLowerCase()) ||
       challan.studentId.rollNumber
         ?.toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
@@ -413,36 +347,27 @@ Falcon House School Administration
 
     const matchesStatus =
       statusFilter === "all" || challan.status === statusFilter;
-    const matchesMonth = monthFilter === "all" || challan.month === monthFilter;
     const matchesYear = yearFilter === "all" || challan.year === yearFilter;
     const matchesWhatsApp =
       whatsappFilter === "all" ||
       (whatsappFilter === "sent" && challan.sentToWhatsApp) ||
       (whatsappFilter === "not_sent" && !challan.sentToWhatsApp);
 
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesMonth &&
-      matchesYear &&
-      matchesWhatsApp
-    );
+    return matchesSearch && matchesStatus && matchesYear && matchesWhatsApp;
   });
 
-  const uniqueMonths = Array.from(new Set(challans.map((c) => c.month)));
-  const uniqueYears = Array.from(new Set(challans.map((c) => c.year)));
+  const uniqueYears = Array.from(new Set(challans.map((c) => c.year))).sort();
 
   const clearAllFilters = () => {
     setStatusFilter("all");
-    setMonthFilter("all");
     setYearFilter("all");
     setWhatsappFilter("all");
     setSearchTerm("");
+    setCurrentPage(1);
   };
 
   const activeFiltersCount = [
     statusFilter !== "all",
-    monthFilter !== "all",
     yearFilter !== "all",
     whatsappFilter !== "all",
     searchTerm.length > 0,
@@ -458,10 +383,6 @@ Falcon House School Administration
         return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
     }
   };
-
-  // Add inside your component
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50; // change as needed
 
   // Calculate paginated challans
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -479,19 +400,89 @@ Falcon House School Administration
     }
   };
 
+  // Summary statistics - now based on filtered data
+  const stats = {
+    total: filteredChallans.length,
+    paid: filteredChallans.filter((c) => c.status === "paid").length,
+    pending: filteredChallans.filter((c) => c.status === "pending").length,
+    overdue: filteredChallans.filter((c) => c.status === "overdue").length,
+    totalAmount: filteredChallans.reduce((sum, c) => sum + c.paperFund, 0),
+    paidAmount: filteredChallans
+      .filter((c) => c.status === "paid")
+      .reduce((sum, c) => sum + c.paperFund, 0),
+    pendingAmount: filteredChallans
+      .filter((c) => c.status !== "paid")
+      .reduce((sum, c) => sum + c.paperFund, 0),
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>
-          Fee Records ({indexOfFirstItem + 1} -{" "}
+          Paper Fund Records ({indexOfFirstItem + 1} -{" "}
           {indexOfLastItem > filteredChallans.length
             ? filteredChallans.length
             : indexOfLastItem}{" "}
           of {filteredChallans.length})
         </CardTitle>
         <CardDescription>
-          View and manage all fee payment records with discounts and arrears
+          View and manage all paper fund payment records
+          {yearFilter !== "all" && (
+            <span className="ml-2 text-blue-600 font-medium">
+              (Showing data for {yearFilter})
+            </span>
+          )}
         </CardDescription>
+
+        {/* Summary Statistics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">
+              {stats.total}
+            </div>
+            <div className="text-sm text-gray-600">Total Records</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">
+              {stats.paid}
+            </div>
+            <div className="text-sm text-gray-600">Paid</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-yellow-600">
+              {stats.pending}
+            </div>
+            <div className="text-sm text-gray-600">Pending</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-red-600">
+              {stats.overdue}
+            </div>
+            <div className="text-sm text-gray-600">Overdue</div>
+          </div>
+        </div>
+
+        {/* Amount Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50 rounded-lg">
+          <div className="text-center">
+            <div className="text-xl font-bold text-blue-800">
+              Rs. {stats.totalAmount.toLocaleString()}
+            </div>
+            <div className="text-sm text-blue-600">Total Amount</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-green-800">
+              Rs. {stats.paidAmount.toLocaleString()}
+            </div>
+            <div className="text-sm text-green-600">Paid Amount</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-orange-800">
+              Rs. {stats.pendingAmount.toLocaleString()}
+            </div>
+            <div className="text-sm text-orange-600">Pending Amount</div>
+          </div>
+        </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -499,7 +490,10 @@ Falcon House School Administration
             <Input
               placeholder="Search by student name, father name, or roll number..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
               className="max-w-sm"
             />
           </div>
@@ -530,7 +524,7 @@ Falcon House School Administration
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -547,24 +541,9 @@ Falcon House School Administration
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Month</Label>
-              <Select value={monthFilter} onValueChange={setMonthFilter}>
-                <SelectTrigger className="h-8">
-                  <SelectValue placeholder="All months" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Months</SelectItem>
-                  {uniqueMonths.sort().map((month) => (
-                    <SelectItem key={month} value={month}>
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Year</Label>
+              <Label className="text-xs text-muted-foreground">
+                Academic Year
+              </Label>
               <Select value={yearFilter} onValueChange={setYearFilter}>
                 <SelectTrigger className="h-8">
                   <SelectValue placeholder="All years" />
@@ -609,12 +588,11 @@ Falcon House School Administration
                 <TableHead>Father</TableHead>
                 <TableHead>Roll Number</TableHead>
                 <TableHead>Class</TableHead>
-                <TableHead>Month/Year</TableHead>
-                <TableHead>Base Amount</TableHead>
-                <TableHead>Arrears</TableHead>
-                <TableHead>Discount</TableHead>
-                <TableHead>Total Amount</TableHead>
+                <TableHead>Academic Year</TableHead>
+                <TableHead>Paper Fund</TableHead>
                 <TableHead>Due Date</TableHead>
+                <TableHead>Generated Date</TableHead>
+                <TableHead>Paid Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>WhatsApp</TableHead>
                 <TableHead>Actions</TableHead>
@@ -629,7 +607,7 @@ Falcon House School Administration
                   >
                     {activeFiltersCount > 0 || searchTerm ? (
                       <div className="space-y-2">
-                        <p>No fee records match your current filters</p>
+                        <p>No paper fund records match your current filters</p>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -640,7 +618,7 @@ Falcon House School Administration
                         </Button>
                       </div>
                     ) : (
-                      "No fee records found"
+                      "No paper fund records found"
                     )}
                   </TableCell>
                 </TableRow>
@@ -651,39 +629,23 @@ Falcon House School Administration
                       {challan.studentId.studentName}
                     </TableCell>
                     <TableCell>{challan.studentId.fatherName}</TableCell>
-                    <TableCell>{challan.studentId.rollNumber}</TableCell>
-                    <TableCell>{challan.studentId.class}</TableCell>
                     <TableCell>
-                      {challan.month} {challan.year}
+                      {challan.studentId.rollNumber || "N/A"}
                     </TableCell>
-                    <TableCell>
-                      Rs.{" "}
-                      {(Number(challan.tutionFee) || 0) +
-                        (Number(challan.examFee) || 0) +
-                        (Number(challan.miscFee) || 0)}
-                    </TableCell>
-                    <TableCell>
-                      {challan.arrears > 0 ? (
-                        <span className="text-red-600 font-semibold">
-                          +Rs. {challan.arrears}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {challan.discount > 0 ? (
-                        <span className="text-green-600 font-semibold">
-                          -Rs. {challan.discount}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </TableCell>
+                    <TableCell>{challan.studentId.class || "N/A"}</TableCell>
+                    <TableCell>{challan.year}</TableCell>
                     <TableCell className="font-semibold">
-                      Rs. {challan.totalAmount + challan.arrears}
+                      Rs. {challan.paperFund.toLocaleString()}
                     </TableCell>
-                    <TableCell>{challan.dueDate}</TableCell>
+                    <TableCell>{challan.dueDate || "N/A"}</TableCell>
+                    <TableCell>{challan.generatedDate || "N/A"}</TableCell>
+                    <TableCell>
+                      {challan.paidDate ? (
+                        challan.paidDate
+                      ) : (
+                        <span className="text-gray-400">Not paid</span>
+                      )}
+                    </TableCell>
                     <TableCell>{getStatusBadge(challan.status)}</TableCell>
                     <TableCell>
                       {challan.sentToWhatsApp ? (
@@ -700,7 +662,7 @@ Falcon House School Administration
                       <div className="flex space-x-2">
                         <Button
                           size="sm"
-                          onClick={() => sendFeeReminder(challan)}
+                          onClick={() => sendPaperFundReminder(challan)}
                           className="bg-green-600 hover:bg-green-700"
                           title="Send WhatsApp Reminder"
                         >
@@ -709,7 +671,7 @@ Falcon House School Administration
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => downloadFeeChallanPDF(challan)}
+                          onClick={() => downloadPaperFundChallanPDF(challan)}
                           title="Download PDF"
                         >
                           <Download className="h-4 w-4" />
@@ -721,7 +683,8 @@ Falcon House School Administration
               )}
             </TableBody>
           </Table>
-          {filteredChallans.length > 0 && (
+
+          {filteredChallans.length > 0 && totalPages > 1 && (
             <div className="flex justify-center items-center space-x-2 mt-4">
               <Button
                 variant="outline"
@@ -735,6 +698,7 @@ Falcon House School Administration
               <span className="text-sm">
                 Page {currentPage} of {totalPages}
               </span>
+
               <Button
                 variant="outline"
                 size="sm"

@@ -2,10 +2,9 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { GenerateFeeTab } from "./tabs/GenerateFee";
-import { SubmitPaymentTab } from "./tabs/SubmitFee";
-import { ViewRecordsTab } from "./tabs/ViewFee";
-import { SettingsTab } from "./tabs/WhatsappSetting";
+import { GeneratePaperFundTab } from "./tabs/GeneratePaperFund";
+import { SubmitPaperFundPaymentTab } from "./tabs/SubmitPaperFund";
+import { ViewPaperFundRecordsTab } from "./tabs/ViewPaperFund";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -22,27 +21,15 @@ interface Student {
   motherOccupation: string;
   rollNumber: string;
   class: string;
+  section: string;
 }
 
 interface ClassFeeStructure {
   className: string;
-  tutionFee: number;
   paperFund: number;
-  examFee: number;
-  miscFee: number;
 }
 
-interface StudentDiscount {
-  _id: string;
-  studentId: {
-    _id: string;
-    studentName: string;
-    rollNumber: string;
-  };
-  discount: number;
-}
-
-interface FeeChallan {
+interface paperFundChallan {
   id: string;
   studentId: {
     _id: string;
@@ -54,36 +41,26 @@ interface FeeChallan {
   };
   month: string;
   year: string;
-  tutionFee: number;
-  examFee: number;
-  miscFee: number;
-  totalAmount: number;
-  arrears: number;
-  discount: number;
+  paperFund: number;
   dueDate: string;
   status: "pending" | "paid" | "overdue";
   generatedDate: string;
   sentToWhatsApp: boolean;
 }
 
-interface FeeManagementProps {
+interface PaperFundManagementProps {
   students: Student[];
   feeStructure: ClassFeeStructure[];
-  setFeeStructure: (feeStuctures: ClassFeeStructure[]) => void;
-  studentDiscounts: StudentDiscount[];
-  setStudentDiscounts: (studentDiscounts: StudentDiscount[]) => void;
-  challans: FeeChallan[];
-  setChallans: (challans: FeeChallan[]) => void;
+  challans: paperFundChallan[];
+  setChallans: (challans: paperFundChallan[]) => void;
 }
 
-export function FeeManagement({
+export function PaperFundManagement({
   students,
   feeStructure,
-  setFeeStructure,
-  studentDiscounts,
   challans,
   setChallans,
-}: FeeManagementProps) {
+}: PaperFundManagementProps) {
   const [whatsappMessage, setWhatsappMessage] = useState("");
 
   useEffect(() => {
@@ -173,21 +150,19 @@ export function FeeManagement({
           <TabsTrigger value="generate">Generate Fee Challans</TabsTrigger>
           <TabsTrigger value="submit">Submit Fee Payment</TabsTrigger>
           <TabsTrigger value="list">View Fee Records</TabsTrigger>
-          <TabsTrigger value="settings">WhatsApp Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="generate">
-          <GenerateFeeTab
+          <GeneratePaperFundTab
             students={students}
             feeStructure={feeStructure}
-            studentDiscounts={studentDiscounts}
             challans={challans}
             setChallans={setChallans}
           />
         </TabsContent>
 
         <TabsContent value="submit">
-          <SubmitPaymentTab
+          <SubmitPaperFundPaymentTab
             students={students}
             challans={challans}
             setChallans={setChallans}
@@ -195,19 +170,10 @@ export function FeeManagement({
         </TabsContent>
 
         <TabsContent value="list">
-          <ViewRecordsTab
+          <ViewPaperFundRecordsTab
             challans={challans}
             setChallans={setChallans}
             whatsappMessage={whatsappMessage}
-          />
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <SettingsTab
-            feeStructure={feeStructure}
-            setFeeStructure={setFeeStructure}
-            whatsappMessage={whatsappMessage}
-            setWhatsappMessage={setWhatsappMessage}
           />
         </TabsContent>
       </Tabs>
