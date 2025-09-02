@@ -50,12 +50,12 @@ app.use(
 );
 
 // Routes
-app.use("api/students", studentRoutes);
-app.use("api/fees", feeRoutes);
-app.use("api/teachers", teacherRoutes);
-app.use("api/fee-structures", feeStructureRoutes);
-app.use("api/student-discounts", studentDiscountRoutes);
-app.use("api/paperFund", PaperFundRoutes);
+app.use("/api/students", studentRoutes);
+app.use("/api/fees", feeRoutes);
+app.use("/api/teachers", teacherRoutes);
+app.use("/api/fee-structures", feeStructureRoutes);
+app.use("/api/student-discounts", studentDiscountRoutes);
+app.use("/api/paperFund", PaperFundRoutes);
 
 app.get("/", (req, res) => {
   res.send("Welcome to Falcon Academic Portal API!");
