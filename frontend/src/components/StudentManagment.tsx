@@ -967,6 +967,7 @@ export function StudentManagement({
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      {columnVisibility.image && <TableHead>Photo</TableHead>}
                       {columnVisibility.rollNumber && (
                         <TableHead>Roll Number</TableHead>
                       )}
@@ -1025,6 +1026,21 @@ export function StudentManagement({
                     ) : (
                       currentStudents.map((student) => (
                         <TableRow key={student._id}>
+                          {columnVisibility.image && (
+                            <TableCell>
+                              {getImageUrl(student) ? (
+                                <img
+                                  src={getImageUrl(student)!}
+                                  alt={`${student.studentName}'s photo`}
+                                  className="w-12 h-12 object-cover rounded-lg border"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                                  <User className="h-6 w-6 text-gray-400" />
+                                </div>
+                              )}
+                            </TableCell>
+                          )}
                           {columnVisibility.rollNumber && (
                             <TableCell className="font-medium">
                               {safeToString(student.rollNumber)}
