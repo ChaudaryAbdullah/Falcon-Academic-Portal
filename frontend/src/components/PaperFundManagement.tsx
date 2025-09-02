@@ -78,6 +78,9 @@ export function PaperFundManagement({
   setChallans,
 }: PaperFundManagementProps) {
   const [whatsappMessage, setWhatsappMessage] = useState("");
+  setWhatsappMessage(
+    "Dear {fatherName}, this is a reminder that the paper fund for {studentName} (Roll No: {rollNumber}) is due on {dueDate}. The amount due is {paperFundAmount}. Please ensure timely payment to avoid any inconvenience. Thank you."
+  );
 
   useEffect(() => {
     const updatedChallans = updateOverdueStatuses(challans);
