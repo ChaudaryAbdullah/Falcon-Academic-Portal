@@ -10,23 +10,38 @@ const BACKEND = import.meta.env.VITE_BACKEND;
 
 interface Student {
   _id: string;
+  rollNumber: string;
   studentName: string;
   fatherName: string;
   fatherCnic: string;
+  motherCnic: string;
   bform: string;
-  dateOfBirth: string;
+  dob: string;
+  section: string;
   fPhoneNumber: string;
+  mPhoneNumber: string;
   fatherOccupation: string;
   motherName: string;
   motherOccupation: string;
-  rollNumber: string;
   class: string;
-  section: string;
+  email: string;
+  password: string;
+  address: string;
+  img?: {
+    data: string;
+    contentType: string;
+  };
 }
 
-interface ClassFeeStructure {
+interface FeeStructure {
+  _id: string;
   className: string;
+  tutionFee: number;
+  examFee: number;
   paperFund: number;
+  miscFee: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface paperFundChallan {
@@ -38,19 +53,20 @@ interface paperFundChallan {
     fatherName: string;
     fPhoneNumber: string;
     class: string;
+    section: string;
   };
-  month: string;
   year: string;
   paperFund: number;
   dueDate: string;
   status: "pending" | "paid" | "overdue";
   generatedDate: string;
   sentToWhatsApp: boolean;
+  paidDate?: string;
 }
 
 interface PaperFundManagementProps {
   students: Student[];
-  feeStructure: ClassFeeStructure[];
+  feeStructure: FeeStructure[];
   challans: paperFundChallan[];
   setChallans: (challans: paperFundChallan[]) => void;
 }
@@ -118,7 +134,7 @@ export function PaperFundManagement({
 
   useEffect(() => {
     const checkOverdueInterval = setInterval(() => {
-      setChallans((prevChallans: any[]) => {
+      setChallans(((prevChallans: paperFundChallan[]) => {
         const updatedChallans = updateOverdueStatuses(prevChallans);
         const hasChanges = updatedChallans.some(
           (challan, index) => challan.status !== prevChallans[index]?.status
@@ -129,7 +145,7 @@ export function PaperFundManagement({
           return updatedChallans;
         }
         return prevChallans;
-      });
+      }) as unknown as paperFundChallan[]);
     }, 10 * 60 * 1000);
 
     return () => clearInterval(checkOverdueInterval);

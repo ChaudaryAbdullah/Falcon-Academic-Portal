@@ -164,11 +164,10 @@ Falcon House School Administration
           { withCredentials: true }
         );
 
-        setChallans((prevChallans: PaperFundChallan[]) =>
+        setChallans(((prevChallans: PaperFundChallan[]) =>
           prevChallans.map((c) =>
             c.id === challan.id ? { ...c, sentToWhatsApp: true } : c
-          )
-        );
+          )) as unknown as PaperFundChallan[]);
       } catch (error) {
         console.error("Error updating WhatsApp status:", error);
         // Continue without blocking the process

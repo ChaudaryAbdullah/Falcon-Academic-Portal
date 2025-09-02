@@ -22,14 +22,109 @@ import { PaperFundManagement } from "../components/PaperFundManagement";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
+interface Student {
+  _id: string;
+  rollNumber: string;
+  studentName: string;
+  fatherName: string;
+  fatherCnic: string;
+  motherCnic: string;
+  bform: string;
+  dob: string;
+  section: string;
+  fPhoneNumber: string;
+  mPhoneNumber: string;
+  fatherOccupation: string;
+  motherName: string;
+  motherOccupation: string;
+  class: string;
+  email: string;
+  password: string;
+  address: string;
+  img?: {
+    data: string;
+    contentType: string;
+  };
+}
+
+interface Teacher {
+  _id: string;
+  fullName: string;
+  fatherHusbandName: string;
+  salary: string;
+  cnic: string;
+  dob: string;
+  phoneNumber: string;
+  email: string;
+  password: string;
+}
+
+interface FeeStructure {
+  _id: string;
+  className: string;
+  tutionFee: number;
+  examFee: number;
+  paperFund: number;
+  miscFee: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface FeeChallan {
+  id: string;
+  studentId: {
+    _id: string;
+    rollNumber: string;
+    studentName: string;
+    fatherName: string;
+    fPhoneNumber: string;
+    class: string;
+    section: string;
+  };
+  month: string;
+  year: string;
+  tutionFee: number;
+  examFee: number;
+  miscFee: number;
+  totalAmount: number;
+  arrears: number;
+  discount: number;
+  dueDate: string;
+  status: "pending" | "paid" | "overdue";
+  generatedDate: string;
+  sentToWhatsApp: boolean;
+}
+
+interface paperFundChallan {
+  id: string;
+  studentId: {
+    _id: string;
+    rollNumber: string;
+    studentName: string;
+    fatherName: string;
+    fPhoneNumber: string;
+    class: string;
+    section: string;
+  };
+  year: string;
+  paperFund: number;
+  dueDate: string;
+  status: "pending" | "paid" | "overdue";
+  generatedDate: string;
+  sentToWhatsApp: boolean;
+  paidDate?: string;
+}
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [students, setStudents] = useState([]);
-  const [teachers, setTeachers] = useState([]);
-  const [feeStructure, setFeeStructure] = useState([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [feeStructure, setFeeStructure] = useState<FeeStructure[]>([]);
   const [studentDiscounts, setStudentDiscounts] = useState([]);
-  const [challans, setChallans] = useState([]);
-  const [paperFundChallans, setPaperFundChallans] = useState([]);
+  const [challans, setChallans] = useState<FeeChallan[]>([]);
+  const [paperFundChallans, setPaperFundChallans] = useState<
+    paperFundChallan[]
+  >([]);
   useEffect(() => {
     const fetchStudents = async () => {
       const res = await axios.get(`${BACKEND}/api/students`, {
@@ -132,7 +227,6 @@ export default function AdminDashboard() {
           <PaperFundManagement
             students={students}
             feeStructure={feeStructure}
-            setFeeStructure={setFeeStructure}
             challans={paperFundChallans}
             setChallans={setPaperFundChallans}
           />

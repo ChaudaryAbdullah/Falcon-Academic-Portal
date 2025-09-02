@@ -69,7 +69,7 @@ interface Student {
 
 interface StudentManagementProps {
   students: Student[];
-  setStudents: (students: Student[]) => void;
+  setStudents: (students: Student[]) => void | React.Dispatch<any>;
 }
 
 interface Filters {
@@ -196,11 +196,14 @@ export function StudentManagement({
       // Append all form fields
       Object.entries(formData).forEach(([key, value]) => {
         if (key === "class") {
-          formDataObj.append(key, String(Number(value))); // convert to number then string
+          formDataObj.append(key, String(value)); // keep as string
         } else if (key === "dob") {
-          formDataObj.append(key, new Date(value).toISOString());
+          formDataObj.append(key, new Date(String(value)).toISOString());
         } else {
-          formDataObj.append(key, value);
+          formDataObj.append(
+            key,
+            typeof value === "string" ? value : JSON.stringify(value)
+          );
         }
       });
 

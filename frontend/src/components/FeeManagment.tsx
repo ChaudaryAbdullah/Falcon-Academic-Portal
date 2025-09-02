@@ -11,25 +11,38 @@ const BACKEND = import.meta.env.VITE_BACKEND;
 
 interface Student {
   _id: string;
+  rollNumber: string;
   studentName: string;
   fatherName: string;
   fatherCnic: string;
+  motherCnic: string;
   bform: string;
-  dateOfBirth: string;
+  dob: string;
+  section: string;
   fPhoneNumber: string;
+  mPhoneNumber: string;
   fatherOccupation: string;
   motherName: string;
   motherOccupation: string;
-  rollNumber: string;
   class: string;
+  email: string;
+  password: string;
+  address: string;
+  img?: {
+    data: string;
+    contentType: string;
+  };
 }
 
 interface ClassFeeStructure {
+  _id: string;
   className: string;
   tutionFee: number;
-  paperFund: number;
   examFee: number;
+  paperFund: number;
   miscFee: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface StudentDiscount {
@@ -51,6 +64,7 @@ interface FeeChallan {
     fatherName: string;
     fPhoneNumber: string;
     class: string;
+    section: string;
   };
   month: string;
   year: string;
@@ -71,7 +85,6 @@ interface FeeManagementProps {
   feeStructure: ClassFeeStructure[];
   setFeeStructure: (feeStuctures: ClassFeeStructure[]) => void;
   studentDiscounts: StudentDiscount[];
-  setStudentDiscounts: (studentDiscounts: StudentDiscount[]) => void;
   challans: FeeChallan[];
   setChallans: (challans: FeeChallan[]) => void;
 }
@@ -92,7 +105,7 @@ export function FeeManagement({
     syncOverdueStatusesWithBackend(updatedChallans);
   }, []);
 
-  const updateOverdueStatuses = (challansData: any[]) => {
+  const updateOverdueStatuses = (challansData: FeeChallan[]): FeeChallan[] => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -112,7 +125,9 @@ export function FeeManagement({
     });
   };
 
-  const syncOverdueStatusesWithBackend = async (updatedChallans: any[]) => {
+  const syncOverdueStatusesWithBackend = async (
+    updatedChallans: FeeChallan[]
+  ) => {
     try {
       const overdueChallans = updatedChallans.filter((challan, index) => {
         const originalChallan = challans[index];
@@ -141,7 +156,7 @@ export function FeeManagement({
 
   useEffect(() => {
     const checkOverdueInterval = setInterval(() => {
-      setChallans((prevChallans: any[]) => {
+      setChallans(((prevChallans: FeeChallan[]) => {
         const updatedChallans = updateOverdueStatuses(prevChallans);
         const hasChanges = updatedChallans.some(
           (challan, index) => challan.status !== prevChallans[index]?.status
@@ -152,7 +167,7 @@ export function FeeManagement({
           return updatedChallans;
         }
         return prevChallans;
-      });
+      }) as unknown as FeeChallan[]);
     }, 10 * 60 * 1000);
 
     return () => clearInterval(checkOverdueInterval);
