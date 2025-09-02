@@ -19,17 +19,27 @@ const BACKEND = import.meta.env.VITE_BACKEND;
 
 interface Student {
   _id: string;
+  rollNumber: string;
   studentName: string;
   fatherName: string;
   fatherCnic: string;
+  motherCnic: string;
   bform: string;
-  dateOfBirth: string;
+  dob: string;
+  section: string;
   fPhoneNumber: string;
+  mPhoneNumber: string;
   fatherOccupation: string;
   motherName: string;
   motherOccupation: string;
-  rollNumber: string;
-  class?: string;
+  class: string;
+  email: string;
+  password: string;
+  address: string;
+  img?: {
+    data: string;
+    contentType: string;
+  };
 }
 
 interface FeeChallan {
@@ -41,11 +51,11 @@ interface FeeChallan {
     fatherName: string;
     fPhoneNumber: string;
     class: string;
+    section: string;
   };
   month: string;
   year: string;
   tutionFee: number;
-  paperFund: number;
   examFee: number;
   miscFee: number;
   totalAmount: number;
@@ -335,7 +345,6 @@ export function SubmitPaymentTab({
                             <div className="text-lg font-bold text-green-600 mt-1">
                               Rs.{" "}
                               {fee.tutionFee +
-                                fee.paperFund +
                                 fee.examFee +
                                 fee.miscFee -
                                 fee.discount +
@@ -362,9 +371,6 @@ export function SubmitPaymentTab({
                           <div className="bg-gray-50 p-2 rounded">
                             <div className="font-medium text-gray-600">
                               Paper Fund
-                            </div>
-                            <div className="font-semibold">
-                              Rs. {fee.paperFund}
                             </div>
                           </div>
                           <div className="bg-gray-50 p-2 rounded">
@@ -522,7 +528,6 @@ export function SubmitPaymentTab({
                           <span className="font-semibold">
                             Rs.{" "}
                             {fee.tutionFee +
-                              fee.paperFund +
                               fee.examFee +
                               fee.miscFee -
                               fee.discount +
@@ -544,7 +549,6 @@ export function SubmitPaymentTab({
                               (sum, fee) =>
                                 sum +
                                 (fee.tutionFee +
-                                  fee.paperFund +
                                   fee.examFee +
                                   fee.miscFee -
                                   fee.discount) +
@@ -588,7 +592,6 @@ export function SubmitPaymentTab({
                         (sum, fee) =>
                           sum +
                           (fee.tutionFee +
-                            fee.paperFund +
                             fee.examFee +
                             fee.miscFee -
                             fee.discount) +

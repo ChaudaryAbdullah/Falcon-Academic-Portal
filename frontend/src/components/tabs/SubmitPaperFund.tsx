@@ -19,17 +19,27 @@ const BACKEND = import.meta.env.VITE_BACKEND;
 
 interface Student {
   _id: string;
+  rollNumber: string;
   studentName: string;
   fatherName: string;
   fatherCnic: string;
+  motherCnic: string;
   bform: string;
-  dateOfBirth: string;
+  dob: string;
+  section: string;
   fPhoneNumber: string;
+  mPhoneNumber: string;
   fatherOccupation: string;
   motherName: string;
   motherOccupation: string;
-  rollNumber: string;
-  class?: string;
+  class: string;
+  email: string;
+  password: string;
+  address: string;
+  img?: {
+    data: string;
+    contentType: string;
+  };
 }
 
 interface PaperFundChallan {
@@ -41,6 +51,7 @@ interface PaperFundChallan {
     fatherName: string;
     fPhoneNumber: string;
     class: string;
+    section: string;
   };
   year: string;
   paperFund: number;
@@ -65,8 +76,12 @@ export function SubmitPaperFundPaymentTab({
   const [selectedStudent, setSelectedStudent] = useState<string>("");
   const [studentSearch, setStudentSearch] = useState("");
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
-  const [pendingPaperFunds, setPendingPaperFunds] = useState<PaperFundChallan[]>([]);
-  const [selectedPendingFunds, setSelectedPendingFunds] = useState<string[]>([]);
+  const [pendingPaperFunds, setPendingPaperFunds] = useState<
+    PaperFundChallan[]
+  >([]);
+  const [selectedPendingFunds, setSelectedPendingFunds] = useState<string[]>(
+    []
+  );
   const [lateFees, setLateFees] = useState<{ [key: string]: number }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -151,7 +166,7 @@ export function SubmitPaperFundPaymentTab({
           const fund = challans.find((c) => c.id === fundId);
           if (!fund) continue;
 
-          const lateFee = lateFees[fundId];
+          // const lateFee = lateFees[fundId];
           // For now, we'll just include late fees in the total calculation
           // In a real system, you might want to update the paperFund amount
           // await axios.put(`${BACKEND}/api/paperFund/${fundId}`, {
@@ -176,7 +191,7 @@ export function SubmitPaperFundPaymentTab({
         const fetchResponse = await axios.get(`${BACKEND}/api/paperFund`, {
           withCredentials: true,
         });
-        
+
         if (fetchResponse.data.success) {
           setChallans(fetchResponse.data.data);
 
@@ -210,14 +225,15 @@ export function SubmitPaperFundPaymentTab({
       }
     } catch (error: any) {
       console.error("Error submitting paper fund payment:", error);
-      
-      let errorMessage = "Failed to submit paper fund payment. Please try again.";
+
+      let errorMessage =
+        "Failed to submit paper fund payment. Please try again.";
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       alert(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -269,7 +285,8 @@ export function SubmitPaperFundPaymentTab({
                           {student.studentName}
                         </div>
                         <div className="text-xs text-gray-500">
-                          Father: {student.fatherName} | Roll: {student.rollNumber} | Class: {student.class}
+                          Father: {student.fatherName} | Roll:{" "}
+                          {student.rollNumber} | Class: {student.class}
                         </div>
                       </div>
                     </div>
@@ -299,7 +316,8 @@ export function SubmitPaperFundPaymentTab({
                       No Generated Paper Fund Challans Found
                     </p>
                     <p className="text-sm text-gray-500 mt-1">
-                      Please generate paper fund challans first in the "Generate Paper Fund Challans" tab
+                      Please generate paper fund challans first in the "Generate
+                      Paper Fund Challans" tab
                     </p>
                   </div>
                 ) : (
@@ -359,8 +377,12 @@ export function SubmitPaperFundPaymentTab({
                         {/* Paper Fund Details */}
                         <div className="bg-gray-50 p-3 rounded">
                           <div className="flex justify-between items-center">
-                            <span className="font-medium text-gray-600">Paper Fund</span>
-                            <span className="font-semibold">Rs. {fund.paperFund}</span>
+                            <span className="font-medium text-gray-600">
+                              Paper Fund
+                            </span>
+                            <span className="font-semibold">
+                              Rs. {fund.paperFund}
+                            </span>
                           </div>
                         </div>
 
@@ -389,7 +411,10 @@ export function SubmitPaperFundPaymentTab({
                                 step="10"
                                 value={lateFees[fund.id] || 0}
                                 onChange={(e) => {
-                                  const value = Math.max(0, Number(e.target.value));
+                                  const value = Math.max(
+                                    0,
+                                    Number(e.target.value)
+                                  );
                                   setLateFees((prev) => ({
                                     ...prev,
                                     [fund.id]: value,
@@ -413,8 +438,9 @@ export function SubmitPaperFundPaymentTab({
 
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                       <p className="text-sm text-yellow-800">
-                        <strong>Note:</strong> Select the paper fund challans above that
-                        you want to mark as paid. You can select multiple years at once.
+                        <strong>Note:</strong> Select the paper fund challans
+                        above that you want to mark as paid. You can select
+                        multiple years at once.
                       </p>
                     </div>
                   </div>
@@ -492,7 +518,9 @@ export function SubmitPaperFundPaymentTab({
                 disabled={selectedPendingFunds.length === 0 || isSubmitting}
               >
                 <Receipt className="h-5 w-5 mr-2" />
-                {isSubmitting ? "Processing..." : `Submit Payment for ${selectedPendingFunds.length} Challan(s)`}
+                {isSubmitting
+                  ? "Processing..."
+                  : `Submit Payment for ${selectedPendingFunds.length} Challan(s)`}
                 {selectedPendingFunds.length > 0 && !isSubmitting && (
                   <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-sm font-bold">
                     Rs.{" "}
@@ -516,8 +544,8 @@ export function SubmitPaperFundPaymentTab({
                 Select a Student
               </h3>
               <p className="text-gray-500">
-                Search and select a student above to view their generated paper fund
-                challans
+                Search and select a student above to view their generated paper
+                fund challans
               </p>
             </div>
           )}

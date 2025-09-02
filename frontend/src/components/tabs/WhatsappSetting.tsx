@@ -12,11 +12,14 @@ import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 
 interface ClassFeeStructure {
+  _id: string;
   className: string;
   tutionFee: number;
-  paperFund: number;
   examFee: number;
+  paperFund: number;
   miscFee: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface SettingsTabProps {

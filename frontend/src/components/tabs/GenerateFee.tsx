@@ -24,17 +24,27 @@ const BACKEND = import.meta.env.VITE_BACKEND;
 
 interface Student {
   _id: string;
+  rollNumber: string;
   studentName: string;
   fatherName: string;
   fatherCnic: string;
+  motherCnic: string;
   bform: string;
-  dateOfBirth: string;
+  dob: string;
+  section: string;
   fPhoneNumber: string;
+  mPhoneNumber: string;
   fatherOccupation: string;
   motherName: string;
   motherOccupation: string;
-  rollNumber: string;
   class: string;
+  email: string;
+  password: string;
+  address: string;
+  img?: {
+    data: string;
+    contentType: string;
+  };
 }
 
 interface ClassFeeStructure {
@@ -63,6 +73,7 @@ interface FeeChallan {
     fatherName: string;
     fPhoneNumber: string;
     class: string;
+    section: string;
   };
   month: string;
   year: string;
@@ -232,6 +243,7 @@ export function GenerateFeeTab({
           fatherName: student.fatherName,
           fPhoneNumber: student.fPhoneNumber,
           class: student.class,
+          section: student.section,
         },
         month,
         year,

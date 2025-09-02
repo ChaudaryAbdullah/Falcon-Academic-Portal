@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -98,18 +98,20 @@ export default function FeeStructure({
           feeData
         );
 
-        setFeeStructures((prev) =>
-          prev.map((structure) =>
+        setFeeStructures(((prev: FeeStructure[]) =>
+          prev.map((structure: FeeStructure) =>
             structure._id === editingId ? res.data : structure
-          )
-        );
+          )) as unknown as FeeStructure[]);
         setEditingId(null);
         toast.success("Fee structure updated successfully");
       } else {
         // 🔹 Add new fee structure
         const res = await axios.post(`${BACKEND}/api/fee-structures`, feeData);
 
-        setFeeStructures((prev) => [res.data, ...prev]);
+        setFeeStructures(((prev: FeeStructure[]) => [
+          res.data as FeeStructure,
+          ...prev,
+        ]) as unknown as FeeStructure[]);
         toast.success("Fee structure created successfully");
       }
 
@@ -160,9 +162,10 @@ export default function FeeStructure({
   const handleDelete = async (id: string) => {
     try {
       await axios.delete(`${BACKEND}/api/fee-structures/${id}`);
-      setFeeStructures((prev) =>
-        prev.filter((structure) => structure._id !== id)
-      );
+      setFeeStructures(((prev: FeeStructure[]) =>
+        prev.filter(
+          (structure: FeeStructure) => structure._id !== id
+        )) as unknown as FeeStructure[]);
       toast.success("Fee structure deleted successfully");
     } catch (error: any) {
       toast.error(

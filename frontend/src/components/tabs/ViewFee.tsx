@@ -204,11 +204,10 @@ Falcon House School Administration
           { withCredentials: true }
         );
 
-        setChallans((prevChallans: any[]) =>
+        setChallans(((prevChallans: FeeChallan[]) =>
           prevChallans.map((c) =>
             c.id === challan.id ? { ...c, sentToWhatsApp: true } : c
-          )
-        );
+          )) as unknown as FeeChallan[]);
       } catch (error) {
         console.error("Error updating WhatsApp status:", error);
       }
