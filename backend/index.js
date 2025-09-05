@@ -21,10 +21,15 @@ const server = http.createServer(app);
 
 app.use(
   cors({
-    origin: [FRONTEND, "https://falcon-academic-portal.vercel.app/"], // Explicitly allow Vercel frontend,
+    origin: [
+      FRONTEND,
+      "https://falcon-academic-portal.vercel.app",
+      "http://falcon-academic-portal.vercel.app",
+      "https://falcon-academic-portal-1ivxky4dc-chaudaryabdullahs-projects.vercel.app", // the deployed preview domain
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
