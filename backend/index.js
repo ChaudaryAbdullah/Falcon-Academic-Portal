@@ -21,17 +21,36 @@ const server = http.createServer(app);
 
 app.use(
   cors({
-    origin: [
-      FRONTEND,
-      "https://falcon-academic-portal.vercel.app",
-      "http://falcon-academic-portal.vercel.app",
-      "https://falcon-academic-portal-1ivxky4dc-chaudaryabdullahs-projects.vercel.app", // the deployed preview domain
-    ],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+
+      // Allowed domains
+      const allowedOrigins = [
+        "https://falcon-academic-portal.vercel.app", // main production frontend
+        "http://falcon-academic-portal.vercel.app",
+        "https://falcon-academic-portal.onrender.com", // backend itself
+      ];
+
+      // Allow all Vercel preview deployments (*.vercel.app)
+      if (
+        allowedOrigins.includes(origin) ||
+        /\.vercel\.app$/.test(new URL(origin).hostname)
+      ) {
+        return callback(null, true);
+      }
+
+      // Otherwise block
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// ✅ Handle preflight requests
+app.options("*", cors());
 
 // Middleware
 app.use(express.json({ limit: "50mb" }));
