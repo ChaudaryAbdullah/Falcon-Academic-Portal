@@ -26,11 +26,7 @@ app.use(
       if (!origin) return callback(null, true);
 
       // Allowed domains
-      const allowedOrigins = [
-        "https://falcon-academic-portal.vercel.app", // main production frontend
-        "http://falcon-academic-portal.vercel.app",
-        "https://falcon-academic-portal.onrender.com", // backend itself
-      ];
+      const allowedOrigins = [FRONTEND];
 
       // Allow all Vercel preview deployments (*.vercel.app)
       if (
@@ -50,7 +46,7 @@ app.use(
 );
 
 // ✅ Handle preflight requests
-app.options("*", cors());
+// app.options("*", cors());
 
 // Middleware
 app.use(express.json({ limit: "50mb" }));
@@ -62,7 +58,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
-      mongoUrl: "mongodb://localhost:27017/session-db",
+      mongoUrl: DB_URL,
     }),
     cookie: {
       secure: false,
