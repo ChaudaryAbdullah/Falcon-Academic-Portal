@@ -310,15 +310,12 @@ export default function FeeReports({ students }: FeeReportProps) {
         params.append("month", reportFilters.month);
       }
 
-      
-
       const response = await axios.get(
         `${BACKEND}/api/fees/reports/class-section?${params}`,
         {
           withCredentials: true,
         }
       );
-
 
       setReportData(response.data.data || []);
       setCurrentPage(1); // Reset to first page when new report is generated
@@ -412,7 +409,7 @@ export default function FeeReports({ students }: FeeReportProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Fee Reports</h2>
@@ -423,7 +420,7 @@ export default function FeeReports({ students }: FeeReportProps) {
       </div>
 
       <Tabs defaultValue="class-reports" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
           <TabsTrigger value="class-reports">Class Reports</TabsTrigger>
           <TabsTrigger value="student-report">Individual Student</TabsTrigger>
           <TabsTrigger value="summary">Summary Reports</TabsTrigger>

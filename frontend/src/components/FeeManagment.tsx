@@ -174,24 +174,46 @@ export function FeeManagement({
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Fee Management</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+          Fee Management
+        </h1>
+        <p className="text-muted-foreground text-sm sm:text-base">
           Generate fee challans with discounts and arrears, submit payments, and
           send notifications
         </p>
       </div>
 
       <Tabs defaultValue="generate" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="generate">Generate Fee Challans</TabsTrigger>
-          <TabsTrigger value="submit">Submit Fee Payment</TabsTrigger>
-          <TabsTrigger value="list">View Fee Records</TabsTrigger>
-          <TabsTrigger value="settings">WhatsApp Settings</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+          <TabsTrigger
+            value="generate"
+            className="text-xs sm:text-sm py-2 px-2 sm:px-4"
+          >
+            Generate Fee
+          </TabsTrigger>
+          <TabsTrigger
+            value="submit"
+            className="text-xs sm:text-sm py-2 px-2 sm:px-4"
+          >
+            Submit Payment
+          </TabsTrigger>
+          <TabsTrigger
+            value="list"
+            className="text-xs sm:text-sm py-2 px-2 sm:px-4"
+          >
+            View Records
+          </TabsTrigger>
+          <TabsTrigger
+            value="settings"
+            className="text-xs sm:text-sm py-2 px-2 sm:px-4"
+          >
+            Settings
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="generate">
+        <TabsContent value="generate" className="mt-4 sm:mt-6">
           <GenerateFeeTab
             students={students}
             feeStructure={feeStructure}
@@ -201,7 +223,7 @@ export function FeeManagement({
           />
         </TabsContent>
 
-        <TabsContent value="submit">
+        <TabsContent value="submit" className="mt-4 sm:mt-6">
           <SubmitPaymentTab
             students={students}
             challans={challans}
@@ -209,7 +231,7 @@ export function FeeManagement({
           />
         </TabsContent>
 
-        <TabsContent value="list">
+        <TabsContent value="list" className="mt-4 sm:mt-6">
           <ViewRecordsTab
             challans={challans}
             setChallans={setChallans}
@@ -217,7 +239,7 @@ export function FeeManagement({
           />
         </TabsContent>
 
-        <TabsContent value="settings">
+        <TabsContent value="settings" className="mt-4 sm:mt-6">
           <SettingsTab
             feeStructure={feeStructure}
             setFeeStructure={setFeeStructure}

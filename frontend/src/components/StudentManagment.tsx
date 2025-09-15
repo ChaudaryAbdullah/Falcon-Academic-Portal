@@ -413,16 +413,16 @@ export function StudentManagement({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
           Student Management
         </h1>
         <p className="text-muted-foreground">Add and manage student records</p>
       </div>
 
       <Tabs defaultValue="add" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="add">Add Student</TabsTrigger>
           <TabsTrigger value="list">View Students</TabsTrigger>
         </TabsList>
@@ -438,7 +438,7 @@ export function StudentManagement({
                 {/* Image Upload Section */}
                 <div className="space-y-4 border border-dashed border-gray-300 rounded-lg p-4">
                   <Label>Student Photo</Label>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4">
                     {imagePreview ? (
                       <div className="relative">
                         <img
@@ -462,7 +462,7 @@ export function StudentManagement({
                       </div>
                     )}
 
-                    <div className="flex-1">
+                    <div className="flex-1 text-center sm:text-left">
                       <Input
                         type="file"
                         accept="image/*"
@@ -485,7 +485,7 @@ export function StudentManagement({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="studentName">Student Name</Label>
                     <Input
@@ -518,7 +518,7 @@ export function StudentManagement({
                       required
                     />
                   </div>
-                  <div className="space-y-2 ">
+                  <div className="space-y-2">
                     <Label htmlFor="address">Address</Label>
                     <Input
                       id="address"
@@ -626,7 +626,7 @@ export function StudentManagement({
                     />
                   </div>
 
-                  <div className="space-y-2 mt-5 ">
+                  <div className="space-y-2 mt-5">
                     <Label htmlFor="motherName">Mother Name</Label>
                     <Input
                       id="motherName"
@@ -659,7 +659,7 @@ export function StudentManagement({
                       placeholder="03XXXXXXXXX"
                     />
                   </div>
-                  <div className="space-y-2 ">
+                  <div className="space-y-2">
                     <Label htmlFor="motherOccupation">Mother Occupation</Label>
                     <Input
                       id="motherOccupation"
@@ -703,7 +703,7 @@ export function StudentManagement({
         <TabsContent value="list">
           <Card>
             <CardHeader>
-              <CardTitle>
+              <CardTitle className="text-lg sm:text-xl">
                 Students List ({indexOfFirstStudent + 1} -{" "}
                 {indexOfLastStudent > filteredStudents.length
                   ? filteredStudents.length
@@ -716,21 +716,21 @@ export function StudentManagement({
 
               {/* Search and Filter Controls */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 flex-1">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center space-x-2 flex-1 w-full sm:w-auto">
                     <Search className="h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search students..."
                       value={searchTerm}
                       onChange={(e) => handleSearchChange(e.target.value)}
-                      className="max-w-sm"
+                      className="w-full sm:max-w-sm"
                     />
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                     {/* Column Visibility Dropdown */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline">
+                        <Button variant="outline" className="w-full sm:w-auto">
                           <Settings className="h-4 w-4 mr-2" />
                           Columns
                         </Button>
@@ -760,6 +760,7 @@ export function StudentManagement({
                     <Button
                       variant="outline"
                       onClick={() => setShowFilters(!showFilters)}
+                      className="w-full sm:w-auto"
                     >
                       <Filter className="h-4 w-4 mr-2" />
                       Filters
@@ -774,7 +775,7 @@ export function StudentManagement({
 
                 {/* Filter Section */}
                 {showFilters && (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted rounded-lg">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-4 bg-muted rounded-lg">
                     <div className="space-y-2">
                       <Label htmlFor="classFilter">Class</Label>
                       <Select
@@ -883,8 +884,8 @@ export function StudentManagement({
                       </Select>
                     </div>
 
-                    {activeFiltersCount > 0 && (
-                      <div className="flex items-end">
+                    <div className="flex items-end sm:col-span-2 lg:col-span-4 xl:col-span-1">
+                      {activeFiltersCount > 0 && (
                         <Button
                           variant="outline"
                           onClick={clearFilters}
@@ -893,8 +894,8 @@ export function StudentManagement({
                           <X className="h-4 w-4 mr-2" />
                           Clear Filters
                         </Button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -902,7 +903,7 @@ export function StudentManagement({
                 {activeFiltersCount > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {filters.class && (
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="text-xs">
                         Class: {filters.class}
                         <Button
                           variant="ghost"
@@ -915,7 +916,7 @@ export function StudentManagement({
                       </Badge>
                     )}
                     {filters.section && (
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="text-xs">
                         Section: {filters.section}
                         <Button
                           variant="ghost"
@@ -928,7 +929,7 @@ export function StudentManagement({
                       </Badge>
                     )}
                     {filters.fatherOccupation && (
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="text-xs">
                         Father Occupation: {filters.fatherOccupation}
                         <Button
                           variant="ghost"
@@ -943,7 +944,7 @@ export function StudentManagement({
                       </Badge>
                     )}
                     {filters.motherOccupation && (
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="text-xs">
                         Mother Occupation: {filters.motherOccupation}
                         <Button
                           variant="ghost"
@@ -967,44 +968,70 @@ export function StudentManagement({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {columnVisibility.image && <TableHead>Photo</TableHead>}
+                      {columnVisibility.image && (
+                        <TableHead className="w-16">Photo</TableHead>
+                      )}
                       {columnVisibility.rollNumber && (
-                        <TableHead>Roll Number</TableHead>
+                        <TableHead className="min-w-[100px]">
+                          Roll Number
+                        </TableHead>
                       )}
                       {columnVisibility.studentName && (
-                        <TableHead>Student Name</TableHead>
+                        <TableHead className="min-w-[150px]">
+                          Student Name
+                        </TableHead>
                       )}
-                      {columnVisibility.class && <TableHead>Class</TableHead>}
+                      {columnVisibility.class && (
+                        <TableHead className="min-w-[80px]">Class</TableHead>
+                      )}
                       {columnVisibility.section && (
-                        <TableHead>Section</TableHead>
+                        <TableHead className="min-w-[80px]">Section</TableHead>
                       )}
                       {columnVisibility.fatherName && (
-                        <TableHead>Father Name</TableHead>
+                        <TableHead className="min-w-[150px]">
+                          Father Name
+                        </TableHead>
                       )}
                       {columnVisibility.fatherCnic && (
-                        <TableHead>Father CNIC</TableHead>
+                        <TableHead className="min-w-[140px]">
+                          Father CNIC
+                        </TableHead>
                       )}
-                      {columnVisibility.bform && <TableHead>B-Form</TableHead>}
+                      {columnVisibility.bform && (
+                        <TableHead className="min-w-[120px]">B-Form</TableHead>
+                      )}
                       {columnVisibility.dob && (
-                        <TableHead>Date of Birth</TableHead>
+                        <TableHead className="min-w-[120px]">
+                          Date of Birth
+                        </TableHead>
                       )}
                       {columnVisibility.fPhoneNumber && (
-                        <TableHead>Father Phone</TableHead>
+                        <TableHead className="min-w-[130px]">
+                          Father Phone
+                        </TableHead>
                       )}
                       {columnVisibility.fatherOccupation && (
-                        <TableHead>Father Occupation</TableHead>
+                        <TableHead className="min-w-[140px]">
+                          Father Occupation
+                        </TableHead>
                       )}
                       {columnVisibility.motherName && (
-                        <TableHead>Mother Name</TableHead>
+                        <TableHead className="min-w-[150px]">
+                          Mother Name
+                        </TableHead>
                       )}
                       {columnVisibility.motherOccupation && (
-                        <TableHead>Mother Occupation</TableHead>
+                        <TableHead className="min-w-[140px]">
+                          Mother Occupation
+                        </TableHead>
                       )}
                       {columnVisibility.mPhoneNumber && (
-                        <TableHead>Mother Phone</TableHead>
+                        <TableHead className="min-w-[130px]">
+                          Mother Phone
+                        </TableHead>
                       )}
                       {columnVisibility.address && (
-                        <TableHead>Address</TableHead>
+                        <TableHead className="min-w-[200px]">Address</TableHead>
                       )}
                     </TableRow>
                   </TableHeader>
@@ -1016,7 +1043,7 @@ export function StudentManagement({
                             Object.values(columnVisibility).filter(Boolean)
                               .length
                           }
-                          className="text-center text-muted-foreground"
+                          className="text-center text-muted-foreground py-8"
                         >
                           {students.length === 0
                             ? "No students found"
@@ -1032,11 +1059,11 @@ export function StudentManagement({
                                 <img
                                   src={getImageUrl(student)!}
                                   alt={`${student.studentName}'s photo`}
-                                  className="w-12 h-12 object-cover rounded-lg border"
+                                  className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-lg border"
                                 />
                               ) : (
-                                <div className="w-12 h-12 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-                                  <User className="h-6 w-6 text-gray-400" />
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                                  <User className="h-4 w-4 sm:h-6 sm:w-6 text-gray-400" />
                                 </div>
                               )}
                             </TableCell>
@@ -1053,14 +1080,14 @@ export function StudentManagement({
                           )}
                           {columnVisibility.class && (
                             <TableCell>
-                              <Badge variant="outline">
+                              <Badge variant="outline" className="text-xs">
                                 Class {safeToString(student.class)}
                               </Badge>
                             </TableCell>
                           )}
                           {columnVisibility.section && (
                             <TableCell>
-                              <Badge variant="outline">
+                              <Badge variant="outline" className="text-xs">
                                 {safeToString(student.section)}
                               </Badge>
                             </TableCell>
@@ -1093,7 +1120,7 @@ export function StudentManagement({
                           {columnVisibility.fatherOccupation && (
                             <TableCell>
                               {student.fatherOccupation && (
-                                <Badge variant="secondary">
+                                <Badge variant="secondary" className="text-xs">
                                   {safeToString(student.fatherOccupation)}
                                 </Badge>
                               )}
@@ -1107,7 +1134,7 @@ export function StudentManagement({
                           {columnVisibility.motherOccupation && (
                             <TableCell>
                               {student.motherOccupation && (
-                                <Badge variant="secondary">
+                                <Badge variant="secondary" className="text-xs">
                                   {safeToString(student.motherOccupation)}
                                 </Badge>
                               )}
@@ -1130,16 +1157,17 @@ export function StudentManagement({
                 </Table>
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
-                  <div className="flex justify-center items-center mt-4 space-x-2">
+                  <div className="flex flex-col sm:flex-row justify-center items-center mt-4 space-y-2 sm:space-y-0 sm:space-x-2">
                     <Button
                       variant="outline"
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
+                      className="w-full sm:w-auto"
                     >
                       Prev
                     </Button>
 
-                    <span className="text-sm">
+                    <span className="text-sm order-first sm:order-none">
                       Page {currentPage} of {totalPages}
                     </span>
 
@@ -1147,6 +1175,7 @@ export function StudentManagement({
                       variant="outline"
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
+                      className="w-full sm:w-auto"
                     >
                       Next
                     </Button>
