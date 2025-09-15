@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Search, FileText, User } from "lucide-react";
+import { toast } from "sonner";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -263,7 +264,7 @@ export function GenerateFeeTab({
     });
 
     if (newChallans.length === 0) {
-      alert(
+      toast.error(
         "No new challans to generate. All selected students already have challans for this month/year."
       );
       return [];
@@ -284,7 +285,7 @@ export function GenerateFeeTab({
         });
         setChallans(fetchResponse.data.data);
 
-        alert(
+        toast.success(
           `Successfully generated ${response.data.data.length} fee challan(s)`
         );
 
@@ -298,7 +299,7 @@ export function GenerateFeeTab({
       }
     } catch (error) {
       console.error("Error generating fee challans:", error);
-      alert("Failed to generate fee challans. Please try again.");
+      toast.error("Failed to generate fee challans. Please try again.");
       return [];
     }
   };

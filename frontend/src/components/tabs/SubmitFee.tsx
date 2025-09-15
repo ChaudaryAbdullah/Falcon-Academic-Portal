@@ -141,11 +141,19 @@ export function SubmitPaymentTab({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "paid":
-        return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
+        return (
+          <Badge className="bg-green-100 text-green-800 text-xs">Paid</Badge>
+        );
       case "overdue":
-        return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
+        return (
+          <Badge className="bg-red-100 text-red-800 text-xs">Overdue</Badge>
+        );
       default:
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800 text-xs">
+            Pending
+          </Badge>
+        );
     }
   };
 
@@ -232,17 +240,20 @@ export function SubmitPaymentTab({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Submit Fee Payment</CardTitle>
-        <CardDescription>
+    <Card className="w-full max-w-none">
+      <CardHeader className="px-4 sm:px-6">
+        <CardTitle className="text-lg sm:text-xl">Submit Fee Payment</CardTitle>
+        <CardDescription className="text-sm">
           Submit payment for generated fee challans
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+        <div className="space-y-4 sm:space-y-6">
+          {/* Student Search Section */}
           <div className="space-y-2 relative">
-            <Label htmlFor="student">Search Student</Label>
+            <Label htmlFor="student" className="text-sm font-medium">
+              Search Student
+            </Label>
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -251,7 +262,7 @@ export function SubmitPaymentTab({
                 value={studentSearch}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 onFocus={() => setShowStudentDropdown(studentSearch.length > 0)}
-                className="pl-10"
+                className="pl-10 h-10 sm:h-11"
               />
             </div>
             {showStudentDropdown && filteredStudents.length > 0 && (
@@ -259,16 +270,16 @@ export function SubmitPaymentTab({
                 {filteredStudents.slice(0, 10).map((student) => (
                   <div
                     key={student._id}
-                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    className="px-4 py-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
                     onClick={() => handleStudentSelect(student)}
                   >
-                    <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium text-sm">
+                    <div className="flex items-start space-x-3">
+                      <User className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">
                           {student.studentName}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 truncate">
                           Father: {student.fatherName} | ID:{" "}
                           {student.rollNumber}
                         </div>
@@ -280,21 +291,24 @@ export function SubmitPaymentTab({
             )}
           </div>
 
+          {/* Selected Student Fee Challans */}
           {selectedStudent && (
             <div className="space-y-4">
-              <div className="border rounded-lg p-4 bg-blue-50">
-                <h3 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Generated Fee Challans for This Student
+              <div className="border rounded-lg p-3 sm:p-4 bg-blue-50">
+                <h3 className="font-semibold text-blue-800 mb-3 flex flex-wrap items-center gap-2 text-sm sm:text-base">
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                  <span className="break-words">
+                    Generated Fee Challans for This Student
+                  </span>
                 </h3>
 
                 {pendingFees.length === 0 ? (
-                  <div className="text-center py-8">
-                    <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-600 font-medium">
+                  <div className="text-center py-6 sm:py-8">
+                    <AlertTriangle className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600 font-medium text-sm sm:text-base">
                       No Generated Fee Challans Found
                     </p>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1 px-2">
                       Please generate fee challans first in the "Generate Fee
                       Challans" tab
                     </p>
@@ -304,10 +318,11 @@ export function SubmitPaymentTab({
                     {pendingFees.map((fee) => (
                       <div
                         key={fee.id}
-                        className="bg-white border rounded-lg p-4 shadow-sm"
+                        className="bg-white border rounded-lg p-3 sm:p-4 shadow-sm"
                       >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-2">
+                        {/* Fee Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                          <div className="flex items-start space-x-3">
                             <Checkbox
                               id={`pending-${fee.id}`}
                               checked={selectedPendingFees.includes(fee.id)}
@@ -325,43 +340,46 @@ export function SubmitPaymentTab({
                                   );
                                 }
                               }}
+                              className="mt-1 flex-shrink-0"
                             />
-                            <div>
-                              <h4 className="font-medium text-lg flex items-center gap-2">
-                                {fee.month} {fee.year}
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-medium text-base sm:text-lg flex flex-wrap items-center gap-2">
+                                <span className="break-words">
+                                  {fee.month} {fee.year}
+                                </span>
                                 {fee.status === "overdue" && (
-                                  <Badge className="bg-red-100 text-red-800 text-xs">
+                                  <Badge className="bg-red-100 text-red-800 text-xs flex-shrink-0">
                                     Overdue
                                   </Badge>
                                 )}
                               </h4>
-                              <p className="text-sm text-gray-500">
+                              <p className="text-xs sm:text-sm text-gray-500">
                                 Due Date: {fee.dueDate}
                               </p>
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="flex flex-col items-end space-y-1">
                             {getStatusBadge(fee.status)}
-                            <div className="text-lg font-bold text-green-600 mt-1">
+                            <div className="text-base sm:text-lg font-bold text-green-600">
                               Rs.{" "}
                               {fee.tutionFee +
                                 fee.examFee +
                                 fee.miscFee -
                                 fee.discount +
                                 (lateFees[fee.id] || 0)}
-                              {lateFees[fee.id] > 0 && (
-                                <span className="text-sm text-red-600 block">
-                                  (+ Rs. {lateFees[fee.id]} late fee)
-                                </span>
-                              )}
                             </div>
+                            {lateFees[fee.id] > 0 && (
+                              <span className="text-xs text-red-600">
+                                (+ Rs. {lateFees[fee.id]} late fee)
+                              </span>
+                            )}
                           </div>
                         </div>
 
                         {/* Enhanced Fee Breakdown */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 text-xs sm:text-sm">
                           <div className="bg-gray-50 p-2 rounded">
-                            <div className="font-medium text-gray-600">
+                            <div className="font-medium text-gray-600 truncate">
                               Tuition Fee
                             </div>
                             <div className="font-semibold">
@@ -369,12 +387,12 @@ export function SubmitPaymentTab({
                             </div>
                           </div>
                           <div className="bg-gray-50 p-2 rounded">
-                            <div className="font-medium text-gray-600">
+                            <div className="font-medium text-gray-600 truncate">
                               Paper Fund
                             </div>
                           </div>
                           <div className="bg-gray-50 p-2 rounded">
-                            <div className="font-medium text-gray-600">
+                            <div className="font-medium text-gray-600 truncate">
                               Exam Fee
                             </div>
                             <div className="font-semibold">
@@ -382,7 +400,7 @@ export function SubmitPaymentTab({
                             </div>
                           </div>
                           <div className="bg-gray-50 p-2 rounded">
-                            <div className="font-medium text-gray-600">
+                            <div className="font-medium text-gray-600 truncate">
                               Misc Fee
                             </div>
                             <div className="font-semibold">
@@ -394,10 +412,10 @@ export function SubmitPaymentTab({
                         {/* Additional Fee Information */}
                         {(fee.arrears > 0 || fee.discount > 0) && (
                           <div className="mt-3 pt-3 border-t">
-                            <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="space-y-2 sm:space-y-0 sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-3 text-xs sm:text-sm">
                               {fee.arrears > 0 && (
-                                <div className="grid grid-cols-1 gap-3 text-sm">
-                                  <div className="bg-red-50 p-2 rounded border border-red-200">
+                                <div className="space-y-2">
+                                  <div className="bg-red-50 p-2 sm:p-3 rounded border border-red-200">
                                     <div className="font-medium text-red-700">
                                       Previous Arrears
                                     </div>
@@ -405,9 +423,8 @@ export function SubmitPaymentTab({
                                       Rs. {fee.arrears}
                                     </div>
                                   </div>
-                                  {/* Note about arrears */}
-                                  <div className="bg-blue-50 p-2 rounded border border-blue-200">
-                                    <div className="text-xs text-blue-700">
+                                  <div className="bg-blue-50 p-2 sm:p-3 rounded border border-blue-200">
+                                    <div className="text-xs text-blue-700 leading-relaxed">
                                       <strong>Note:</strong> This shows
                                       individual month fees. Previous unpaid
                                       amounts are shown as separate entries
@@ -417,7 +434,7 @@ export function SubmitPaymentTab({
                                 </div>
                               )}
                               {fee.discount > 0 && (
-                                <div className="bg-green-50 p-2 rounded border border-green-200">
+                                <div className="bg-green-50 p-2 sm:p-3 rounded border border-green-200">
                                   <div className="font-medium text-green-700">
                                     Discount Applied
                                   </div>
@@ -433,18 +450,18 @@ export function SubmitPaymentTab({
                         {/* Late Fee Input for Overdue Fees */}
                         {fee.status === "overdue" && (
                           <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                               <div className="flex items-center gap-2">
-                                <AlertTriangle className="h-4 w-4 text-red-600" />
-                                <span className="font-medium text-red-800">
+                                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                                <span className="font-medium text-red-800 text-sm">
                                   Overdue Fee - Add Late Fee
                                 </span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                               <Label
                                 htmlFor={`lateFee-${fee.id}`}
-                                className="text-sm"
+                                className="text-sm flex-shrink-0"
                               >
                                 Late Fee Amount (Rs.)
                               </Label>
@@ -464,14 +481,14 @@ export function SubmitPaymentTab({
                                     [fee.id]: value,
                                   }));
                                 }}
-                                className="w-24 h-8"
+                                className="w-full sm:w-24 h-8"
                                 placeholder="0"
                               />
                               <span className="text-xs text-red-600">
                                 Will be added to misc fee
                               </span>
                             </div>
-                            <p className="text-xs text-red-600 mt-1">
+                            <p className="text-xs text-red-600 mt-2 leading-relaxed">
                               Due date was {fee.dueDate}. This fee is{" "}
                               {Math.ceil(
                                 (new Date().getTime() -
@@ -486,7 +503,7 @@ export function SubmitPaymentTab({
                     ))}
 
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <p className="text-sm text-yellow-800">
+                      <p className="text-xs sm:text-sm text-yellow-800 leading-relaxed">
                         <strong>Note:</strong> Select the challans above that
                         you want to mark as paid. You can select multiple months
                         at once.
@@ -498,9 +515,9 @@ export function SubmitPaymentTab({
 
               {/* Payment Summary */}
               {selectedPendingFees.length > 0 && (
-                <div className="border rounded-lg p-4 bg-green-50">
-                  <h3 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
-                    <Receipt className="h-5 w-5" />
+                <div className="border rounded-lg p-3 sm:p-4 bg-green-50">
+                  <h3 className="font-semibold text-green-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                    <Receipt className="h-4 w-4 sm:h-5 sm:w-5" />
                     Payment Summary
                   </h3>
 
@@ -510,22 +527,24 @@ export function SubmitPaymentTab({
                       .map((fee) => (
                         <div
                           key={fee.id}
-                          className="flex justify-between items-center bg-white p-2 rounded"
+                          className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white p-3 rounded gap-2"
                         >
-                          <span className="text-sm">
-                            {fee.month} {fee.year}
+                          <div className="text-xs sm:text-sm">
+                            <span className="font-medium">
+                              {fee.month} {fee.year}
+                            </span>
                             {fee.discount > 0 && (
-                              <span className="text-green-600 ml-1">
+                              <span className="text-green-600 ml-1 block sm:inline">
                                 (- Rs. {fee.discount} discount)
                               </span>
                             )}
                             {lateFees[fee.id] > 0 && (
-                              <span className="text-red-600 ml-1">
+                              <span className="text-red-600 ml-1 block sm:inline">
                                 (+ Rs. {lateFees[fee.id]} late fee)
                               </span>
                             )}
-                          </span>
-                          <span className="font-semibold">
+                          </div>
+                          <span className="font-semibold text-sm sm:text-base">
                             Rs.{" "}
                             {fee.tutionFee +
                               fee.examFee +
@@ -536,10 +555,12 @@ export function SubmitPaymentTab({
                         </div>
                       ))}
 
-                    <div className="border-t pt-2 mt-3">
-                      <div className="flex justify-between items-center font-bold text-lg">
-                        <span>Total Amount:</span>
-                        <span className="text-green-600">
+                    <div className="border-t pt-3 mt-3">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                        <span className="font-bold text-base sm:text-lg">
+                          Total Amount:
+                        </span>
+                        <span className="font-bold text-base sm:text-lg text-green-600">
                           Rs.{" "}
                           {pendingFees
                             .filter((fee) =>
@@ -558,7 +579,7 @@ export function SubmitPaymentTab({
                         </span>
                       </div>
                       {Object.values(lateFees).some((fee) => fee > 0) && (
-                        <div className="flex justify-between items-center text-sm text-red-600 mt-1">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs sm:text-sm text-red-600 mt-1 gap-1">
                           <span>Late Fees:</span>
                           <span>
                             Rs.{" "}
@@ -577,14 +598,16 @@ export function SubmitPaymentTab({
               {/* Submit Payment Button */}
               <Button
                 onClick={submitFeePayment}
-                className="w-full"
+                className="w-full h-12 sm:h-auto text-sm sm:text-base"
                 size="lg"
                 disabled={selectedPendingFees.length === 0}
               >
-                <Receipt className="h-5 w-5 mr-2" />
-                Submit Payment for {selectedPendingFees.length} Challan(s)
+                <Receipt className="h-4 w-4 sm:h-5 sm:w-5 mr-2 flex-shrink-0" />
+                <span className="flex-1 truncate">
+                  Submit Payment for {selectedPendingFees.length} Challan(s)
+                </span>
                 {selectedPendingFees.length > 0 && (
-                  <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-sm font-bold">
+                  <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-xs sm:text-sm font-bold flex-shrink-0">
                     Rs.{" "}
                     {pendingFees
                       .filter((fee) => selectedPendingFees.includes(fee.id))
@@ -604,13 +627,14 @@ export function SubmitPaymentTab({
             </div>
           )}
 
+          {/* No Student Selected State */}
           {!selectedStudent && (
-            <div className="text-center py-12">
-              <User className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-600 mb-2">
+            <div className="text-center py-8 sm:py-12">
+              <User className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-base sm:text-lg font-medium text-gray-600 mb-2">
                 Select a Student
               </h3>
-              <p className="text-gray-500">
+              <p className="text-sm text-gray-500 px-4">
                 Search and select a student above to view their generated fee
                 challans
               </p>

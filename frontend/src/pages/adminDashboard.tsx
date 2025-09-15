@@ -244,7 +244,7 @@ export default function AdminDashboard() {
         return <FeeReports students={students} />;
       default:
         return (
-          <div className="space-y-6">
+          <div className="space-y-6  p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">
                 Admin Dashboard
@@ -349,9 +349,7 @@ export default function AdminDashboard() {
       <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <main className="md:ml-72 py-6 pr-6">
-        <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
-          {renderContent()}
-        </div>
+        <div className="space-y-6">{renderContent()}</div>
       </main>
       <Toaster position="top-right" richColors />
     </div>
