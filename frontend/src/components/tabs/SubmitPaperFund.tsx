@@ -14,6 +14,7 @@ import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
 import { Receipt, Search, User, FileText, AlertTriangle } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
+import { toast } from "sonner";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -146,7 +147,7 @@ export function SubmitPaperFundPaymentTab({
 
   const submitPaperFundPayment = async () => {
     if (!selectedStudent || selectedPendingFunds.length === 0) {
-      alert(
+      toast.error(
         "Please select a student and at least one paper fund challan to process payment."
       );
       return;
@@ -218,7 +219,7 @@ export function SubmitPaperFundPaymentTab({
               ? `Payment successfully recorded! Total amount: Rs. ${totalPaid} (including Rs. ${totalLateFees} late fees)`
               : `Payment successfully recorded! Total amount: Rs. ${totalPaid}`;
 
-          alert(message);
+          toast.success(message);
         }
       } else {
         throw new Error("Failed to update payment status");
@@ -234,7 +235,7 @@ export function SubmitPaperFundPaymentTab({
         errorMessage = error.message;
       }
 
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
