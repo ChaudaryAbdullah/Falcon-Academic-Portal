@@ -348,8 +348,10 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gray-50">
       <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <main className="ml-72 py-6 pr-6">
-        <div className="px-4 py-6 sm:px-0">{renderContent()}</div>
+      <main className="md:ml-72 py-6 pr-6">
+        <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
+          {renderContent()}
+        </div>
       </main>
       <Toaster position="top-right" richColors />
     </div>

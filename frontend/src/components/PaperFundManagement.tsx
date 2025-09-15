@@ -86,6 +86,23 @@ export function PaperFundManagement({
     const updatedChallans = updateOverdueStatuses(challans);
     setChallans(updatedChallans);
     syncOverdueStatusesWithBackend(updatedChallans);
+
+    const checkOverdueInterval = setInterval(() => {
+      setChallans(((prevChallans: paperFundChallan[]) => {
+        const updatedChallans = updateOverdueStatuses(prevChallans);
+        const hasChanges = updatedChallans.some(
+          (challan, index) => challan.status !== prevChallans[index]?.status
+        );
+
+        if (hasChanges) {
+          syncOverdueStatusesWithBackend(updatedChallans);
+          return updatedChallans;
+        }
+        return prevChallans;
+      }) as unknown as paperFundChallan[]);
+    }, 100 * 60 * 1000);
+
+    return () => clearInterval(checkOverdueInterval);
   }, []);
 
   const updateOverdueStatuses = (challansData: any[]) => {
@@ -134,25 +151,6 @@ export function PaperFundManagement({
       console.error("Error syncing overdue statuses with backend:", error);
     }
   };
-
-  useEffect(() => {
-    const checkOverdueInterval = setInterval(() => {
-      setChallans(((prevChallans: paperFundChallan[]) => {
-        const updatedChallans = updateOverdueStatuses(prevChallans);
-        const hasChanges = updatedChallans.some(
-          (challan, index) => challan.status !== prevChallans[index]?.status
-        );
-
-        if (hasChanges) {
-          syncOverdueStatusesWithBackend(updatedChallans);
-          return updatedChallans;
-        }
-        return prevChallans;
-      }) as unknown as paperFundChallan[]);
-    }, 10 * 60 * 1000);
-
-    return () => clearInterval(checkOverdueInterval);
-  }, []);
 
   return (
     <div className="space-y-6">
