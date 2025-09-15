@@ -39,6 +39,7 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { Plus, Search, Filter, X, Settings, Upload, User } from "lucide-react";
+import { toast } from "sonner";
 
 const BACKEND = import.meta.env.VITE_BACKEND; // your backend URL
 
@@ -159,13 +160,13 @@ export function StudentManagement({
     if (file) {
       // Validate file type
       if (!file.type.startsWith("image/")) {
-        alert("Please select a valid image file");
+        toast.error("Please select a valid image file");
         return;
       }
 
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image size should be less than 5MB");
+        toast.error("Image size should be less than 5MB");
         return;
       }
 
@@ -222,7 +223,7 @@ export function StudentManagement({
           },
         }
       );
-
+      toast.success("Student added successfully!");
       // Backend returns created student object
       const createdStudent = response.data.data;
 
@@ -253,13 +254,13 @@ export function StudentManagement({
     } catch (error) {
       console.error("Error adding student:", error);
       if (axios.isAxiosError(error) && error.response) {
-        alert(
+        toast.error(
           `Failed to add student: ${
             error.response.data.message || "Please try again."
           }`
         );
       } else {
-        alert("Failed to add student. Please try again.");
+        toast.error("Failed to add student. Please try again.");
       }
     }
   };

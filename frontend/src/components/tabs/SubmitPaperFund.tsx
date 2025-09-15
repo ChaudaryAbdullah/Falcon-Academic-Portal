@@ -14,6 +14,7 @@ import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
 import { Receipt, Search, User, FileText, AlertTriangle } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
+import { toast } from "sonner";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -146,7 +147,7 @@ export function SubmitPaperFundPaymentTab({
 
   const submitPaperFundPayment = async () => {
     if (!selectedStudent || selectedPendingFunds.length === 0) {
-      alert(
+      toast.error(
         "Please select a student and at least one paper fund challan to process payment."
       );
       return;
@@ -218,7 +219,7 @@ export function SubmitPaperFundPaymentTab({
               ? `Payment successfully recorded! Total amount: Rs. ${totalPaid} (including Rs. ${totalLateFees} late fees)`
               : `Payment successfully recorded! Total amount: Rs. ${totalPaid}`;
 
-          alert(message);
+          toast.success(message);
         }
       } else {
         throw new Error("Failed to update payment status");
@@ -234,7 +235,7 @@ export function SubmitPaperFundPaymentTab({
         errorMessage = error.message;
       }
 
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -248,17 +249,24 @@ export function SubmitPaperFundPaymentTab({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Submit Paper Fund Payment</CardTitle>
-        <CardDescription>
+    <Card className="w-full max-w-7xl mx-auto">
+      <CardHeader className="px-4 sm:px-6">
+        <CardTitle className="text-lg sm:text-xl lg:text-2xl">
+          Submit Paper Fund Payment
+        </CardTitle>
+        <CardDescription className="text-sm sm:text-base">
           Submit payment for generated paper fund challans
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="px-4 sm:px-6">
+        <div className="space-y-4 sm:space-y-6">
           <div className="space-y-2 relative">
-            <Label htmlFor="student">Search Student</Label>
+            <Label
+              htmlFor="student"
+              className="text-sm sm:text-base font-medium"
+            >
+              Search Student
+            </Label>
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -267,7 +275,7 @@ export function SubmitPaperFundPaymentTab({
                 value={studentSearch}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 onFocus={() => setShowStudentDropdown(studentSearch.length > 0)}
-                className="pl-10"
+                className="pl-10 text-sm sm:text-base h-10 sm:h-11"
               />
             </div>
             {showStudentDropdown && filteredStudents.length > 0 && (
@@ -275,16 +283,16 @@ export function SubmitPaperFundPaymentTab({
                 {filteredStudents.slice(0, 10).map((student) => (
                   <div
                     key={student._id}
-                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    className="px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
                     onClick={() => handleStudentSelect(student)}
                   >
                     <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium text-sm">
+                      <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm sm:text-base truncate">
                           {student.studentName}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs sm:text-sm text-gray-500 truncate">
                           Father: {student.fatherName} | Roll:{" "}
                           {student.rollNumber} | Class: {student.class}
                         </div>
@@ -295,40 +303,40 @@ export function SubmitPaperFundPaymentTab({
               </div>
             )}
             {showStudentDropdown && filteredStudents.length === 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-4 text-center text-gray-500">
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-4 text-center text-gray-500 text-sm sm:text-base">
                 No students found
               </div>
             )}
           </div>
 
           {selectedStudent && (
-            <div className="space-y-4">
-              <div className="border rounded-lg p-4 bg-blue-50">
-                <h3 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
+            <div className="space-y-4 sm:space-y-6">
+              <div className="border rounded-lg p-3 sm:p-4 lg:p-6 bg-blue-50">
+                <h3 className="font-semibold text-blue-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base lg:text-lg">
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                   Generated Paper Fund Challans for This Student
                 </h3>
 
                 {pendingPaperFunds.length === 0 ? (
-                  <div className="text-center py-8">
-                    <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-600 font-medium">
+                  <div className="text-center py-6 sm:py-8 lg:py-12">
+                    <AlertTriangle className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                    <p className="text-gray-600 font-medium text-sm sm:text-base lg:text-lg">
                       No Generated Paper Fund Challans Found
                     </p>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs sm:text-sm lg:text-base text-gray-500 mt-1 px-4">
                       Please generate paper fund challans first in the "Generate
                       Paper Fund Challans" tab
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 sm:space-y-4">
                     {pendingPaperFunds.map((fund) => (
                       <div
                         key={fund.id}
-                        className="bg-white border rounded-lg p-4 shadow-sm"
+                        className="bg-white border rounded-lg p-3 sm:p-4 lg:p-5 shadow-sm"
                       >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4 gap-3 sm:gap-0">
+                          <div className="flex items-start sm:items-center space-x-2 sm:space-x-3">
                             <Checkbox
                               id={`pending-${fund.id}`}
                               checked={selectedPendingFunds.includes(fund.id)}
@@ -346,27 +354,30 @@ export function SubmitPaperFundPaymentTab({
                                   );
                                 }
                               }}
+                              className="mt-1 sm:mt-0 flex-shrink-0"
                             />
-                            <div>
-                              <h4 className="font-medium text-lg flex items-center gap-2">
-                                Academic Year {fund.year}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-base sm:text-lg flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                <span>Academic Year {fund.year}</span>
                                 {fund.status === "overdue" && (
-                                  <Badge className="bg-red-100 text-red-800 text-xs">
+                                  <Badge className="bg-red-100 text-red-800 text-xs self-start sm:self-center">
                                     Overdue
                                   </Badge>
                                 )}
                               </h4>
-                              <p className="text-sm text-gray-500">
+                              <p className="text-xs sm:text-sm text-gray-500 mt-1">
                                 Due Date: {fund.dueDate}
                               </p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            {getStatusBadge(fund.status)}
-                            <div className="text-lg font-bold text-green-600 mt-1">
+                          <div className="text-right flex-shrink-0">
+                            <div className="mb-2">
+                              {getStatusBadge(fund.status)}
+                            </div>
+                            <div className="text-base sm:text-lg lg:text-xl font-bold text-green-600">
                               Rs. {fund.paperFund + (lateFees[fund.id] || 0)}
                               {lateFees[fund.id] > 0 && (
-                                <span className="text-sm text-red-600 block">
+                                <span className="text-xs sm:text-sm text-red-600 block mt-1">
                                   (+ Rs. {lateFees[fund.id]} late fee)
                                 </span>
                               )}
@@ -375,12 +386,12 @@ export function SubmitPaperFundPaymentTab({
                         </div>
 
                         {/* Paper Fund Details */}
-                        <div className="bg-gray-50 p-3 rounded">
+                        <div className="bg-gray-50 p-2 sm:p-3 rounded mb-3">
                           <div className="flex justify-between items-center">
-                            <span className="font-medium text-gray-600">
+                            <span className="font-medium text-gray-600 text-sm sm:text-base">
                               Paper Fund
                             </span>
-                            <span className="font-semibold">
+                            <span className="font-semibold text-sm sm:text-base">
                               Rs. {fund.paperFund}
                             </span>
                           </div>
@@ -388,19 +399,19 @@ export function SubmitPaperFundPaymentTab({
 
                         {/* Late Fee Input for Overdue Paper Funds */}
                         {fund.status === "overdue" && (
-                          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
+                          <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 sm:mb-3 gap-2 sm:gap-0">
                               <div className="flex items-center gap-2">
-                                <AlertTriangle className="h-4 w-4 text-red-600" />
-                                <span className="font-medium text-red-800">
+                                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                                <span className="font-medium text-red-800 text-sm sm:text-base">
                                   Overdue Payment - Add Late Fee
                                 </span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                               <Label
                                 htmlFor={`lateFee-${fund.id}`}
-                                className="text-sm"
+                                className="text-xs sm:text-sm flex-shrink-0"
                               >
                                 Late Fee Amount (Rs.)
                               </Label>
@@ -420,14 +431,14 @@ export function SubmitPaperFundPaymentTab({
                                     [fund.id]: value,
                                   }));
                                 }}
-                                className="w-24 h-8"
+                                className="w-20 sm:w-24 h-8 sm:h-9 text-sm"
                                 placeholder="0"
                               />
-                              <span className="text-xs text-red-600">
+                              <span className="text-xs text-red-600 flex-1">
                                 Additional late fee
                               </span>
                             </div>
-                            <p className="text-xs text-red-600 mt-1">
+                            <p className="text-xs text-red-600 mt-2">
                               Due date was {fund.dueDate}. This payment is{" "}
                               {calculateDaysOverdue(fund.dueDate)} days overdue.
                             </p>
@@ -436,8 +447,8 @@ export function SubmitPaperFundPaymentTab({
                       </div>
                     ))}
 
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <p className="text-sm text-yellow-800">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4">
+                      <p className="text-xs sm:text-sm text-yellow-800">
                         <strong>Note:</strong> Select the paper fund challans
                         above that you want to mark as paid. You can select
                         multiple years at once.
@@ -449,36 +460,36 @@ export function SubmitPaperFundPaymentTab({
 
               {/* Payment Summary */}
               {selectedPendingFunds.length > 0 && (
-                <div className="border rounded-lg p-4 bg-green-50">
-                  <h3 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
-                    <Receipt className="h-5 w-5" />
+                <div className="border rounded-lg p-3 sm:p-4 lg:p-6 bg-green-50">
+                  <h3 className="font-semibold text-green-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base lg:text-lg">
+                    <Receipt className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                     Payment Summary
                   </h3>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 sm:space-y-3">
                     {pendingPaperFunds
                       .filter((fund) => selectedPendingFunds.includes(fund.id))
                       .map((fund) => (
                         <div
                           key={fund.id}
-                          className="flex justify-between items-center bg-white p-2 rounded"
+                          className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white p-2 sm:p-3 rounded gap-1 sm:gap-0"
                         >
-                          <span className="text-sm">
+                          <span className="text-xs sm:text-sm flex-1">
                             Academic Year {fund.year}
                             {lateFees[fund.id] > 0 && (
-                              <span className="text-red-600 ml-1">
+                              <span className="text-red-600 ml-1 block sm:inline">
                                 (+ Rs. {lateFees[fund.id]} late fee)
                               </span>
                             )}
                           </span>
-                          <span className="font-semibold">
+                          <span className="font-semibold text-sm sm:text-base self-start sm:self-center">
                             Rs. {fund.paperFund + (lateFees[fund.id] || 0)}
                           </span>
                         </div>
                       ))}
 
-                    <div className="border-t pt-2 mt-3">
-                      <div className="flex justify-between items-center font-bold text-lg">
+                    <div className="border-t pt-2 sm:pt-3 mt-3 sm:mt-4">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center font-bold text-base sm:text-lg lg:text-xl gap-1 sm:gap-0">
                         <span>Total Amount:</span>
                         <span className="text-green-600">
                           Rs.{" "}
@@ -494,7 +505,7 @@ export function SubmitPaperFundPaymentTab({
                         </span>
                       </div>
                       {Object.values(lateFees).some((fee) => fee > 0) && (
-                        <div className="flex justify-between items-center text-sm text-red-600 mt-1">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs sm:text-sm text-red-600 mt-1 gap-1 sm:gap-0">
                           <span>Late Fees:</span>
                           <span>
                             Rs.{" "}
@@ -513,16 +524,18 @@ export function SubmitPaperFundPaymentTab({
               {/* Submit Payment Button */}
               <Button
                 onClick={submitPaperFundPayment}
-                className="w-full"
+                className="w-full h-11 sm:h-12 text-sm sm:text-base"
                 size="lg"
                 disabled={selectedPendingFunds.length === 0 || isSubmitting}
               >
-                <Receipt className="h-5 w-5 mr-2" />
-                {isSubmitting
-                  ? "Processing..."
-                  : `Submit Payment for ${selectedPendingFunds.length} Challan(s)`}
+                <Receipt className="h-4 w-4 sm:h-5 sm:w-5 mr-2 flex-shrink-0" />
+                <span className="flex-1 text-center">
+                  {isSubmitting
+                    ? "Processing..."
+                    : `Submit Payment for ${selectedPendingFunds.length} Challan(s)`}
+                </span>
                 {selectedPendingFunds.length > 0 && !isSubmitting && (
-                  <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-sm font-bold">
+                  <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-xs sm:text-sm font-bold flex-shrink-0">
                     Rs.{" "}
                     {pendingPaperFunds
                       .filter((fund) => selectedPendingFunds.includes(fund.id))
@@ -538,12 +551,12 @@ export function SubmitPaperFundPaymentTab({
           )}
 
           {!selectedStudent && (
-            <div className="text-center py-12">
-              <User className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-600 mb-2">
+            <div className="text-center py-8 sm:py-12 lg:py-16">
+              <User className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
+              <h3 className="text-base sm:text-lg lg:text-xl font-medium text-gray-600 mb-2">
                 Select a Student
               </h3>
-              <p className="text-gray-500">
+              <p className="text-sm sm:text-base text-gray-500 px-4">
                 Search and select a student above to view their generated paper
                 fund challans
               </p>

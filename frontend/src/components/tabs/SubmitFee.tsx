@@ -14,6 +14,7 @@ import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
 import { Receipt, Search, User, FileText, AlertTriangle } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
+import { toast } from "sonner";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -159,7 +160,7 @@ export function SubmitPaymentTab({
 
   const submitFeePayment = async () => {
     if (!selectedStudent || selectedPendingFees.length === 0) {
-      alert(
+      toast.error(
         "Please select a student and at least one fee challan to process payment."
       );
       return;
@@ -229,13 +230,13 @@ export function SubmitPaymentTab({
             ? `Payment successfully recorded! Total amount: Rs. ${totalPaid} (including Rs. ${totalLateFees} late fees)`
             : `Payment successfully recorded! Total amount: Rs. ${totalPaid}`;
 
-        alert(message);
+        toast.error(message);
       } else {
         throw new Error("Failed to update payment status");
       }
     } catch (error) {
       console.error("Error submitting fee payment:", error);
-      alert("Failed to submit fee payment. Please try again.");
+      toast.error("Failed to submit fee payment. Please try again.");
     }
   };
 

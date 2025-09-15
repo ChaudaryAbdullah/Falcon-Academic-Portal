@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Search, FileText, User, Calendar } from "lucide-react";
+import { toast } from "sonner";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -176,12 +177,12 @@ export function GeneratePaperFundTab({
 
   const handleGeneratePaperFund = async () => {
     if (!selectedYear) {
-      alert("Please select a year");
+      toast.error("Please select a year");
       return;
     }
 
     if (!selectedDueDate) {
-      alert("Please select a due date");
+      toast.error("Please select a due date");
       return;
     }
 
@@ -198,7 +199,7 @@ export function GeneratePaperFundTab({
     }
 
     if (studentIds.length === 0) {
-      alert("Please select students to generate paper fund challans for");
+      toast.error("Please select students to generate paper fund challans for");
       return;
     }
 
@@ -213,7 +214,7 @@ export function GeneratePaperFundTab({
       );
 
       if (challansToCreate.length === 0) {
-        alert(
+        toast.error(
           "No new paper fund challans to generate. All selected students already have challans for this year."
         );
         setIsGenerating(false);
@@ -239,7 +240,9 @@ export function GeneratePaperFundTab({
           const successCount = response.data.data
             ? response.data.data.length
             : challansToCreate.length;
-          alert(`Successfully generated ${successCount} paper fund challan(s)`);
+          toast.success(
+            `Successfully generated ${successCount} paper fund challan(s)`
+          );
 
           // Reset form
           setSelectedClass("");
@@ -262,7 +265,7 @@ export function GeneratePaperFundTab({
         errorMessage = error.message;
       }
 
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsGenerating(false);
     }

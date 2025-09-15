@@ -28,6 +28,7 @@ import {
 } from "../ui/select";
 import { Badge } from "../ui/badge";
 import { Search, Download, MessageCircle, Filter, X } from "lucide-react";
+import { toast } from "sonner";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -78,7 +79,7 @@ export function ViewRecordsTab({
   const sendFeeReminder = async (challan: FeeChallan) => {
     try {
       if (!challan.studentId.fPhoneNumber) {
-        alert(
+        toast.error(
           `Phone number not available for ${challan.studentId.studentName}. Please update the student's phone number first.`
         );
         return;
@@ -98,7 +99,7 @@ export function ViewRecordsTab({
         if (phoneNumber.startsWith("3")) {
           phoneNumber = "92" + phoneNumber;
         } else {
-          alert(
+          toast.error(
             `Invalid phone number format for ${challan.studentId.studentName}: ${challan.studentId.fPhoneNumber}`
           );
           return;
@@ -106,7 +107,7 @@ export function ViewRecordsTab({
       }
 
       if (phoneNumber.length < 12 || phoneNumber.length > 13) {
-        alert(
+        toast.error(
           `Invalid phone number length for ${challan.studentId.studentName}: ${challan.studentId.fPhoneNumber}`
         );
         return;
@@ -213,7 +214,7 @@ Falcon House School Administration
       }
     } catch (error) {
       console.error("Error in sendFeeReminder:", error);
-      alert("Error sending WhatsApp reminder. Please try again.");
+      toast.error("Error sending WhatsApp reminder. Please try again.");
     }
   };
 

@@ -23,6 +23,7 @@ import {
 } from "./ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Plus, Search } from "lucide-react";
+import { toast } from "sonner";
 const BACKEND = import.meta.env.VITE_BACKEND; // your backend URL
 
 interface Teacher {
@@ -64,7 +65,7 @@ export function TeacherManagement({
     try {
       // Send formData to backend API
       const response = await axios.post(`${BACKEND}/api/teachers`, formData);
-
+      toast.success("Teacher added successfully!");
       // Backend returns created student object
       const newTeacher = response.data.data;
       setTeachers([...teachers, newTeacher]);
@@ -79,8 +80,8 @@ export function TeacherManagement({
         password: "",
       });
     } catch (error) {
-      console.error("Error adding student:", error);
-      alert("Failed to add student. Please try again.");
+      console.error("Error adding Teacher:", error);
+      toast.error("Failed to add Teacher. Please try again.");
     }
   };
 
