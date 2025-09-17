@@ -77,6 +77,7 @@ interface StudentManagementProps {
 interface Filters {
   class: string;
   section: string;
+  gender: string;
   fatherOccupation: string;
   motherOccupation: string;
 }
@@ -87,6 +88,7 @@ interface ColumnVisibility {
   studentName: boolean;
   class: boolean;
   section: boolean;
+  gender: boolean;
   fatherName: boolean;
   fatherCnic: boolean;
   bform: boolean;
@@ -134,6 +136,7 @@ export function StudentManagement({
   const [filters, setFilters] = useState<Filters>({
     class: "",
     section: "",
+    gender: "",
     fatherOccupation: "",
     motherOccupation: "",
   });
@@ -144,6 +147,7 @@ export function StudentManagement({
     studentName: true,
     class: true,
     section: true,
+    gender: true,
     fatherName: true,
     fatherCnic: false,
     bform: false,
@@ -285,6 +289,7 @@ export function StudentManagement({
     setFilters({
       class: "",
       section: "",
+      gender: "",
       fatherOccupation: "",
       motherOccupation: "",
     });
@@ -304,6 +309,7 @@ export function StudentManagement({
     studentName: "Student Name",
     class: "Class",
     section: "Section",
+    gender: "Gender",
     fatherName: "Father Name",
     fatherCnic: "Father CNIC",
     bform: "B-Form",
@@ -352,6 +358,7 @@ export function StudentManagement({
           student.studentName,
           student.fatherName,
           student.motherName,
+          student.gender,
           student.fPhoneNumber,
           student.mPhoneNumber,
           student.fatherCnic,
@@ -370,6 +377,8 @@ export function StudentManagement({
         !filters.class || safeToString(student.class) === filters.class;
       const matchesSection =
         !filters.section || safeToString(student.section) === filters.section;
+      const matchesGender =
+        !filters.gender || safeToString(student.gender) === filters.gender;
       const matchesFatherOccupation =
         !filters.fatherOccupation ||
         safeToString(student.fatherOccupation) === filters.fatherOccupation;
@@ -381,6 +390,7 @@ export function StudentManagement({
         matchesSearch &&
         matchesClass &&
         matchesSection &&
+        matchesGender &&
         matchesFatherOccupation &&
         matchesMotherOccupation
       );
@@ -828,6 +838,31 @@ export function StudentManagement({
                     </div>
 
                     <div className="space-y-2">
+                      <Label htmlFor="GenderFilter">Gender</Label>
+                      <Select
+                        value={filters.gender || "all"}
+                        onValueChange={(value) =>
+                          handleFilterChange(
+                            "gender",
+                            value === "all" ? "" : value
+                          )
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="All Genders" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Genders</SelectItem>
+                          {getUniqueValues("gender").map((gender) => (
+                            <SelectItem key={gender} value={gender}>
+                              {gender}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
                       <Label htmlFor="fatherOccupationFilter">
                         Father Occupation
                       </Label>
@@ -988,6 +1023,9 @@ export function StudentManagement({
                       {columnVisibility.section && (
                         <TableHead className="min-w-[80px]">Section</TableHead>
                       )}
+                      {columnVisibility.gender && (
+                        <TableHead className="min-w-[80px]">Gender</TableHead>
+                      )}
                       {columnVisibility.fatherName && (
                         <TableHead className="min-w-[150px]">
                           Father Name
@@ -1090,6 +1128,13 @@ export function StudentManagement({
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {safeToString(student.section)}
+                              </Badge>
+                            </TableCell>
+                          )}
+                          {columnVisibility.gender && (
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {safeToString(student.gender)}
                               </Badge>
                             </TableCell>
                           )}
