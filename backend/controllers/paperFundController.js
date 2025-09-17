@@ -9,7 +9,7 @@ export const createPaperFund = async (req, res) => {
       .findById(record._id)
       .populate(
         "studentId",
-        "studentName fatherName fPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section"
       );
     res.status(201).json({ success: true, data: populated });
   } catch (error) {
@@ -24,7 +24,7 @@ export const getPaperFunds = async (req, res) => {
       .find({})
       .populate(
         "studentId",
-        "studentName fatherName fPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section"
       )
       .sort({ createdAt: -1 });
 
@@ -34,7 +34,7 @@ export const getPaperFunds = async (req, res) => {
         _id: fund.studentId._id.toString(),
         studentName: fund.studentId.studentName,
         fatherName: fund.studentId.fatherName,
-        fPhoneNumber: fund.studentId.fPhoneNumber,
+        mPhoneNumber: fund.studentId.mPhoneNumber,
         rollNumber: fund.studentId.rollNumber,
         class: fund.studentId.class,
         section: fund.studentId.section,
@@ -61,7 +61,7 @@ export const getPaperFundById = async (req, res) => {
       .findById(req.params.id)
       .populate(
         "studentId",
-        "studentName fatherName fPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section"
       );
     if (!fund)
       return res
@@ -83,7 +83,7 @@ export const updatePaperFund = async (req, res) => {
       })
       .populate(
         "studentId",
-        "studentName fatherName fPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section"
       );
 
     if (!fund)
@@ -121,7 +121,7 @@ export const getPaperFundByStudentId = async (req, res) => {
       .find({ studentId })
       .populate(
         "studentId",
-        "studentName fatherName fPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section"
       );
 
     if (!funds || funds.length === 0) {
@@ -173,7 +173,7 @@ export const bulkUpdatePaperFundStatus = async (req, res) => {
       .find({ _id: { $in: validObjectIds } })
       .populate(
         "studentId",
-        "studentName fatherName fPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section"
       );
 
     res.status(200).json({
@@ -228,7 +228,7 @@ export const generateBulkPaperFund = async (req, res) => {
           .findById(newRecord._id)
           .populate(
             "studentId",
-            "studentName fatherName fPhoneNumber rollNumber class section"
+            "studentName fatherName mPhoneNumber rollNumber class section"
           );
 
         // Transform to match frontend format
@@ -238,7 +238,7 @@ export const generateBulkPaperFund = async (req, res) => {
             _id: populatedRecord.studentId._id.toString(),
             studentName: populatedRecord.studentId.studentName,
             fatherName: populatedRecord.studentId.fatherName,
-            fPhoneNumber: populatedRecord.studentId.fPhoneNumber,
+            mPhoneNumber: populatedRecord.studentId.mPhoneNumber,
             rollNumber: populatedRecord.studentId.rollNumber,
             class: populatedRecord.studentId.class,
             section: populatedRecord.studentId.section || "",

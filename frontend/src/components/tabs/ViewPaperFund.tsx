@@ -39,7 +39,7 @@ interface PaperFundChallan {
     rollNumber: string;
     studentName: string;
     fatherName: string;
-    fPhoneNumber: string;
+    mPhoneNumber: string;
     class: string;
     section: string;
   };
@@ -74,14 +74,14 @@ export function ViewPaperFundRecordsTab({
 
   const sendPaperFundReminder = async (challan: PaperFundChallan) => {
     try {
-      if (!challan.studentId.fPhoneNumber) {
+      if (!challan.studentId.mPhoneNumber) {
         toast.error(
           `Phone number not available for ${challan.studentId.studentName}. Please update the student's phone number first.`
         );
         return;
       }
 
-      let phoneNumber = challan.studentId.fPhoneNumber
+      let phoneNumber = challan.studentId.mPhoneNumber
         .toString()
         .replace(/[\s-]/g, "");
 
@@ -96,7 +96,7 @@ export function ViewPaperFundRecordsTab({
           phoneNumber = "92" + phoneNumber;
         } else {
           toast.error(
-            `Invalid phone number format for ${challan.studentId.studentName}: ${challan.studentId.fPhoneNumber}`
+            `Invalid phone number format for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`
           );
           return;
         }
@@ -104,7 +104,7 @@ export function ViewPaperFundRecordsTab({
 
       if (phoneNumber.length < 12 || phoneNumber.length > 13) {
         toast.error(
-          `Invalid phone number length for ${challan.studentId.studentName}: ${challan.studentId.fPhoneNumber}`
+          `Invalid phone number length for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`
         );
         return;
       }

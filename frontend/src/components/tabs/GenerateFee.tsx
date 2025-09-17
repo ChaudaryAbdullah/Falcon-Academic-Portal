@@ -34,6 +34,7 @@ interface Student {
   dob: string;
   section: string;
   fPhoneNumber: string;
+  gender: string;
   mPhoneNumber: string;
   fatherOccupation: string;
   motherName: string;
@@ -72,7 +73,7 @@ interface FeeChallan {
     rollNumber: string;
     studentName: string;
     fatherName: string;
-    fPhoneNumber: string;
+    mPhoneNumber: string;
     class: string;
     section: string;
   };
@@ -242,7 +243,7 @@ export function GenerateFeeTab({
           rollNumber: student.rollNumber,
           studentName: student.studentName,
           fatherName: student.fatherName,
-          fPhoneNumber: student.fPhoneNumber,
+          mPhoneNumber: student.mPhoneNumber,
           class: student.class,
           section: student.section,
         },

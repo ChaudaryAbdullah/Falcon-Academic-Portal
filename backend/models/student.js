@@ -39,6 +39,10 @@ const studentSchema = mongoose.Schema(
       type: String,
       required: true,
     },
+    gender: {
+      type: String,
+      required: true,
+    },
     fatherName: {
       type: String,
       required: true,
