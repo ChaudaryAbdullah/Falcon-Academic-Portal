@@ -32,6 +32,7 @@ interface Student {
   bform: string;
   dob: string;
   section: string;
+  gender: string;
   fPhoneNumber: string;
   mPhoneNumber: string;
   fatherOccupation: string;
@@ -77,7 +78,7 @@ interface FeeChallan {
     rollNumber: string;
     studentName: string;
     fatherName: string;
-    fPhoneNumber: string;
+    mPhoneNumber: string;
     class: string;
     section: string;
   };
@@ -102,7 +103,7 @@ interface paperFundChallan {
     rollNumber: string;
     studentName: string;
     fatherName: string;
-    fPhoneNumber: string;
+    mPhoneNumber: string;
     class: string;
     section: string;
   };

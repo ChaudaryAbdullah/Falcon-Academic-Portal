@@ -53,6 +53,7 @@ interface Student {
   bform: string;
   dob: string;
   section: string;
+  gender: string;
   fPhoneNumber: string;
   mPhoneNumber: string;
   fatherOccupation: string;
@@ -110,6 +111,7 @@ export function StudentManagement({
     bform: "",
     dob: "",
     section: "",
+    gender: "",
     fPhoneNumber: "",
     mPhoneNumber: "",
     fatherOccupation: "",
@@ -239,6 +241,7 @@ export function StudentManagement({
         bform: "",
         dob: "",
         section: "",
+        gender: "",
         fPhoneNumber: "",
         mPhoneNumber: "",
         motherCnic: "",
@@ -579,6 +582,35 @@ export function StudentManagement({
                     </select>
                   </div>
 
+                  <div className="space-y-2 mb-5">
+                    <Label htmlFor="gender">Gender</Label>
+                    <select
+                      id="gender"
+                      value={formData.gender}
+                      onChange={(e) =>
+                        handleInputChange("gender", e.target.value)
+                      }
+                      required
+                      className="border border-gray-250 shadow-xs rounded-lg px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">-- Select a gender --</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="mPhoneNumber1">Whatsapp Number</Label>
+                    <Input
+                      id="mPhoneNumber"
+                      value={formData.mPhoneNumber}
+                      onChange={(e) =>
+                        handleInputChange("mPhoneNumber", e.target.value)
+                      }
+                      placeholder="03XXXXXXXXX"
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="fatherName">Father Name</Label>
                     <Input
@@ -650,44 +682,12 @@ export function StudentManagement({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="mPhoneNumber1">Mother Phone Number</Label>
-                    <Input
-                      id="mPhoneNumber"
-                      value={formData.mPhoneNumber}
-                      onChange={(e) =>
-                        handleInputChange("mPhoneNumber", e.target.value)
-                      }
-                      placeholder="03XXXXXXXXX"
-                    />
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="motherOccupation">Mother Occupation</Label>
                     <Input
                       id="motherOccupation"
                       value={formData.motherOccupation}
                       onChange={(e) =>
                         handleInputChange("motherOccupation", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2 mt-5">
-                    <Label htmlFor="Email">Email</Label>
-                    <Input
-                      id="Email"
-                      value={formData.email}
-                      onChange={(e) =>
-                        handleInputChange("email", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2 mt-5">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      value={formData.password}
-                      onChange={(e) =>
-                        handleInputChange("password", e.target.value)
                       }
                     />
                   </div>

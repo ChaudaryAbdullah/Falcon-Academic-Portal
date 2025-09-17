@@ -18,6 +18,7 @@ interface Student {
   bform: string;
   dob: string;
   section: string;
+  gender: string;
   fPhoneNumber: string;
   mPhoneNumber: string;
   fatherOccupation: string;
@@ -51,7 +52,7 @@ interface PaperFundChallan {
     rollNumber: string;
     studentName: string;
     fatherName: string;
-    fPhoneNumber: string;
+    mPhoneNumber: string;
     class: string;
     section: string;
   };

@@ -24,7 +24,7 @@ interface Student {
   rollNumber: string;
   studentName: string;
   fatherName: string;
-  fPhoneNumber: string;
+  mPhoneNumber: string;
   class: string;
 }
 
@@ -308,7 +308,7 @@ export default function StudentDiscountPage({
                               <div className="flex items-center gap-2 mt-1">
                                 <Phone className="w-3 h-3 text-gray-400" />
                                 <span className="text-xs text-gray-500">
-                                  {discount.studentId.fPhoneNumber}
+                                  {discount.studentId.mPhoneNumber}
                                 </span>
                               </div>
                             </div>
