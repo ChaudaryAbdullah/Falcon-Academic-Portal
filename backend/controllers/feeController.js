@@ -720,3 +720,315 @@ export const getAvailableYears = async (req, res) => {
     });
   }
 };
+
+// Generate Daily Report
+export const getDailyReport = async (req, res) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: "Date parameter is required",
+      });
+    }
+
+    // Parse the date and create start and end of day
+    const reportDate = new Date(date);
+    const startOfDay = new Date(reportDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(reportDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Get all paid fees for the specified date
+    const pipeline = [
+      {
+        $match: {
+          status: "paid",
+          paidDate: {
+            $gte: startOfDay,
+            $lte: endOfDay,
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "students",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "student",
+        },
+      },
+      {
+        $unwind: "$student",
+      },
+      {
+        $project: {
+          studentId: "$student._id",
+          studentName: "$student.studentName",
+          rollNumber: "$student.rollNumber",
+          class: "$student.class",
+          section: "$student.section",
+          amount: "$totalAmount",
+          challanId: "$_id",
+          paymentTime: "$paidDate",
+          month: "$month",
+          year: "$year",
+        },
+      },
+      {
+        $sort: {
+          paymentTime: 1, // Sort by payment time ascending
+        },
+      },
+    ];
+
+    const dailyTransactions = await Fee.aggregate(pipeline);
+
+    // Calculate summary statistics
+    const totalCollected = dailyTransactions.reduce(
+      (sum, transaction) => sum + (transaction.amount || 0),
+      0
+    );
+
+    // Get total expected for the day (all pending fees that were due on or before this date)
+    const expectedPipeline = [
+      {
+        $match: {
+          dueDate: { $lte: endOfDay },
+          status: { $ne: "paid" },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalExpected: { $sum: "$totalAmount" },
+        },
+      },
+    ];
+
+    const expectedResult = await Fee.aggregate(expectedPipeline);
+    const totalExpected = expectedResult[0]?.totalExpected || 0;
+
+    // Format the response
+    const reportData = {
+      date: date,
+      totalExpected: totalExpected,
+      totalCollected: totalCollected,
+      totalPending: totalExpected,
+      totalTransactions: dailyTransactions.length,
+      students: dailyTransactions.map((transaction) => ({
+        studentId: transaction.studentId,
+        studentName: transaction.studentName,
+        rollNumber: transaction.rollNumber,
+        class: transaction.class,
+        section: transaction.section,
+        amount: transaction.amount,
+        challanId: transaction.challanId.toString(),
+        paymentTime: transaction.paymentTime.toISOString(),
+        month: transaction.month,
+        year: transaction.year,
+      })),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: reportData,
+    });
+  } catch (error) {
+    console.error("Error generating daily report:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
+
+// Get Daily Collection Summary for a Date Range (optional - for dashboard widgets)
+export const getDailyCollectionSummary = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Start date and end date parameters are required",
+      });
+    }
+
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const pipeline = [
+      {
+        $match: {
+          status: "paid",
+          paidDate: {
+            $gte: start,
+            $lte: end,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$paidDate" },
+          },
+          totalCollected: { $sum: "$totalAmount" },
+          transactionCount: { $sum: 1 },
+        },
+      },
+      {
+        $sort: {
+          _id: 1,
+        },
+      },
+      {
+        $project: {
+          date: "$_id",
+          totalCollected: 1,
+          transactionCount: 1,
+          _id: 0,
+        },
+      },
+    ];
+
+    const dailySummary = await Fee.aggregate(pipeline);
+
+    // Calculate total for the period
+    const periodTotal = dailySummary.reduce(
+      (sum, day) => sum + day.totalCollected,
+      0
+    );
+
+    const totalTransactions = dailySummary.reduce(
+      (sum, day) => sum + day.transactionCount,
+      0
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        dailySummary,
+        periodTotal,
+        totalTransactions,
+        averagePerDay:
+          dailySummary.length > 0
+            ? Math.round(periodTotal / dailySummary.length)
+            : 0,
+      },
+    });
+  } catch (error) {
+    console.error("Error generating daily collection summary:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
+
+// Get Today's Collection Summary (for dashboard)
+export const getTodayCollectionSummary = async (req, res) => {
+  try {
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Get today's collections
+    const todayPipeline = [
+      {
+        $match: {
+          status: "paid",
+          paidDate: {
+            $gte: startOfDay,
+            $lte: endOfDay,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalCollected: { $sum: "$totalAmount" },
+          transactionCount: { $sum: 1 },
+          students: { $addToSet: "$studentId" },
+        },
+      },
+    ];
+
+    const todayResult = await Fee.aggregate(todayPipeline);
+    const todayData = todayResult[0] || {
+      totalCollected: 0,
+      transactionCount: 0,
+      students: [],
+    };
+
+    // Get yesterday's collections for comparison
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const startOfYesterday = new Date(yesterday);
+    startOfYesterday.setHours(0, 0, 0, 0);
+    const endOfYesterday = new Date(yesterday);
+    endOfYesterday.setHours(23, 59, 59, 999);
+
+    const yesterdayPipeline = [
+      {
+        $match: {
+          status: "paid",
+          paidDate: {
+            $gte: startOfYesterday,
+            $lte: endOfYesterday,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalCollected: { $sum: "$totalAmount" },
+        },
+      },
+    ];
+
+    const yesterdayResult = await Fee.aggregate(yesterdayPipeline);
+    const yesterdayTotal = yesterdayResult[0]?.totalCollected || 0;
+
+    // Calculate percentage change
+    const percentageChange =
+      yesterdayTotal > 0
+        ? Math.round(
+            ((todayData.totalCollected - yesterdayTotal) / yesterdayTotal) * 100
+          )
+        : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        date: today.toISOString().split("T")[0],
+        totalCollected: todayData.totalCollected,
+        transactionCount: todayData.transactionCount,
+        uniqueStudents: todayData.students.length,
+        yesterdayTotal: yesterdayTotal,
+        percentageChange: percentageChange,
+        averagePerTransaction:
+          todayData.transactionCount > 0
+            ? Math.round(todayData.totalCollected / todayData.transactionCount)
+            : 0,
+      },
+    });
+  } catch (error) {
+    console.error("Error generating today's collection summary:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};

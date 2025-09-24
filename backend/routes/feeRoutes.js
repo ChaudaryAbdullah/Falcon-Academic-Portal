@@ -9,11 +9,13 @@ import {
   generateBulkFees,
   bulkUpdateFeeStatus,
   updateWhatsAppStatus,
-  // New report endpoints
   getClassSectionReport,
   getStudentReport,
   getSummaryReport,
   getAvailableYears,
+  getDailyReport,
+  getDailyCollectionSummary,
+  getTodayCollectionSummary,
 } from "../controllers/feeController.js";
 
 const router = express.Router();
@@ -42,5 +44,7 @@ router.get("/available-years", getAvailableYears);
 router.get("/reports/class-section", getClassSectionReport);
 router.get("/reports/student/:studentId", getStudentReport);
 router.get("/reports/summary", getSummaryReport);
-
+router.get("/reports/daily", getDailyReport);
+router.get("/reports/daily-summary", getDailyCollectionSummary);
+router.get("/reports/today-summary", getTodayCollectionSummary);
 export default router;
