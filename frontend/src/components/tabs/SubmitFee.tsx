@@ -142,6 +142,7 @@ export function SubmitPaymentTab({
       .map((fee) => `${fee.month} ${fee.year}`)
       .join(", ");
 
+    const reciptId = Math.random().toString(36).substr(2, 9).toUpperCase();
     return `
 <!DOCTYPE html>
 <html>
@@ -300,10 +301,7 @@ export function SubmitPaymentTab({
         <p><strong>Class:</strong> ${selectedFees[0].studentId.class}-${
       selectedFees[0].studentId.section
     }</p>
-        <p><strong>Receipt No:</strong> ${Math.random()
-          .toString(36)
-          .substr(2, 9)
-          .toUpperCase()}</p>
+        <p><strong>Receipt No:</strong> ${reciptId}</p>
         <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
     </div>
 
@@ -378,10 +376,7 @@ export function SubmitPaymentTab({
         <p><strong>Class:</strong> ${selectedFees[0].studentId.class}-${
       selectedFees[0].studentId.section
     }</p>
-        <p><strong>Receipt No:</strong> ${Math.random()
-          .toString(36)
-          .substr(2, 9)
-          .toUpperCase()}</p>
+        <p><strong>Receipt No:</strong> ${reciptId}</p>
         <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
     </div>
 
