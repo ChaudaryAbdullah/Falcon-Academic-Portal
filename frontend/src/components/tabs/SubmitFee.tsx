@@ -210,7 +210,7 @@ export function SubmitPaymentTab({
         .fee-details {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 8mm;
+            margin-bottom: 5mm;
         }
         
         .fee-details th, 
@@ -268,7 +268,7 @@ export function SubmitPaymentTab({
             
         }
             .space{
-                margin:20px 0;
+                margin:15px 0;
                border-bottom: 1px dotted #333;
 
 
