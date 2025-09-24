@@ -107,6 +107,369 @@ export function SubmitPaymentTab({
       }));
   };
 
+  const generateFeeChallanHTML = (
+    selectedFees: FeeChallan[],
+    lateFees: { [key: string]: number }
+  ) => {
+    const totalTuitionFee = selectedFees.reduce(
+      (sum, fee) => sum + fee.tutionFee,
+      0
+    );
+    const totalExamFee = selectedFees.reduce(
+      (sum, fee) => sum + fee.examFee,
+      0
+    );
+    const totalMiscFee = selectedFees.reduce(
+      (sum, fee) => sum + fee.miscFee,
+      0
+    );
+    const totalDiscount = selectedFees.reduce(
+      (sum, fee) => sum + fee.discount,
+      0
+    );
+    const totalLateFees = Object.values(lateFees).reduce(
+      (sum, fee) => sum + fee,
+      0
+    );
+    const grandTotal =
+      totalTuitionFee +
+      totalExamFee +
+      totalMiscFee +
+      totalLateFees -
+      totalDiscount;
+
+    const monthsString = selectedFees
+      .map((fee) => `${fee.month} ${fee.year}`)
+      .join(", ");
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fee Payment Receipt</title>
+    <style>
+        /* Reset margins and ensure exact A5 size */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @page {
+            size: A4;  /* Use A4 size */
+            margin: 0; /* Remove default margins */
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            width: 210mm;    /* A4 width */
+            height: 148.5mm; /* Half of A4 height */
+            padding: 10mm;   /* Inner padding */
+            font-size: 11pt;
+            position: relative;
+            page-break-after: always;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 8mm;
+            border-bottom: 1px solid #333;
+            padding-bottom: 3mm;
+        }
+        
+        .header h1 {
+            font-size: 16pt;
+            margin-bottom: 2mm;
+        }
+        
+        .header h2 {
+            font-size: 14pt;
+        }
+        
+        .payment-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4mm 8mm;
+            margin-bottom: 6mm;
+        }
+        
+        .payment-info p {
+            margin: 0;
+            line-height: 1.3;
+        }
+        
+        .months-paid {
+            margin-bottom: 6mm;
+            padding: 2mm 3mm;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 2mm;
+            font-size: 10pt;
+        }
+        
+        .fee-details {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8mm;
+        }
+        
+        .fee-details th, 
+        .fee-details td {
+            border: 0.5pt solid #ddd;
+            padding: 2mm 3mm;
+            text-align: left;
+        }
+        
+        .fee-details th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        
+        .amount-column {
+            text-align: right !important;
+            width: 30mm;
+        }
+        
+        .grand-total {
+            font-weight: bold;
+            font-size: 12pt;
+            background-color: #e9ecef;
+        }
+        
+        .signature-section {
+            position: absolute;
+            bottom: 20mm;
+            width: calc(100% - 20mm);
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .signature-box {
+            width: 60mm;
+            text-align: center;
+        }
+        
+        .signature-line {
+            border-top: 1px solid #000;
+            padding-top: 2mm;
+            font-size: 10pt;
+        }
+        
+        .footer {
+            
+            bottom: 10mm;
+            left: 10mm;
+            right: 10mm;
+            text-align: center;
+            font-size: 8pt;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 2mm;
+            
+        }
+            .space{
+                margin:20px 0;
+               border-bottom: 1px dotted #333;
+
+
+        /* Print-specific styles */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FALCON House School</h1>
+        <h2>Fee Payment Receipt ( Parents ) </h2>
+    </div>
+    
+    <div class="payment-info">
+        <p><strong>Student Name:</strong> ${
+          selectedFees[0].studentId.studentName
+        }</p>
+        <p><strong>Roll Number:</strong> ${
+          selectedFees[0].studentId.rollNumber
+        }</p>
+        <p><strong>Father Name:</strong> ${
+          selectedFees[0].studentId.fatherName
+        }</p>
+        <p><strong>Class:</strong> ${selectedFees[0].studentId.class}-${
+      selectedFees[0].studentId.section
+    }</p>
+        <p><strong>Receipt No:</strong> ${Math.random()
+          .toString(36)
+          .substr(2, 9)
+          .toUpperCase()}</p>
+        <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+    </div>
+
+    <div class="months-paid">
+        <strong>Months:</strong> ${monthsString}
+    </div>
+
+    <table class="fee-details">
+        <tr>
+            <th>Description</th>
+            <th class="amount-column">Amount (Rs.)</th>
+        </tr>
+        <tr>
+            <td>Tuition Fee</td>
+            <td class="amount-column">${totalTuitionFee.toLocaleString()}</td>
+        </tr>
+        <tr>
+            <td>Exam Fee</td>
+            <td class="amount-column">${totalExamFee.toLocaleString()}</td>
+        </tr>
+        <tr>
+            <td>Miscellaneous Fee</td>
+            <td class="amount-column">${totalMiscFee.toLocaleString()}</td>
+        </tr>
+        ${
+          totalLateFees > 0
+            ? `
+        <tr>
+            <td>Late Fee</td>
+            <td class="amount-column">${totalLateFees.toLocaleString()}</td>
+        </tr>
+        `
+            : ""
+        }
+        ${
+          totalDiscount > 0
+            ? `
+        <tr>
+            <td>Discount</td>
+            <td class="amount-column">-${totalDiscount.toLocaleString()}</td>
+        </tr>
+        `
+            : ""
+        }
+        <tr class="grand-total">
+            <td>Total Amount Paid</td>
+            <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
+        </tr>
+    </table> 
+
+    <div class="footer">
+        <p>This is a computer generated receipt. Thank you for your payment.</p>
+    </div>
+
+<div class="space"></div>
+
+     <div class="header">
+        <h1>FALCON House School</h1>
+        <h2>Fee Payment Receipt ( Admin )</h2>
+    </div>
+    
+    <div class="payment-info">
+        <p><strong>Student Name:</strong> ${
+          selectedFees[0].studentId.studentName
+        }</p>
+        <p><strong>Roll Number:</strong> ${
+          selectedFees[0].studentId.rollNumber
+        }</p>
+        <p><strong>Father Name:</strong> ${
+          selectedFees[0].studentId.fatherName
+        }</p>
+        <p><strong>Class:</strong> ${selectedFees[0].studentId.class}-${
+      selectedFees[0].studentId.section
+    }</p>
+        <p><strong>Receipt No:</strong> ${Math.random()
+          .toString(36)
+          .substr(2, 9)
+          .toUpperCase()}</p>
+        <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+    </div>
+
+    <div class="months-paid">
+        <strong>Months:</strong> ${monthsString}
+    </div>
+
+    <table class="fee-details">
+        <tr>
+            <th>Description</th>
+            <th class="amount-column">Amount (Rs.)</th>
+        </tr>
+        <tr>
+            <td>Tuition Fee</td>
+            <td class="amount-column">${totalTuitionFee.toLocaleString()}</td>
+        </tr>
+        <tr>
+            <td>Exam Fee</td>
+            <td class="amount-column">${totalExamFee.toLocaleString()}</td>
+        </tr>
+        <tr>
+            <td>Miscellaneous Fee</td>
+            <td class="amount-column">${totalMiscFee.toLocaleString()}</td>
+        </tr>
+        ${
+          totalLateFees > 0
+            ? `
+        <tr>
+            <td>Late Fee</td>
+            <td class="amount-column">${totalLateFees.toLocaleString()}</td>
+        </tr>
+        `
+            : ""
+        }
+        ${
+          totalDiscount > 0
+            ? `
+        <tr>
+            <td>Discount</td>
+            <td class="amount-column">-${totalDiscount.toLocaleString()}</td>
+        </tr>
+        `
+            : ""
+        }
+        <tr class="grand-total">
+            <td>Total Amount Paid</td>
+            <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
+        </tr>
+    </table> 
+
+    <div class="footer">
+        <p>This is a computer generated receipt. Thank you for your payment.</p>
+    </div>
+</body>
+</html>
+
+  `;
+  };
+
+  const printPaymentReceipt = () => {
+    const selectedFees = pendingFees.filter((fee) =>
+      selectedPendingFees.includes(fee.id)
+    );
+
+    if (selectedFees.length === 0) {
+      toast.error("Please select at least one fee challan to print receipt");
+      return;
+    }
+
+    const receiptContent = generateFeeChallanHTML(selectedFees, lateFees);
+
+    // Create a new window for printing
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(receiptContent);
+      printWindow.document.close();
+
+      // Wait for content to load then print
+      printWindow.onload = function () {
+        printWindow.print();
+        // Close the window after printing (optional)
+        printWindow.onafterprint = function () {
+          printWindow.close();
+        };
+      };
+    }
+  };
+
   useEffect(() => {
     if (selectedStudent) {
       const pending = getPendingFeesForStudent(selectedStudent);
@@ -597,35 +960,48 @@ export function SubmitPaymentTab({
                 </div>
               )}
 
-              {/* Submit Payment Button */}
-              <Button
-                onClick={submitFeePayment}
-                className="w-full h-12 sm:h-auto text-sm sm:text-base"
-                size="lg"
-                disabled={selectedPendingFees.length === 0}
-              >
-                <Receipt className="h-4 w-4 sm:h-5 sm:w-5 mr-2 flex-shrink-0" />
-                <span className="flex-1 truncate">
-                  Submit Payment for {selectedPendingFees.length} Challan(s)
-                </span>
-                {selectedPendingFees.length > 0 && (
-                  <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-xs sm:text-sm font-bold flex-shrink-0">
-                    Rs.{" "}
-                    {pendingFees
-                      .filter((fee) => selectedPendingFees.includes(fee.id))
-                      .reduce(
-                        (sum, fee) =>
-                          sum +
-                          (fee.tutionFee +
-                            fee.examFee +
-                            fee.miscFee -
-                            fee.discount) +
-                          (lateFees[fee.id] || 0),
-                        0
-                      )}
+              {/* Submit and Print Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  onClick={submitFeePayment}
+                  className="flex-1 h-12 sm:h-auto text-sm sm:text-base"
+                  size="lg"
+                  disabled={selectedPendingFees.length === 0}
+                >
+                  <Receipt className="h-4 w-4 sm:h-5 sm:w-5 mr-2 flex-shrink-0" />
+                  <span className="flex-1 truncate">
+                    Submit Payment for {selectedPendingFees.length} Challan(s)
                   </span>
-                )}
-              </Button>
+                  {selectedPendingFees.length > 0 && (
+                    <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-xs sm:text-sm font-bold flex-shrink-0">
+                      Rs.{" "}
+                      {pendingFees
+                        .filter((fee) => selectedPendingFees.includes(fee.id))
+                        .reduce(
+                          (sum, fee) =>
+                            sum +
+                            (fee.tutionFee +
+                              fee.examFee +
+                              fee.miscFee -
+                              fee.discount) +
+                            (lateFees[fee.id] || 0),
+                          0
+                        )}
+                    </span>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={printPaymentReceipt}
+                  variant="outline"
+                  className="h-12 sm:h-auto text-sm sm:text-base"
+                  size="lg"
+                  disabled={selectedPendingFees.length === 0}
+                >
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  Print Receipt
+                </Button>
+              </div>
             </div>
           )}
 
