@@ -1239,7 +1239,7 @@ Falcon House School Administration
               </h3>
               <p className="text-sm text-gray-500 px-4">
                 Search and select a student above to view their generated fee
-                challans
+                challans.
               </p>
             </div>
           )}
