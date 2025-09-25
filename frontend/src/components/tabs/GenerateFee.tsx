@@ -18,7 +18,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { Search, FileText, User } from "lucide-react";
+import {
+  Search,
+  FileText,
+  User,
+  Printer,
+  Calendar,
+  GraduationCap,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
@@ -118,6 +126,16 @@ export function GenerateFeeTab({
     "all" | "class" | "individual"
   >("class");
 
+  // New state for print functionality
+  const [printDate, setPrintDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [printClass, setPrintClass] = useState("");
+  const [printSection, setPrintSection] = useState("");
+  const [printClassDate, setPrintClassDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+
   const filteredStudents = students.filter(
     (student) =>
       student.studentName.toLowerCase().includes(studentSearch.toLowerCase()) ||
@@ -194,6 +212,311 @@ export function GenerateFeeTab({
     setStudentSearch(value);
     setSelectedStudent("");
     setShowStudentDropdown(value.length > 0);
+  };
+
+  // Generate multiple challans HTML for bulk printing
+  const generateBulkChallansHTML = (challansArray: FeeChallan[]) => {
+    const challanPages = challansArray
+      .map((challan, index) => {
+        const pageBreak =
+          index < challansArray.length - 1
+            ? 'style="page-break-after: always;"'
+            : "";
+
+        return `
+<div ${pageBreak}>
+    <div class="header">
+        <h1>FALCON House School</h1>
+        <h2>Fee Challan</h2>
+    </div>
+    
+    <div class="challan-info">
+        <p><strong>Student Name:</strong> ${challan.studentId.studentName}</p>
+        <p><strong>Father Name:</strong> ${challan.studentId.fatherName}</p>
+        <p><strong>Roll Number:</strong> ${challan.studentId.rollNumber}</p>
+        <p><strong>Class:</strong> ${challan.studentId.class} ${
+          challan.studentId.section
+        }</p>
+        <p><strong>Month/Year:</strong> ${challan.month} ${challan.year}</p>
+        <p><strong>Due Date:</strong> ${challan.dueDate}</p>
+    </div>
+
+    <table class="fee-details">
+        <tr>
+            <th>Fee Type</th>
+            <th>Amount (Rs.)</th>
+        </tr>
+        <tr>
+            <td>Tuition Fee</td>
+            <td>${challan.tutionFee || 0}</td>
+        </tr>
+        <tr>
+            <td>Exam Fee</td>
+            <td>${challan.examFee || 0}</td>
+        </tr>
+        <tr>
+            <td>Miscellaneous Fee</td>
+            <td>${challan.miscFee || 0}</td>
+        </tr>
+        ${
+          challan.arrears > 0
+            ? `
+        <tr class="arrears">
+            <td><strong>Previous Arrears</strong></td>
+            <td><strong>${challan.arrears}</strong></td>
+        </tr>`
+            : ""
+        }
+        ${
+          challan.discount > 0
+            ? `
+        <tr class="discount">
+            <td><strong>Discount</strong></td>
+            <td><strong>-${challan.discount}</strong></td>
+        </tr>`
+            : ""
+        }
+        <tr class="total">
+            <td>Total Amount</td>
+            <td>Rs. ${challan.totalAmount + challan.arrears}</td>
+        </tr>
+    </table>
+
+    <div class="footer">
+        <p>Please pay before the due date to avoid late fees.</p>
+        <p>For queries, contact school administration.</p>
+    </div>
+</div>
+      `;
+      })
+      .join("");
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fee Challans - Bulk Print</title>
+    <style>
+        @page {
+            size: 210mm 148.5mm;
+            margin: 10mm; 
+        }
+        
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0;
+            width: 190mm;
+            font-size: 13px; 
+        }
+        
+        .header { 
+            text-align: center; 
+            margin-bottom: 15px; 
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            margin: 0 0 3px 0;
+        }
+        
+        .header h2 {
+            font-size: 18px;
+            margin: 0;
+        }
+        
+        .challan-info { 
+            margin: 15px 0; 
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-gap: 15px 30px;
+            font-size: 13px;
+        }
+        
+        .challan-info p {
+            margin: 1px 0;
+        }
+        
+        .fee-details { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin: 15px 0; 
+            font-size: 13px;
+        }
+        
+        .fee-details th, .fee-details td { 
+            border: 1px solid #ddd; 
+            padding: 8px; 
+            text-align: left; 
+        }
+        
+        .fee-details th { 
+            background-color: #f2f2f2; 
+            font-weight: bold;
+        }
+        
+        .total { 
+            font-weight: bold; 
+            font-size: 12px; 
+        }
+        
+        .footer { 
+            margin-top: 15px; 
+            text-align: center; 
+            font-size: 10px; 
+            line-height: 1;
+        }
+        
+        .footer p {
+            margin: 3px 0;
+        }
+        
+        .arrears { 
+            color: #e74c3c; 
+        }
+        
+        .discount { 
+            color: #27ae60; 
+        }
+        
+        @media print {
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    ${challanPages}
+</body>
+</html>
+    `;
+  };
+
+  // Print challans generated today
+  const printTodaysChallans = () => {
+    const today = new Date().toISOString().split("T")[0];
+    const todaysChallans = challans.filter(
+      (challan) => challan.generatedDate === today
+    );
+
+    if (todaysChallans.length === 0) {
+      toast.error("No challans were generated today.");
+      return;
+    }
+
+    const printContent = generateBulkChallansHTML(todaysChallans);
+    openPrintWindow(
+      printContent,
+      `Today's Challans (${todaysChallans.length})`
+    );
+  };
+
+  // Print challans generated on specific date
+  const printSpecificDateChallans = () => {
+    if (!printDate) {
+      toast.error("Please select a date.");
+      return;
+    }
+
+    const dateChallans = challans.filter(
+      (challan) => challan.generatedDate === printDate
+    );
+
+    if (dateChallans.length === 0) {
+      toast.error(`No challans were generated on ${printDate}.`);
+      return;
+    }
+
+    const printContent = generateBulkChallansHTML(dateChallans);
+    openPrintWindow(
+      printContent,
+      `Challans for ${printDate} (${dateChallans.length})`
+    );
+  };
+
+  // Print challans for specific class (all sections)
+  const printClassChallans = () => {
+    if (!printClass || !printClassDate) {
+      toast.error("Please select a class and date.");
+      return;
+    }
+
+    const classChallans = challans.filter(
+      (challan) =>
+        challan.studentId.class === printClass &&
+        challan.generatedDate === printClassDate
+    );
+
+    if (classChallans.length === 0) {
+      toast.error(
+        `No challans were generated on ${printClassDate} for class ${printClass}.`
+      );
+      return;
+    }
+
+    const printContent = generateBulkChallansHTML(classChallans);
+    openPrintWindow(
+      printContent,
+      `Class ${printClass} Challans - ${printClassDate} (${classChallans.length})`
+    );
+  };
+
+  // Print challans for specific class and section
+  const printSectionChallans = () => {
+    if (!printClass || !printSection || !printClassDate) {
+      toast.error("Please select class, section, and date.");
+      return;
+    }
+
+    const sectionChallans = challans.filter(
+      (challan) =>
+        challan.studentId.class === printClass &&
+        challan.studentId.section === printSection &&
+        challan.generatedDate === printClassDate
+    );
+
+    if (sectionChallans.length === 0) {
+      toast.error(
+        `No challans were generated on ${printClassDate} for class ${printClass} section ${printSection}.`
+      );
+      return;
+    }
+
+    const printContent = generateBulkChallansHTML(sectionChallans);
+    openPrintWindow(
+      printContent,
+      `Class ${printClass}-${printSection} Challans - ${printClassDate} (${sectionChallans.length})`
+    );
+  };
+
+  // Helper function to open print window
+  const openPrintWindow = (content: string, title: string) => {
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(content);
+      printWindow.document.close();
+      printWindow.document.title = title;
+
+      printWindow.onload = function () {
+        printWindow.print();
+        printWindow.onafterprint = function () {
+          printWindow.close();
+        };
+      };
+
+      toast.success(`Opening print dialog for ${title.toLowerCase()}`);
+    } else {
+      toast.error(
+        "Unable to open print window. Please check your browser settings."
+      );
+    }
   };
 
   const generateFeeChallan = async (
@@ -335,6 +658,42 @@ export function GenerateFeeTab({
   const uniqueClasses = Array.from(
     new Set(students.map((s) => s.class).filter(Boolean))
   );
+
+  // Get unique sections for selected print class
+  const uniqueSections = Array.from(
+    new Set(
+      students
+        .filter((s) => s.class === printClass)
+        .map((s) => s.section)
+        .filter(Boolean)
+    )
+  );
+
+  // Get today's challans count
+  const todaysChallansCount = challans.filter(
+    (challan) =>
+      challan.generatedDate === new Date().toISOString().split("T")[0]
+  ).length;
+
+  // Get specific date challans count
+  const specificDateChallansCount = challans.filter(
+    (challan) => challan.generatedDate === printDate
+  ).length;
+
+  // Get class challans count (today only)
+  const classChallansCount = challans.filter(
+    (challan) =>
+      challan.studentId.class === printClass &&
+      challan.generatedDate === printClassDate
+  ).length;
+
+  // Get section challans count (today only)
+  const sectionChallansCount = challans.filter(
+    (challan) =>
+      challan.studentId.class === printClass &&
+      challan.studentId.section === printSection &&
+      challan.generatedDate === printClassDate
+  ).length;
 
   return (
     <Card>
@@ -499,6 +858,317 @@ export function GenerateFeeTab({
             <FileText className="h-4 w-4 mr-2" />
             Generate Fee Challans
           </Button>
+
+          {/* Print Challans Section */}
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Printer className="h-5 w-5" />
+              Print Challans (Today's Generated Only)
+            </h3>
+
+            <div className="space-y-4">
+              {/* Print All Today's Challans */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h4 className="font-medium text-green-800 flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      All Today's Challans
+                    </h4>
+                    <p className="text-sm text-green-600">
+                      Print all challans generated today ({todaysChallansCount}{" "}
+                      challans)
+                    </p>
+                  </div>
+                  <Button
+                    onClick={printTodaysChallans}
+                    variant="outline"
+                    className="bg-green-100 hover:bg-green-200 border-green-300 text-green-700"
+                    disabled={todaysChallansCount === 0}
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print All Today's
+                  </Button>
+                </div>
+              </div>
+              {/* Print by Class (All Sections) */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="space-y-3">
+                  <h4 className="font-medium text-blue-800 flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4" />
+                    Print by Class (All Sections)
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div>
+                      <Label
+                        htmlFor="printClass"
+                        className="text-sm text-blue-700"
+                      >
+                        Select Class
+                      </Label>
+                      <Select value={printClass} onValueChange={setPrintClass}>
+                        <SelectTrigger className="border-blue-300 focus:border-blue-500">
+                          <SelectValue placeholder="Select class" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {uniqueClasses.map((className) => (
+                            <SelectItem key={className} value={className}>
+                              {className}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label
+                        htmlFor="printClassDate"
+                        className="text-sm text-blue-700"
+                      >
+                        Select Date
+                      </Label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-3 h-4 w-4 text-blue-400" />
+                        <Input
+                          id="printClassDate"
+                          type="date"
+                          value={printClassDate}
+                          onChange={(e) => setPrintClassDate(e.target.value)}
+                          className="pl-10 border-blue-300 focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <Button
+                        onClick={printClassChallans}
+                        variant="outline"
+                        className="bg-blue-100 hover:bg-blue-200 border-blue-300 text-blue-700"
+                        disabled={
+                          !printClass ||
+                          !printClassDate ||
+                          classChallansCount === 0
+                        }
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print Class
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-blue-600">
+                    {classChallansCount} challans found for class{" "}
+                    {printClass || "..."} on {printClassDate}
+                  </p>
+                </div>
+              </div>
+              {/* Print by Class and Section */}
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div className="space-y-3">
+                  <h4 className="font-medium text-orange-800 flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Print by Class & Section
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                      <Label
+                        htmlFor="printClassSection"
+                        className="text-sm text-orange-700"
+                      >
+                        Select Class
+                      </Label>
+                      <Select
+                        value={printClass}
+                        onValueChange={(value) => {
+                          setPrintClass(value);
+                          setPrintSection("");
+                        }}
+                      >
+                        <SelectTrigger className="border-orange-300 focus:border-orange-500">
+                          <SelectValue placeholder="Select class" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {uniqueClasses.map((className) => (
+                            <SelectItem key={className} value={className}>
+                              {className}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label
+                        htmlFor="printSectionSelect"
+                        className="text-sm text-orange-700"
+                      >
+                        Select Section
+                      </Label>
+                      <Select
+                        value={printSection}
+                        onValueChange={setPrintSection}
+                        disabled={!printClass}
+                      >
+                        <SelectTrigger className="border-orange-300 focus:border-orange-500">
+                          <SelectValue placeholder="Select section" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {uniqueSections.map((section) => (
+                            <SelectItem key={section} value={section}>
+                              {section}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label
+                        htmlFor="printSectionDate"
+                        className="text-sm text-orange-700"
+                      >
+                        Select Date
+                      </Label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-3 h-4 w-4 text-orange-400" />
+                        <Input
+                          id="printSectionDate"
+                          type="date"
+                          value={printClassDate}
+                          onChange={(e) => setPrintClassDate(e.target.value)}
+                          className="pl-10 border-orange-300 focus:border-orange-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <Button
+                        onClick={printSectionChallans}
+                        variant="outline"
+                        className="bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-700"
+                        disabled={
+                          !printClass ||
+                          !printSection ||
+                          !printClassDate ||
+                          sectionChallansCount === 0
+                        }
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print Section
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-orange-600">
+                    {sectionChallansCount} challans found for{" "}
+                    {printClass || "..."}-{printSection || "..."} on{" "}
+                    {printClassDate}
+                  </p>
+                </div>
+              </div>
+              {/* Print Specific Date Challans */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="space-y-3">
+                  <h4 className="font-medium text-purple-800 flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Print by Date
+                  </h4>
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                    <div className="flex-1">
+                      <Label
+                        htmlFor="printDate"
+                        className="text-sm text-purple-700"
+                      >
+                        Select Date
+                      </Label>
+                      <div className="relative mt-1">
+                        <Calendar className="absolute left-3 top-3 h-4 w-4 text-purple-400" />
+                        <Input
+                          id="printDate"
+                          type="date"
+                          value={printDate}
+                          onChange={(e) => setPrintDate(e.target.value)}
+                          className="pl-10 border-purple-300 focus:border-purple-500"
+                        />
+                      </div>
+                      <p className="text-xs text-purple-600 mt-1">
+                        {specificDateChallansCount} challans found for selected
+                        date
+                      </p>
+                    </div>
+                    <Button
+                      onClick={printSpecificDateChallans}
+                      variant="outline"
+                      className="bg-purple-100 mb-5 hover:bg-purple-200 border-purple-300 text-purple-700"
+                      disabled={specificDateChallansCount === 0}
+                    >
+                      <Printer className="h-4 w-4 mr-2" />
+                      Print Date Challans
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              {/* Print Instructions */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="font-medium text-gray-800 mb-2">
+                  Print Instructions:
+                </h4>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  <li>• Each challan will be printed on a separate page</li>
+                  <li>
+                    • Use A4 paper size with landscape orientation for best
+                    results
+                  </li>
+                  <li>
+                    • Ensure your printer has sufficient paper for bulk printing
+                  </li>
+                  <li>• Check print preview before printing large batches</li>
+
+                  <li>
+                    • <strong>Note:</strong> Class and section printing works
+                    for any selected date
+                  </li>
+                </ul>
+              </div>
+              {/* Print Summary */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="font-medium text-yellow-800 mb-2">
+                  Today's Print Summary:
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                  <div className="bg-white p-3 rounded border">
+                    <div className="font-medium text-gray-700">Total Today</div>
+                    <div className="text-lg font-bold text-green-600">
+                      {todaysChallansCount}
+                    </div>
+                  </div>
+                  {printClass && (
+                    <div className="bg-white p-3 rounded border">
+                      <div className="font-medium text-gray-700">
+                        Class {printClass}
+                      </div>
+                      <div className="text-lg font-bold text-blue-600">
+                        {classChallansCount}
+                      </div>
+                    </div>
+                  )}
+                  {printClass && printSection && (
+                    <div className="bg-white p-3 rounded border">
+                      <div className="font-medium text-gray-700">
+                        {printClass}-{printSection}
+                      </div>
+                      <div className="text-lg font-bold text-orange-600">
+                        {sectionChallansCount}
+                      </div>
+                    </div>
+                  )}
+                  {printDate && (
+                    <div className="bg-white p-3 rounded border">
+                      <div className="font-medium text-gray-700">
+                        {printDate}
+                      </div>
+                      <div className="text-lg font-bold text-purple-600">
+                        {specificDateChallansCount}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
