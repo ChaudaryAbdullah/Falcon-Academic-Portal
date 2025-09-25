@@ -181,8 +181,6 @@ export function SubmitPaymentTab({
         .map((fee) => `${fee.month} ${fee.year}`)
         .join(", ");
 
-      const receiptId = Math.random().toString(36).substr(2, 9).toUpperCase();
-
       // Create payment confirmation message
       const message = `
 *Payment Confirmation - Falcon House School*
@@ -197,7 +195,6 @@ Thank you for your payment! Here are the details:
 • Class: ${student.class}-${student.section}
 
 *Payment Details:*
-• Receipt ID: ${receiptId}
 • Date: ${new Date().toLocaleDateString()}
 • Months Paid: ${monthsString}
 
