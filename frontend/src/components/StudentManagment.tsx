@@ -318,7 +318,7 @@ export function StudentManagement({
     fatherOccupation: "Father Occupation",
     motherName: "Mother Name",
     motherOccupation: "Mother Occupation",
-    mPhoneNumber: "Mother Phone",
+    mPhoneNumber: "Whatsapp Number",
     address: "Address",
   };
 
@@ -1066,7 +1066,7 @@ export function StudentManagement({
                       )}
                       {columnVisibility.mPhoneNumber && (
                         <TableHead className="min-w-[130px]">
-                          Mother Phone
+                          Whatsapp Number
                         </TableHead>
                       )}
                       {columnVisibility.address && (
