@@ -107,6 +107,129 @@ export function SubmitPaymentTab({
       }));
   };
 
+  // New WhatsApp function
+  const sendPaymentConfirmation = async (
+    selectedFees: FeeChallan[],
+    lateFees: { [key: string]: number }
+  ) => {
+    try {
+      const student = selectedFees[0].studentId;
+
+      if (!student.mPhoneNumber) {
+        toast.error(
+          `Phone number not available for ${student.studentName}. Please update the student's phone number first.`
+        );
+        return;
+      }
+
+      // Format phone number (same logic as your existing function)
+      let phoneNumber = student.mPhoneNumber.toString().replace(/[\s-]/g, "");
+
+      phoneNumber = phoneNumber.replace(/[^\d+]/g, "");
+
+      if (phoneNumber.startsWith("+92")) {
+        phoneNumber = phoneNumber.substring(1);
+      } else if (phoneNumber.startsWith("0")) {
+        phoneNumber = "92" + phoneNumber.substring(1);
+      } else if (!phoneNumber.startsWith("92")) {
+        if (phoneNumber.startsWith("3")) {
+          phoneNumber = "92" + phoneNumber;
+        } else {
+          toast.error(
+            `Invalid phone number format for ${student.studentName}: ${student.mPhoneNumber}`
+          );
+          return;
+        }
+      }
+
+      if (phoneNumber.length < 12 || phoneNumber.length > 13) {
+        toast.error(
+          `Invalid phone number length for ${student.studentName}: ${student.mPhoneNumber}`
+        );
+        return;
+      }
+
+      // Calculate totals
+      const totalTuitionFee = selectedFees.reduce(
+        (sum, fee) => sum + fee.tutionFee,
+        0
+      );
+      const totalExamFee = selectedFees.reduce(
+        (sum, fee) => sum + fee.examFee,
+        0
+      );
+      const totalMiscFee = selectedFees.reduce(
+        (sum, fee) => sum + fee.miscFee,
+        0
+      );
+      const totalDiscount = selectedFees.reduce(
+        (sum, fee) => sum + fee.discount,
+        0
+      );
+      const totalLateFees = Object.values(lateFees).reduce(
+        (sum, fee) => sum + fee,
+        0
+      );
+      const grandTotal =
+        totalTuitionFee +
+        totalExamFee +
+        totalMiscFee +
+        totalLateFees -
+        totalDiscount;
+
+      const monthsString = selectedFees
+        .map((fee) => `${fee.month} ${fee.year}`)
+        .join(", ");
+
+      const receiptId = Math.random().toString(36).substr(2, 9).toUpperCase();
+
+      // Create payment confirmation message
+      const message = `
+*Payment Confirmation - Falcon House School*
+
+Dear ${student.fatherName || "Parent"},
+
+Thank you for your payment! Here are the details:
+
+*Student Information:*
+• Name: ${student.studentName}
+• Roll Number: ${student.rollNumber}
+• Class: ${student.class}-${student.section}
+
+*Payment Details:*
+• Receipt ID: ${receiptId}
+• Date: ${new Date().toLocaleDateString()}
+• Months Paid: ${monthsString}
+
+*Fee Breakdown:*
+• Tuition Fee: Rs. ${totalTuitionFee.toLocaleString()}
+• Exam Fee: Rs. ${totalExamFee.toLocaleString()}
+• Miscellaneous Fee: Rs. ${totalMiscFee.toLocaleString()}
+${totalLateFees > 0 ? `• Late Fee: Rs. ${totalLateFees.toLocaleString()}` : ""}
+${totalDiscount > 0 ? `• Discount: Rs. -${totalDiscount.toLocaleString()}` : ""}
+
+*Total Paid: Rs. ${grandTotal.toLocaleString()}*
+
+Your payment has been successfully recorded in our system. Please keep this message as confirmation.
+
+Thank you for choosing Falcon House School!
+
+Best regards,
+Falcon House School Administration
+      `.trim();
+
+      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
+        message
+      )}`;
+      window.open(whatsappUrl, "_blank");
+
+      toast.success("WhatsApp message opened successfully!");
+    } catch (error) {
+      console.error("Error sending payment confirmation:", error);
+      toast.error("Error opening WhatsApp message. Please try again.");
+    }
+  };
+
   const generateFeeChallanHTML = (
     selectedFees: FeeChallan[],
     lateFees: { [key: string]: number }
@@ -361,7 +484,7 @@ export function SubmitPaymentTab({
     <!-- Student 1 - Admin Receipt (Top Right) -->
     <div class="receipt-container">
         <div class="header">
-            <h1>FALCON House School</h1>
+                    <h1>FALCON House School</h1>
             <h2>Fee Payment Receipt (Admin)</h2>
         </div>
         
@@ -529,6 +652,11 @@ export function SubmitPaymentTab({
     }
 
     try {
+      // Get selected fees for WhatsApp message
+      const selectedFees = pendingFees.filter((fee) =>
+        selectedPendingFees.includes(fee.id)
+      );
+
       // Check if any fees have late fees that need to be updated first
       const feesWithLateFees = selectedPendingFees.filter(
         (feeId) => lateFees[feeId] && lateFees[feeId] > 0
@@ -580,6 +708,9 @@ export function SubmitPaymentTab({
           const lateFee = lateFees[feeId] || 0;
           return sum + (fee ? fee.totalAmount + lateFee : 0);
         }, 0);
+
+        // Send WhatsApp confirmation message
+        await sendPaymentConfirmation(selectedFees, lateFees);
 
         // Reset form
         setSelectedPendingFees([]);
@@ -959,46 +1090,142 @@ export function SubmitPaymentTab({
               )}
 
               {/* Submit and Print Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button
-                  onClick={submitFeePayment}
-                  className="flex-1 h-12 sm:h-auto text-sm sm:text-base"
-                  size="lg"
-                  disabled={selectedPendingFees.length === 0}
-                >
-                  <Receipt className="h-4 w-4 sm:h-5 sm:w-5 mr-2 flex-shrink-0" />
-                  <span className="flex-1 truncate">
-                    Submit Payment for {selectedPendingFees.length} Challan(s)
-                  </span>
-                  {selectedPendingFees.length > 0 && (
-                    <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-xs sm:text-sm font-bold flex-shrink-0">
-                      Rs.{" "}
-                      {pendingFees
-                        .filter((fee) => selectedPendingFees.includes(fee.id))
-                        .reduce(
-                          (sum, fee) =>
-                            sum +
-                            (fee.tutionFee +
-                              fee.examFee +
-                              fee.miscFee -
-                              fee.discount) +
-                            (lateFees[fee.id] || 0),
-                          0
-                        )}
+              <div className="space-y-3">
+                {/* Mobile View - Stacked buttons */}
+                <div className="flex flex-col gap-3 md:hidden">
+                  <Button
+                    onClick={submitFeePayment}
+                    className="w-full h-12 text-sm"
+                    size="lg"
+                    disabled={selectedPendingFees.length === 0}
+                  >
+                    <Receipt className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="flex-1 truncate">
+                      Submit Payment ({selectedPendingFees.length})
                     </span>
-                  )}
-                </Button>
+                    {selectedPendingFees.length > 0 && (
+                      <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-xs font-bold flex-shrink-0">
+                        Rs.{" "}
+                        {pendingFees
+                          .filter((fee) => selectedPendingFees.includes(fee.id))
+                          .reduce(
+                            (sum, fee) =>
+                              sum +
+                              (fee.tutionFee +
+                                fee.examFee +
+                                fee.miscFee -
+                                fee.discount) +
+                              (lateFees[fee.id] || 0),
+                            0
+                          )
+                          .toLocaleString()}
+                      </span>
+                    )}
+                  </Button>
 
-                <Button
-                  onClick={printPaymentReceipt}
-                  variant="outline"
-                  className="h-12 sm:h-auto text-sm sm:text-base"
-                  size="lg"
-                  disabled={selectedPendingFees.length === 0}
-                >
-                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  Print Receipt
-                </Button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      onClick={printPaymentReceipt}
+                      variant="outline"
+                      className="h-12 text-sm"
+                      size="lg"
+                      disabled={selectedPendingFees.length === 0}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Print
+                    </Button>
+
+                    <Button
+                      onClick={() => {
+                        const selectedFees = pendingFees.filter((fee) =>
+                          selectedPendingFees.includes(fee.id)
+                        );
+                        sendPaymentConfirmation(selectedFees, lateFees);
+                      }}
+                      variant="outline"
+                      className="h-12 text-sm bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                      size="lg"
+                      disabled={selectedPendingFees.length === 0}
+                    >
+                      <svg
+                        className="h-4 w-4 mr-2"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
+                      </svg>
+                      WhatsApp
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Tablet View - 2 rows */}
+                <div className="hidden md:flex lg:flex flex-col gap-3">
+                  <Button
+                    onClick={submitFeePayment}
+                    className="w-full h-12 text-sm"
+                    size="lg"
+                    disabled={selectedPendingFees.length === 0}
+                  >
+                    <Receipt className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="flex-1 truncate">
+                      Submit Payment for {selectedPendingFees.length} Challan(s)
+                    </span>
+                    {selectedPendingFees.length > 0 && (
+                      <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-sm font-bold flex-shrink-0">
+                        Rs.{" "}
+                        {pendingFees
+                          .filter((fee) => selectedPendingFees.includes(fee.id))
+                          .reduce(
+                            (sum, fee) =>
+                              sum +
+                              (fee.tutionFee +
+                                fee.examFee +
+                                fee.miscFee -
+                                fee.discount) +
+                              (lateFees[fee.id] || 0),
+                            0
+                          )
+                          .toLocaleString()}
+                      </span>
+                    )}
+                  </Button>
+
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={printPaymentReceipt}
+                      variant="outline"
+                      className="flex-1 h-11 text-sm"
+                      size="lg"
+                      disabled={selectedPendingFees.length === 0}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Print Receipt
+                    </Button>
+
+                    <Button
+                      onClick={() => {
+                        const selectedFees = pendingFees.filter((fee) =>
+                          selectedPendingFees.includes(fee.id)
+                        );
+                        sendPaymentConfirmation(selectedFees, lateFees);
+                      }}
+                      variant="outline"
+                      className="flex-1 h-11 text-sm bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                      size="lg"
+                      disabled={selectedPendingFees.length === 0}
+                    >
+                      <svg
+                        className="h-4 w-4 mr-2"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
+                      </svg>
+                      Send WhatsApp
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
