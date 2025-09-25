@@ -147,9 +147,9 @@ export function SubmitPaymentTab({
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Fee Payment Receipt</title>
+    <title>Fee Payment Receipt - 4 Per Page</title>
     <style>
-        /* Reset margins and ensure exact A5 size */
+        /* Reset margins and ensure exact A4 size */
         * {
             margin: 0;
             padding: 0;
@@ -157,121 +157,120 @@ export function SubmitPaymentTab({
         }
 
         @page {
-            size: A4;  /* Use A4 size */
-            margin: 0; /* Remove default margins */
+            size: A4;
+            margin: 0;
         }
         
         body {
             font-family: Arial, sans-serif;
-            width: 210mm;    /* A4 width */
-            height: 148.5mm; /* Half of A4 height */
-            padding: 10mm;   /* Inner padding */
-            font-size: 11pt;
+            width: 210mm;
+            height: 297mm;
+            font-size: 7pt;
             position: relative;
-            page-break-after: always;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 0;
+        }
+
+        .receipt-container {
+            width: 105mm; /* Half A4 width */
+            height: 148.5mm; /* Half A4 height */
+            padding: 3mm;
+            position: relative;
+            border: 1px dashed #999;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
         
         .header {
             text-align: center;
-            margin-bottom: 8mm;
+            margin-bottom: 2mm;
             border-bottom: 1px solid #333;
-            padding-bottom: 3mm;
+            padding-bottom: 1mm;
+            flex-shrink: 0;
         }
         
         .header h1 {
-            font-size: 16pt;
-            margin-bottom: 2mm;
+            font-size: 9pt;
+            margin-bottom: 0.5mm;
+            font-weight: bold;
         }
         
         .header h2 {
-            font-size: 14pt;
+            font-size: 7pt;
+            font-weight: normal;
         }
         
         .payment-info {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4mm 8mm;
-            margin-bottom: 6mm;
+             grid-template-columns: 1fr 1fr;
+            gap: 0.5mm;
+            margin-bottom: 2mm;
+            flex-shrink: 0;
         }
         
         .payment-info p {
             margin: 0;
-            line-height: 1.3;
+            line-height: 1.1;
+            font-size: 6pt;
         }
         
         .months-paid {
-            margin-bottom: 6mm;
-            padding: 2mm 3mm;
+            margin-bottom: 1.5mm;
+            padding: 0.5mm 1mm;
             background-color: #f8f9fa;
             border: 1px solid #ddd;
-            border-radius: 2mm;
-            font-size: 10pt;
+            border-radius: 1mm;
+            font-size: 6pt;
+            flex-shrink: 0;
         }
         
         .fee-details {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 5mm;
+            margin-bottom: 1mm;
+            font-size: 5pt;
+            flex: 1;
         }
         
         .fee-details th, 
         .fee-details td {
-            border: 0.5pt solid #ddd;
-            padding: 2mm 3mm;
+            border: 0.3pt solid #ddd;
+            padding: 0.5mm 1mm;
             text-align: left;
+            line-height: 1;
         }
         
         .fee-details th {
             background-color: #f2f2f2;
             font-weight: bold;
+            font-size: 5pt;
         }
         
         .amount-column {
             text-align: right !important;
-            width: 30mm;
+            width: 18mm;
         }
         
         .grand-total {
             font-weight: bold;
-            font-size: 12pt;
+            font-size: 6pt;
             background-color: #e9ecef;
         }
         
-        .signature-section {
-            position: absolute;
-            bottom: 20mm;
-            width: calc(100% - 20mm);
-            display: flex;
-            justify-content: space-between;
-        }
-        
-        .signature-box {
-            width: 60mm;
-            text-align: center;
-        }
-        
-        .signature-line {
-            border-top: 1px solid #000;
-            padding-top: 2mm;
-            font-size: 10pt;
-        }
-        
         .footer {
-            
-            bottom: 10mm;
-            left: 10mm;
-            right: 10mm;
+            // position: absolute;
+            bottom: 3mm;
+            left: 3mm;
+            right: 3mm;
             text-align: center;
-            font-size: 8pt;
+            font-size: 4pt;
             color: #666;
-            border-top: 1px solid #ddd;
-            padding-top: 2mm;
-            
+            border-top: 0.5pt solid #ddd;
+            padding-top: 0.5mm;
         }
-            .space{
-                margin:15px 0;
-               border-bottom: 1px dotted #333;
-
 
         /* Print-specific styles */
         @media print {
@@ -283,153 +282,157 @@ export function SubmitPaymentTab({
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>FALCON House School</h1>
-        <h2>Fee Payment Receipt ( Parents ) </h2>
-    </div>
-    
-    <div class="payment-info">
-        <p><strong>Student Name:</strong> ${
-          selectedFees[0].studentId.studentName
-        }</p>
-        <p><strong>Roll Number:</strong> ${
-          selectedFees[0].studentId.rollNumber
-        }</p>
-        <p><strong>Father Name:</strong> ${
-          selectedFees[0].studentId.fatherName
-        }</p>
-        <p><strong>Class:</strong> ${selectedFees[0].studentId.class}-${
+    <!-- Student 1 - Parents Receipt (Top Left) -->
+    <div class="receipt-container">
+        <div class="header">
+            <h1>FALCON House School</h1>
+            <h2>Fee Payment Receipt (Parents)</h2>
+        </div>
+        
+        <div class="payment-info">
+            <p><strong>Student:</strong> ${
+              selectedFees[0].studentId.studentName
+            }</p>
+            <p><strong>Roll:</strong> ${
+              selectedFees[0].studentId.rollNumber
+            }</p>
+            <p><strong>Father:</strong> ${
+              selectedFees[0].studentId.fatherName
+            }</p>
+            <p><strong>Class:</strong> ${selectedFees[0].studentId.class}-${
       selectedFees[0].studentId.section
     }</p>
-        <p><strong>Receipt No:</strong> ${reciptId}</p>
-        <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            <p><strong>Receipt:</strong> ${reciptId}</p>
+            <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+        </div>
+
+        <div class="months-paid">
+            <strong>Months:</strong> ${monthsString}
+        </div>
+
+        <table class="fee-details">
+            <tr>
+                <th>Description</th>
+                <th class="amount-column">Amount</th>
+            </tr>
+            <tr>
+                <td>Tuition Fee</td>
+                <td class="amount-column">${totalTuitionFee.toLocaleString()}</td>
+            </tr>
+            <tr>
+                <td>Exam Fee</td>
+                <td class="amount-column">${totalExamFee.toLocaleString()}</td>
+            </tr>
+            <tr>
+                <td>Misc Fee</td>
+                <td class="amount-column">${totalMiscFee.toLocaleString()}</td>
+            </tr>
+            ${
+              totalLateFees > 0
+                ? `
+            <tr>
+                <td>Late Fee</td>
+                <td class="amount-column">${totalLateFees.toLocaleString()}</td>
+            </tr>
+            `
+                : ""
+            }
+            ${
+              totalDiscount > 0
+                ? `
+            <tr>
+                <td>Discount</td>
+                <td class="amount-column">-${totalDiscount.toLocaleString()}</td>
+            </tr>
+            `
+                : ""
+            }
+            <tr class="grand-total">
+                <td>Total Paid</td>
+                <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
+            </tr>
+        </table> 
+
+        <div class="footer">
+            <p>This is a computer generated receipt. Thank you for your payment.</p>
+        </div>
     </div>
 
-    <div class="months-paid">
-        <strong>Months:</strong> ${monthsString}
-    </div>
-
-    <table class="fee-details">
-        <tr>
-            <th>Description</th>
-            <th class="amount-column">Amount (Rs.)</th>
-        </tr>
-        <tr>
-            <td>Tuition Fee</td>
-            <td class="amount-column">${totalTuitionFee.toLocaleString()}</td>
-        </tr>
-        <tr>
-            <td>Exam Fee</td>
-            <td class="amount-column">${totalExamFee.toLocaleString()}</td>
-        </tr>
-        <tr>
-            <td>Miscellaneous Fee</td>
-            <td class="amount-column">${totalMiscFee.toLocaleString()}</td>
-        </tr>
-        ${
-          totalLateFees > 0
-            ? `
-        <tr>
-            <td>Late Fee</td>
-            <td class="amount-column">${totalLateFees.toLocaleString()}</td>
-        </tr>
-        `
-            : ""
-        }
-        ${
-          totalDiscount > 0
-            ? `
-        <tr>
-            <td>Discount</td>
-            <td class="amount-column">-${totalDiscount.toLocaleString()}</td>
-        </tr>
-        `
-            : ""
-        }
-        <tr class="grand-total">
-            <td>Total Amount Paid</td>
-            <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
-        </tr>
-    </table> 
-
-    <div class="footer">
-        <p>This is a computer generated receipt. Thank you for your payment.</p>
-    </div>
-
-<div class="space"></div>
-
-     <div class="header">
-        <h1>FALCON House School</h1>
-        <h2>Fee Payment Receipt ( Admin )</h2>
-    </div>
-    
-    <div class="payment-info">
-        <p><strong>Student Name:</strong> ${
-          selectedFees[0].studentId.studentName
-        }</p>
-        <p><strong>Roll Number:</strong> ${
-          selectedFees[0].studentId.rollNumber
-        }</p>
-        <p><strong>Father Name:</strong> ${
-          selectedFees[0].studentId.fatherName
-        }</p>
-        <p><strong>Class:</strong> ${selectedFees[0].studentId.class}-${
+    <!-- Student 1 - Admin Receipt (Top Right) -->
+    <div class="receipt-container">
+        <div class="header">
+            <h1>FALCON House School</h1>
+            <h2>Fee Payment Receipt (Admin)</h2>
+        </div>
+        
+        <div class="payment-info">
+            <p><strong>Student:</strong> ${
+              selectedFees[0].studentId.studentName
+            }</p>
+            <p><strong>Roll:</strong> ${
+              selectedFees[0].studentId.rollNumber
+            }</p>
+            <p><strong>Father:</strong> ${
+              selectedFees[0].studentId.fatherName
+            }</p>
+            <p><strong>Class:</strong> ${selectedFees[0].studentId.class}-${
       selectedFees[0].studentId.section
     }</p>
-        <p><strong>Receipt No:</strong> ${reciptId}</p>
-        <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-    </div>
+            <p><strong>Receipt:</strong> ${reciptId}</p>
+            <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+        </div>
 
-    <div class="months-paid">
-        <strong>Months:</strong> ${monthsString}
-    </div>
+        <div class="months-paid">
+            <strong>Months:</strong> ${monthsString}
+        </div>
 
-    <table class="fee-details">
-        <tr>
-            <th>Description</th>
-            <th class="amount-column">Amount (Rs.)</th>
-        </tr>
-        <tr>
-            <td>Tuition Fee</td>
-            <td class="amount-column">${totalTuitionFee.toLocaleString()}</td>
-        </tr>
-        <tr>
-            <td>Exam Fee</td>
-            <td class="amount-column">${totalExamFee.toLocaleString()}</td>
-        </tr>
-        <tr>
-            <td>Miscellaneous Fee</td>
-            <td class="amount-column">${totalMiscFee.toLocaleString()}</td>
-        </tr>
-        ${
-          totalLateFees > 0
-            ? `
-        <tr>
-            <td>Late Fee</td>
-            <td class="amount-column">${totalLateFees.toLocaleString()}</td>
-        </tr>
-        `
-            : ""
-        }
-        ${
-          totalDiscount > 0
-            ? `
-        <tr>
-            <td>Discount</td>
-            <td class="amount-column">-${totalDiscount.toLocaleString()}</td>
-        </tr>
-        `
-            : ""
-        }
-        <tr class="grand-total">
-            <td>Total Amount Paid</td>
-            <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
-        </tr>
-    </table> 
+        <table class="fee-details">
+            <tr>
+                <th>Description</th>
+                <th class="amount-column">Amount</th>
+            </tr>
+            <tr>
+                <td>Tuition Fee</td>
+                <td class="amount-column">${totalTuitionFee.toLocaleString()}</td>
+            </tr>
+            <tr>
+                <td>Exam Fee</td>
+                <td class="amount-column">${totalExamFee.toLocaleString()}</td>
+            </tr>
+            <tr>
+                <td>Misc Fee</td>
+                <td class="amount-column">${totalMiscFee.toLocaleString()}</td>
+            </tr>
+            ${
+              totalLateFees > 0
+                ? `
+            <tr>
+                <td>Late Fee</td>
+                <td class="amount-column">${totalLateFees.toLocaleString()}</td>
+            </tr>
+            `
+                : ""
+            }
+            ${
+              totalDiscount > 0
+                ? `
+            <tr>
+                <td>Discount</td>
+                <td class="amount-column">-${totalDiscount.toLocaleString()}</td>
+            </tr>
+            `
+                : ""
+            }
+            <tr class="grand-total">
+                <td>Total Paid</td>
+                <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
+            </tr>
+        </table> 
 
-    <div class="footer">
-        <p>This is a computer generated receipt. Thank you for your payment.</p>
-    </div>
+        <div class="footer">
+            <p>This is a computer generated receipt. Thank you for your payment.</p>
+        </div>
+    </div>   
 </body>
 </html>
 
