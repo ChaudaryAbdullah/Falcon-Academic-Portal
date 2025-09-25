@@ -230,7 +230,7 @@ export function GenerateFeeTab({
             : "";
 
         const challansOnPage = pair
-          .map((challan, challanIndex) => {
+          .map((challan) => {
             return `
 <div class="challan-container">
     <div class="header">
