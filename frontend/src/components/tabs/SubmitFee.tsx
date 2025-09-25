@@ -589,7 +589,7 @@ export function SubmitPaymentTab({
             ? `Payment successfully recorded! Total amount: Rs. ${totalPaid} (including Rs. ${totalLateFees} late fees)`
             : `Payment successfully recorded! Total amount: Rs. ${totalPaid}`;
 
-        toast.error(message);
+        toast.success(message);
       } else {
         throw new Error("Failed to update payment status");
       }
