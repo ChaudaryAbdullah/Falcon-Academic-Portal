@@ -216,15 +216,23 @@ export function GenerateFeeTab({
 
   // Generate multiple challans HTML for bulk printing
   const generateBulkChallansHTML = (challansArray: FeeChallan[]) => {
-    const challanPages = challansArray
-      .map((challan, index) => {
+    // Group challans in pairs for 2 per page
+    const challanPairs = [];
+    for (let i = 0; i < challansArray.length; i += 2) {
+      challanPairs.push(challansArray.slice(i, i + 2));
+    }
+
+    const pages = challanPairs
+      .map((pair, pageIndex) => {
         const pageBreak =
-          index < challansArray.length - 1
+          pageIndex < challanPairs.length - 1
             ? 'style="page-break-after: always;"'
             : "";
 
-        return `
-<div ${pageBreak}>
+        const challansOnPage = pair
+          .map((challan, challanIndex) => {
+            return `
+<div class="challan-container">
     <div class="header">
         <h1>FALCON House School</h1>
         <h2>Fee Challan</h2>
@@ -235,8 +243,8 @@ export function GenerateFeeTab({
         <p><strong>Father Name:</strong> ${challan.studentId.fatherName}</p>
         <p><strong>Roll Number:</strong> ${challan.studentId.rollNumber}</p>
         <p><strong>Class:</strong> ${challan.studentId.class} ${
-          challan.studentId.section
-        }</p>
+              challan.studentId.section
+            }</p>
         <p><strong>Month/Year:</strong> ${challan.month} ${challan.year}</p>
         <p><strong>Due Date:</strong> ${challan.dueDate}</p>
     </div>
@@ -287,7 +295,15 @@ export function GenerateFeeTab({
         <p>For queries, contact school administration.</p>
     </div>
 </div>
-      `;
+        `;
+          })
+          .join("");
+
+        return `
+<div class="page" ${pageBreak}>
+    ${challansOnPage}
+</div>
+    `;
       })
       .join("");
 
@@ -298,85 +314,109 @@ export function GenerateFeeTab({
     <title>Fee Challans - Bulk Print</title>
     <style>
         @page {
-            size: 210mm 148.5mm;
-            margin: 10mm; 
+            size: A4 portrait;
+            margin: 8mm; 
         }
         
         body { 
             font-family: Arial, sans-serif; 
             margin: 0; 
             padding: 0;
-            width: 190mm;
-            font-size: 13px; 
+            font-size: 10px; 
+        }
+        
+        .page {
+            width: 100%;
+            min-height: 281mm; /* A4 height minus margins */
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .challan-container {
+            width: 100%;
+            height: 140mm; /* Exactly half of A4 height */
+            border: 1px dashed #999;
+            padding: 4mm;
+            box-sizing: border-box;
+            flex: 0 0 140mm; /* Fixed height, no grow/shrink */
+            overflow: hidden;
         }
         
         .header { 
             text-align: center; 
-            margin-bottom: 15px; 
+            margin-bottom: 6px; 
         }
         
         .header h1 {
-            font-size: 20px;
-            margin: 0 0 3px 0;
+            font-size: 14px;
+            margin: 0 0 2px 0;
+            font-weight: bold;
         }
         
         .header h2 {
-            font-size: 18px;
+            font-size: 12px;
             margin: 0;
+            font-weight: normal;
         }
         
         .challan-info { 
-            margin: 15px 0; 
+            margin: 6px 0; 
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-gap: 15px 30px;
-            font-size: 13px;
+            grid-gap: 4px 15px;
+            font-size: 10px;
         }
         
         .challan-info p {
             margin: 1px 0;
+            line-height: 1.1;
         }
         
         .fee-details { 
             border-collapse: collapse; 
             width: 100%; 
-            margin: 15px 0; 
-            font-size: 13px;
+            margin: 6px 0; 
+            font-size: 9px;
         }
         
         .fee-details th, .fee-details td { 
             border: 1px solid #ddd; 
-            padding: 8px; 
+            padding: 3px 4px; 
             text-align: left; 
+            line-height: 1;
         }
         
         .fee-details th { 
             background-color: #f2f2f2; 
             font-weight: bold;
+            font-size: 9px;
         }
         
         .total { 
             font-weight: bold; 
-            font-size: 12px; 
+            font-size: 9px; 
+            background-color: #f8f9fa;
         }
         
         .footer { 
-            margin-top: 15px; 
+            margin-top: 6px; 
             text-align: center; 
-            font-size: 10px; 
+            font-size: 7px; 
             line-height: 1;
         }
         
         .footer p {
-            margin: 3px 0;
+            margin: 1px 0;
         }
         
         .arrears { 
             color: #e74c3c; 
+            font-weight: bold;
         }
         
         .discount { 
             color: #27ae60; 
+            font-weight: bold;
         }
         
         @media print {
@@ -389,14 +429,26 @@ export function GenerateFeeTab({
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
+            
+            .page {
+                page-break-after: always;
+            }
+            
+            .page:last-child {
+                page-break-after: auto;
+            }
+            
+            .challan-container {
+                page-break-inside: avoid;
+            }
         }
     </style>
 </head>
 <body>
-    ${challanPages}
+    ${pages}
 </body>
 </html>
-    `;
+`;
   };
 
   // Print challans generated today
