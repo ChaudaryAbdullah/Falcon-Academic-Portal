@@ -1270,7 +1270,7 @@ export const submitPartialPayment = async (req, res) => {
   }
 };
 
-// Also add this helper function to get partial payment summary
+// helper function to get partial payment summary
 export const getPartialPaymentSummary = async (req, res) => {
   try {
     const { studentId, selectedFeeIds } = req.body;

@@ -185,7 +185,7 @@ export function GenerateFeeTab({
           (challanYear === currentYearNum &&
             challanMonthIndex < currentMonthIndex)
         ) {
-          totalArrears += challan.totalAmount;
+          totalArrears += challan.remainingBalance;
         }
       }
     });
