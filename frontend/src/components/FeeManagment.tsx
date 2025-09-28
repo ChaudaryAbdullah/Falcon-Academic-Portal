@@ -73,6 +73,7 @@ interface FeeChallan {
   examFee: number;
   miscFee: number;
   totalAmount: number;
+  remainingBalance: number;
   arrears: number;
   discount: number;
   dueDate: string;

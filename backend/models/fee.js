@@ -46,6 +46,10 @@ const feeSchema = mongoose.Schema(
       required: true,
       default: 0,
     },
+    remainingBalance: {
+      type: Number,
+      default: 0,
+    },
     dueDate: {
       type: Date,
       required: true,
@@ -80,9 +84,7 @@ feeSchema.index({ studentId: 1, month: 1, year: 1 }, { unique: true });
 feeSchema.pre("save", function (next) {
   // Calculate base fees
   const baseFees =
-    (this.tutionFee || 0) +
-    (this.examFee || 0) +
-    (this.miscFee || 0);
+    (this.tutionFee || 0) + (this.examFee || 0) + (this.miscFee || 0);
 
   // Subtract discount
   this.totalAmount = baseFees - (this.discount || 0);
@@ -90,7 +92,16 @@ feeSchema.pre("save", function (next) {
   // Ensure total amount is never negative
   this.totalAmount = Math.max(0, this.totalAmount);
 
+  // NEW: Set remaining balance to total amount if not set and status is not paid
+  if (this.remainingBalance === 0 && this.status !== "paid") {
+    this.remainingBalance = this.totalAmount;
+  }
+
+  // NEW: If status is paid, remaining balance should be 0
+  if (this.status === "paid") {
+    this.remainingBalance = 0;
+  }
+
   next();
 });
-
 export const Fee = mongoose.model("Fee", feeSchema);

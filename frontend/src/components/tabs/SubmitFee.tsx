@@ -12,7 +12,14 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
-import { Receipt, Search, User, FileText, AlertTriangle } from "lucide-react";
+import {
+  Receipt,
+  Search,
+  User,
+  FileText,
+  AlertTriangle,
+  Calculator,
+} from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { toast } from "sonner";
 
@@ -44,6 +51,25 @@ interface Student {
   };
 }
 
+interface PaymentBreakdown {
+  feeId: string;
+  month: string;
+  year: string;
+  originalAmount: number;
+  currentBalance: number;
+  lateFee: number;
+  totalRequired: number;
+  paymentAmount: number;
+  newBalance: number;
+  status: "paid" | "pending";
+}
+
+interface PaymentSummary {
+  totalPaid: number;
+  breakdown: PaymentBreakdown[];
+  remainingAmount: number;
+}
+
 interface FeeChallan {
   id: string;
   studentId: {
@@ -61,6 +87,7 @@ interface FeeChallan {
   examFee: number;
   miscFee: number;
   totalAmount: number;
+  remainingBalance: number;
   arrears: number;
   discount: number;
   dueDate: string;
@@ -86,6 +113,11 @@ export function SubmitPaymentTab({
   const [pendingFees, setPendingFees] = useState<FeeChallan[]>([]);
   const [selectedPendingFees, setSelectedPendingFees] = useState<string[]>([]);
   const [lateFees, setLateFees] = useState<{ [key: string]: number }>({});
+  const [partialPaymentMode, setPartialPaymentMode] = useState(false);
+  const [partialAmount, setPartialAmount] = useState("");
+  const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(
+    null
+  );
 
   const filteredStudents = students.filter(
     (student) =>
@@ -588,6 +620,262 @@ Falcon House School Administration
     }
   };
 
+  const simulatePartialPayment = (amount: string): PaymentSummary | null => {
+    if (!amount || parseFloat(amount) <= 0) return null;
+
+    const selectedFees = pendingFees
+      .filter((fee: FeeChallan) => selectedPendingFees.includes(fee.id))
+      .sort((a: FeeChallan, b: FeeChallan) => {
+        // Sort by year first (oldest first)
+        const yearA = parseInt(a.year);
+        const yearB = parseInt(b.year);
+        if (yearA !== yearB) {
+          return yearA - yearB;
+        }
+
+        // Then sort by month (oldest first for FIFO)
+        const months: { [key: string]: number } = {
+          January: 1,
+          February: 2,
+          March: 3,
+          April: 4,
+          May: 5,
+          June: 6,
+          July: 7,
+          August: 8,
+          September: 9,
+          October: 10,
+          November: 11,
+          December: 12,
+        };
+
+        const monthA = months[a.month] || 0;
+        const monthB = months[b.month] || 0;
+        return monthA - monthB;
+      });
+
+    let remainingAmount: number = parseFloat(amount);
+    const paymentBreakdown: PaymentBreakdown[] = [];
+
+    for (const fee of selectedFees) {
+      if (remainingAmount <= 0) break;
+
+      const lateFee: number = lateFees[fee.id] || 0;
+      const currentBalance: number = fee.remainingBalance || fee.totalAmount;
+      const totalRequired: number = currentBalance + lateFee;
+
+      const paymentForThisFee: number = Math.min(
+        remainingAmount,
+        totalRequired
+      );
+      const newBalance: number = Math.max(0, totalRequired - paymentForThisFee);
+
+      paymentBreakdown.push({
+        feeId: fee.id,
+        month: fee.month,
+        year: fee.year,
+        originalAmount: fee.totalAmount,
+        currentBalance,
+        lateFee,
+        totalRequired,
+        paymentAmount: paymentForThisFee,
+        newBalance,
+        status: newBalance <= 0 ? "paid" : "pending",
+      });
+
+      remainingAmount -= paymentForThisFee;
+    }
+
+    return {
+      totalPaid: parseFloat(amount),
+      breakdown: paymentBreakdown,
+      remainingAmount: remainingAmount,
+    };
+  };
+
+  const submitPartialPayment = async (): Promise<void> => {
+    if (
+      !selectedStudent ||
+      selectedPendingFees.length === 0 ||
+      !partialAmount
+    ) {
+      toast.error("Please select fees and enter partial payment amount.");
+      return;
+    }
+
+    const amount: number = parseFloat(partialAmount);
+    const totalOutstanding: number = selectedPendingFees.reduce(
+      (total: number, feeId: string) => {
+        const fee = pendingFees.find((f: FeeChallan) => f.id === feeId);
+        if (!fee) return total;
+
+        const currentBalance: number = fee.remainingBalance || fee.totalAmount;
+        const lateFee: number = lateFees[feeId] || 0;
+        return total + currentBalance + lateFee;
+      },
+      0
+    );
+
+    if (amount <= 0) {
+      toast.error("Please enter a valid amount greater than 0.");
+      return;
+    }
+
+    if (amount > totalOutstanding) {
+      toast.error(
+        `Amount cannot exceed total outstanding (Rs. ${totalOutstanding.toLocaleString()})`
+      );
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${BACKEND}/api/fees/partial-payment`,
+        {
+          studentId: selectedStudent,
+          selectedFeeIds: selectedPendingFees,
+          partialAmount: amount,
+          lateFees: lateFees,
+        },
+        { withCredentials: true }
+      );
+
+      if (response.data.success) {
+        // Refresh the fees list
+        const fetchResponse = await axios.get(`${BACKEND}/api/fees`, {
+          withCredentials: true,
+        });
+        setChallans(fetchResponse.data.data);
+
+        // Send WhatsApp confirmation for partial payment
+        const selectedFees: FeeChallan[] = pendingFees.filter(
+          (fee: FeeChallan) => selectedPendingFees.includes(fee.id)
+        );
+        await sendPartialPaymentConfirmation(selectedFees, amount, lateFees);
+
+        toast.success(
+          `Partial payment of Rs. ${amount.toLocaleString()} submitted successfully!`
+        );
+
+        // Reset form
+        setSelectedPendingFees([]);
+        setPartialPaymentMode(false);
+        setPartialAmount("");
+        setPaymentSummary(null);
+        setLateFees({});
+      }
+    } catch (error) {
+      console.error("Error submitting partial payment:", error);
+      toast.error("Failed to submit partial payment. Please try again.");
+    }
+  };
+
+  // ADD this function for partial payment WhatsApp confirmation:
+  const sendPartialPaymentConfirmation = async (
+    selectedFees: FeeChallan[],
+    paidAmount: number,
+    lateFees: { [key: string]: number }
+  ): Promise<void> => {
+    try {
+      const student = selectedFees[0].studentId;
+
+      if (!student.mPhoneNumber) {
+        toast.error(
+          `Phone number not available for ${student.studentName}. Please update the student's phone number first.`
+        );
+        return;
+      }
+
+      // Format phone number (same logic as existing function)
+      let phoneNumber: string = student.mPhoneNumber
+        .toString()
+        .replace(/[\s-]/g, "");
+      phoneNumber = phoneNumber.replace(/[^\d+]/g, "");
+
+      if (phoneNumber.startsWith("+92")) {
+        phoneNumber = phoneNumber.substring(1);
+      } else if (phoneNumber.startsWith("0")) {
+        phoneNumber = "92" + phoneNumber.substring(1);
+      } else if (!phoneNumber.startsWith("92")) {
+        if (phoneNumber.startsWith("3")) {
+          phoneNumber = "92" + phoneNumber;
+        } else {
+          toast.error(
+            `Invalid phone number format for ${student.studentName}: ${student.mPhoneNumber}`
+          );
+          return;
+        }
+      }
+
+      if (phoneNumber.length < 12 || phoneNumber.length > 13) {
+        toast.error(
+          `Invalid phone number length for ${student.studentName}: ${student.mPhoneNumber}`
+        );
+        return;
+      }
+
+      const monthsString: string = selectedFees
+        .map((fee: FeeChallan) => `${fee.month} ${fee.year}`)
+        .join(", ");
+
+      // Calculate outstanding balance
+      const totalOutstanding: number = selectedFees.reduce(
+        (sum: number, fee: FeeChallan) => {
+          const currentBalance: number =
+            fee.remainingBalance || fee.totalAmount;
+          const lateFee: number = lateFees[fee.id] || 0;
+          return sum + currentBalance + lateFee;
+        },
+        0
+      );
+
+      const remainingBalance: number = totalOutstanding - paidAmount;
+
+      // Create partial payment confirmation message
+      const message: string = `
+*Partial Payment Confirmation - Falcon House School*
+
+Dear ${student.fatherName || "Parent"},
+
+Thank you for your partial payment!
+
+*Student Information:*
+• Name: ${student.studentName}
+• Roll Number: ${student.rollNumber}
+• Class: ${student.class}-${student.section}
+
+*Payment Details:*
+• Date: ${new Date().toLocaleDateString()}
+• Months: ${monthsString}
+• Amount Paid: Rs. ${paidAmount.toLocaleString()}
+
+*Balance Information:*
+• Total Outstanding: Rs. ${totalOutstanding.toLocaleString()}
+• Amount Paid: Rs. ${paidAmount.toLocaleString()}
+• Remaining Balance: Rs. ${remainingBalance.toLocaleString()}
+
+Your partial payment has been successfully recorded. The remaining balance will be allocated to pending fees.
+
+Thank you for choosing Falcon House School!
+
+Best regards,
+Falcon House School Administration
+    `.trim();
+
+      const whatsappUrl: string = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
+        message
+      )}`;
+      window.open(whatsappUrl, "_blank");
+
+      toast.success(
+        "WhatsApp partial payment confirmation opened successfully!"
+      );
+    } catch (error) {
+      console.error("Error sending partial payment confirmation:", error);
+      toast.error("Error opening WhatsApp message. Please try again.");
+    }
+  };
+
   useEffect(() => {
     if (selectedStudent) {
       const pending = getPendingFeesForStudent(selectedStudent);
@@ -853,11 +1141,7 @@ Falcon House School Administration
                             {getStatusBadge(fee.status)}
                             <div className="text-base sm:text-lg font-bold text-green-600">
                               Rs.{" "}
-                              {fee.tutionFee +
-                                fee.examFee +
-                                fee.miscFee -
-                                fee.discount +
-                                (lateFees[fee.id] || 0)}
+                              {fee.remainingBalance + (lateFees[fee.id] || 0)}
                             </div>
                             {lateFees[fee.id] > 0 && (
                               <span className="text-xs text-red-600">
@@ -877,11 +1161,7 @@ Falcon House School Administration
                               Rs. {fee.tutionFee}
                             </div>
                           </div>
-                          <div className="bg-gray-50 p-2 rounded">
-                            <div className="font-medium text-gray-600 truncate">
-                              Paper Fund
-                            </div>
-                          </div>
+
                           <div className="bg-gray-50 p-2 rounded">
                             <div className="font-medium text-gray-600 truncate">
                               Exam Fee
@@ -1083,6 +1363,181 @@ Falcon House School Administration
                       )}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Partial Payment Section */}
+              {selectedPendingFees.length > 0 && (
+                <div className="border rounded-lg p-3 sm:p-4 bg-orange-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-orange-800 flex items-center gap-2 text-sm sm:text-base">
+                      <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />
+                      Payment Options
+                    </h3>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant={partialPaymentMode ? "outline" : "default"}
+                        onClick={() => {
+                          setPartialPaymentMode(false);
+                          setPartialAmount("");
+                          setPaymentSummary(null);
+                        }}
+                      >
+                        Full Payment
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={partialPaymentMode ? "default" : "outline"}
+                        onClick={() => setPartialPaymentMode(true)}
+                      >
+                        Partial Payment
+                      </Button>
+                    </div>
+                  </div>
+
+                  {partialPaymentMode && (
+                    <div className="space-y-4">
+                      <div className="bg-white p-3 rounded border">
+                        <Label
+                          htmlFor="partialAmount"
+                          className="text-sm font-medium"
+                        >
+                          Enter Partial Payment Amount
+                        </Label>
+                        <div className="flex items-center gap-3 mt-2">
+                          <div className="relative flex-1">
+                            <span className="absolute left-3 top-2 text-sm text-gray-500">
+                              Rs.
+                            </span>
+                            <Input
+                              id="partialAmount"
+                              type="number"
+                              min="1"
+                              max={selectedPendingFees.reduce(
+                                (total: number, feeId: string) => {
+                                  const fee = pendingFees.find(
+                                    (f: FeeChallan) => f.id === feeId
+                                  );
+                                  if (!fee) return total;
+                                  const currentBalance: number =
+                                    fee.remainingBalance || fee.totalAmount;
+                                  const lateFee: number = lateFees[feeId] || 0;
+                                  return total + currentBalance + lateFee;
+                                },
+                                0
+                              )}
+                              value={partialAmount}
+                              onChange={(
+                                e: React.ChangeEvent<HTMLInputElement>
+                              ) => {
+                                const value: string = e.target.value;
+                                setPartialAmount(value);
+                                if (value && parseFloat(value) > 0) {
+                                  const summary: PaymentSummary | null =
+                                    simulatePartialPayment(value);
+                                  setPaymentSummary(summary);
+                                } else {
+                                  setPaymentSummary(null);
+                                }
+                              }}
+                              placeholder="Enter amount"
+                              className="pl-8"
+                            />
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Max: Rs.{" "}
+                            {selectedPendingFees
+                              .reduce((total: number, feeId: string) => {
+                                const fee = pendingFees.find(
+                                  (f: FeeChallan) => f.id === feeId
+                                );
+                                if (!fee) return total;
+                                const currentBalance: number =
+                                  fee.remainingBalance || fee.totalAmount;
+                                const lateFee: number = lateFees[feeId] || 0;
+                                return total + currentBalance + lateFee;
+                              }, 0)
+                              .toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Partial Payment Preview */}
+                      {paymentSummary && (
+                        <div className="bg-white p-3 rounded border">
+                          <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            Payment Allocation Preview
+                          </h4>
+                          <div className="space-y-2">
+                            {paymentSummary.breakdown.map(
+                              (item: PaymentBreakdown, index: number) => (
+                                <div
+                                  key={index}
+                                  className="text-xs bg-gray-50 p-2 rounded"
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-medium">
+                                      {item.month} {item.year}
+                                    </span>
+                                    <Badge
+                                      className={
+                                        item.status === "paid"
+                                          ? "bg-green-100 text-green-800"
+                                          : "bg-blue-100 text-blue-800"
+                                      }
+                                    >
+                                      {item.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                      Balance: Rs.{" "}
+                                      {item.currentBalance.toLocaleString()}
+                                    </div>
+                                    <div>
+                                      Payment: Rs.{" "}
+                                      {item.paymentAmount.toLocaleString()}
+                                    </div>
+                                    <div>
+                                      Late Fee: Rs.{" "}
+                                      {item.lateFee.toLocaleString()}
+                                    </div>
+                                    <div className="font-medium">
+                                      Remaining: Rs.{" "}
+                                      {item.newBalance.toLocaleString()}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                          <div className="mt-3 p-2 bg-green-50 rounded border-l-4 border-green-400">
+                            <div className="text-sm font-medium text-green-800">
+                              Total Payment: Rs.{" "}
+                              {paymentSummary.totalPaid.toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Partial Payment Submit Button */}
+                      <Button
+                        onClick={submitPartialPayment}
+                        className="w-full h-12"
+                        disabled={
+                          !partialAmount || parseFloat(partialAmount) <= 0
+                        }
+                      >
+                        <Calculator className="h-4 w-4 mr-2" />
+                        Submit Partial Payment - Rs.{" "}
+                        {partialAmount
+                          ? parseFloat(partialAmount).toLocaleString()
+                          : "0"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 
