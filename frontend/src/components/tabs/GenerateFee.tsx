@@ -91,6 +91,7 @@ interface FeeChallan {
   examFee: number;
   miscFee: number;
   totalAmount: number;
+  remainingBalance: number;
   arrears: number;
   discount: number;
   dueDate: string;
@@ -629,6 +630,7 @@ export function GenerateFeeTab({
         miscFee: classFee.miscFee,
         arrears: arrears,
         discount: discount,
+        remainingBalance: totalAmount,
         totalAmount: totalAmount,
         dueDate,
         status: "pending",

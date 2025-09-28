@@ -49,6 +49,7 @@ interface FeeChallan {
   examFee: number;
   miscFee: number;
   totalAmount: number;
+  remainingBalance: number;
   arrears: number;
   discount: number;
   dueDate: string;
@@ -614,6 +615,7 @@ Falcon House School Administration
                 <TableHead>Arrears</TableHead>
                 <TableHead>Discount</TableHead>
                 <TableHead>Total Amount</TableHead>
+                <TableHead>Remaining Amount</TableHead>
                 <TableHead>Due Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>WhatsApp</TableHead>
@@ -683,6 +685,7 @@ Falcon House School Administration
                     <TableCell className="font-semibold">
                       Rs. {challan.totalAmount + challan.arrears}
                     </TableCell>
+                    <TableCell>{challan.remainingBalance}</TableCell>
                     <TableCell>{challan.dueDate}</TableCell>
                     <TableCell>{getStatusBadge(challan.status)}</TableCell>
                     <TableCell>

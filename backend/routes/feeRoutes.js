@@ -16,6 +16,7 @@ import {
   getDailyReport,
   getDailyCollectionSummary,
   getTodayCollectionSummary,
+  submitPartialPayment,
 } from "../controllers/feeController.js";
 
 const router = express.Router();
@@ -47,4 +48,5 @@ router.get("/reports/summary", getSummaryReport);
 router.get("/reports/daily", getDailyReport);
 router.get("/reports/daily-summary", getDailyCollectionSummary);
 router.get("/reports/today-summary", getTodayCollectionSummary);
+router.post("/partial-payment", submitPartialPayment);
 export default router;

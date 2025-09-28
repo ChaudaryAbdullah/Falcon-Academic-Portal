@@ -40,7 +40,7 @@ export const getFees = async (req, res) => {
       month: fee.month,
       year: fee.year,
       tutionFee: fee.tutionFee,
-
+      remainingBalance: fee.remainingBalance,
       examFee: fee.examFee,
       miscFee: fee.miscFee,
       arrears: fee.arrears,
@@ -1029,6 +1029,304 @@ export const getTodayCollectionSummary = async (req, res) => {
       success: false,
       message: error.message,
       stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
+
+// Submit Partial Payment
+export const submitPartialPayment = async (req, res) => {
+  try {
+    const {
+      studentId,
+      selectedFeeIds,
+      partialAmount,
+      lateFees = {},
+    } = req.body;
+
+    // Validation
+    if (
+      !studentId ||
+      !selectedFeeIds ||
+      !Array.isArray(selectedFeeIds) ||
+      selectedFeeIds.length === 0 ||
+      !partialAmount
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Student ID, fee IDs array, and partial amount are required",
+      });
+    }
+
+    const amount = parseFloat(partialAmount);
+    if (amount <= 0 || isNaN(amount)) {
+      return res.status(400).json({
+        success: false,
+        message: "Partial amount must be a valid number greater than 0",
+      });
+    }
+
+    // Convert string IDs to ObjectIds if needed
+    const validObjectIds = [];
+    for (const id of selectedFeeIds) {
+      try {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          validObjectIds.push(new mongoose.Types.ObjectId(id));
+        }
+      } catch (error) {
+        console.error(`Invalid fee ID: ${id}`);
+      }
+    }
+
+    if (validObjectIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fee IDs provided",
+      });
+    }
+
+    // Get selected fees first
+    const selectedFees = await Fee.find({
+      _id: { $in: validObjectIds },
+      studentId: studentId,
+      status: { $in: ["pending", "overdue"] },
+    });
+
+    // Sort manually to ensure proper FIFO (oldest first)
+    selectedFees.sort((a, b) => {
+      // First sort by year
+      const yearA = parseInt(a.year);
+      const yearB = parseInt(b.year);
+      if (yearA !== yearB) {
+        return yearA - yearB;
+      }
+
+      // Then sort by month (convert month names to numbers)
+      const months = {
+        January: 1,
+        February: 2,
+        March: 3,
+        April: 4,
+        May: 5,
+        June: 6,
+        July: 7,
+        August: 8,
+        September: 9,
+        October: 10,
+        November: 11,
+        December: 12,
+      };
+
+      const monthA = months[a.month] || 0;
+      const monthB = months[b.month] || 0;
+      if (monthA !== monthB) {
+        return monthA - monthB;
+      }
+
+      // Finally sort by creation date as fallback
+      return new Date(a.createdAt) - new Date(b.createdAt);
+    });
+
+    if (selectedFees.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No valid unpaid fees found for this student",
+      });
+    }
+
+    // Calculate total outstanding amount including late fees
+    let totalOutstanding = 0;
+    const feeCalculations = [];
+
+    for (const fee of selectedFees) {
+      const feeIdString = fee._id.toString();
+      const lateFee = lateFees[feeIdString] || 0;
+
+      // Get current balance - if remainingBalance exists and is not null, use it; otherwise use totalAmount
+      let currentBalance;
+      if (fee.remainingBalance !== null && fee.remainingBalance !== undefined) {
+        currentBalance = fee.remainingBalance;
+      } else {
+        currentBalance = fee.totalAmount;
+      }
+
+      const totalRequired = currentBalance + lateFee;
+      totalOutstanding += totalRequired;
+
+      feeCalculations.push({
+        fee,
+        lateFee,
+        currentBalance,
+        totalRequired,
+        feeIdString,
+      });
+    }
+
+    if (amount > totalOutstanding) {
+      return res.status(400).json({
+        success: false,
+        message: `Partial amount (Rs. ${amount}) cannot exceed total outstanding amount (Rs. ${totalOutstanding})`,
+        totalOutstanding: totalOutstanding,
+      });
+    }
+
+    let remainingAmount = amount;
+    const updatedFees = [];
+    const paymentDetails = [];
+
+    // Process payments in FIFO order (oldest first)
+    for (const {
+      fee,
+      lateFee,
+      currentBalance,
+      totalRequired,
+      feeIdString,
+    } of feeCalculations) {
+      if (remainingAmount <= 0) break;
+
+      const paymentForThisFee = Math.min(remainingAmount, totalRequired);
+      const newRemainingBalance = Math.max(
+        0,
+        totalRequired - paymentForThisFee
+      );
+      const newStatus = newRemainingBalance <= 0 ? "paid" : "pending";
+
+      // Prepare update data
+      const updateData = {
+        status: newStatus,
+        remainingBalance: newRemainingBalance,
+      };
+
+      // Add late fee to miscFee if applicable
+      if (lateFee > 0) {
+        updateData.miscFee = fee.miscFee + lateFee;
+        // Recalculate totalAmount with the late fee
+        updateData.totalAmount =
+          fee.tutionFee + fee.examFee + updateData.miscFee - fee.discount;
+      }
+
+      // Set payment date if fully paid
+      if (newStatus === "paid") {
+        updateData.paidDate = new Date();
+        updateData.remainingBalance = 0;
+      }
+
+      // Update the fee record
+      const updatedFee = await Fee.findByIdAndUpdate(fee._id, updateData, {
+        new: true,
+        runValidators: true,
+      }).populate(
+        "studentId",
+        "studentName fatherName mPhoneNumber rollNumber class section"
+      );
+
+      if (!updatedFee) {
+        throw new Error(`Failed to update fee record ${fee._id}`);
+      }
+
+      updatedFees.push(updatedFee);
+
+      paymentDetails.push({
+        feeId: fee._id.toString(),
+        month: fee.month,
+        year: fee.year,
+        originalAmount: fee.totalAmount,
+        currentBalance: currentBalance,
+        paidAmount: paymentForThisFee,
+        remainingBalance: newRemainingBalance,
+        status: newStatus,
+        lateFeeAdded: lateFee,
+      });
+
+      remainingAmount -= paymentForThisFee;
+    }
+
+    // Log the transaction for audit purposes
+    console.log(
+      `Partial payment processed: Student ${studentId}, Amount: ${amount}, Fees updated: ${updatedFees.length}`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Partial payment of Rs. ${amount} processed successfully`,
+      data: {
+        updatedFees,
+        paymentDetails,
+        totalPaid: amount,
+        totalOutstanding: totalOutstanding,
+        remainingAmount: totalOutstanding - amount,
+      },
+    });
+  } catch (error) {
+    console.error("Error processing partial payment:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while processing partial payment",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Please try again later",
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
+
+// Also add this helper function to get partial payment summary
+export const getPartialPaymentSummary = async (req, res) => {
+  try {
+    const { studentId, selectedFeeIds } = req.body;
+
+    if (!studentId || !selectedFeeIds || !Array.isArray(selectedFeeIds)) {
+      return res.status(400).json({
+        success: false,
+        message: "Student ID and fee IDs array are required",
+      });
+    }
+
+    // Convert string IDs to ObjectIds
+    const validObjectIds = selectedFeeIds.map(
+      (id) => new mongoose.Types.ObjectId(id)
+    );
+
+    const fees = await Fee.find({
+      _id: { $in: validObjectIds },
+      studentId: studentId,
+      status: { $in: ["pending", "overdue"] },
+    }).populate(
+      "studentId",
+      "studentName fatherName mPhoneNumber rollNumber class section"
+    );
+
+    const summary = fees.map((fee) => ({
+      id: fee._id.toString(),
+      month: fee.month,
+      year: fee.year,
+      totalAmount: fee.totalAmount,
+      remainingBalance: fee.remainingBalance || fee.totalAmount,
+      status: fee.status,
+      tutionFee: fee.tutionFee,
+      examFee: fee.examFee,
+      miscFee: fee.miscFee,
+      discount: fee.discount,
+    }));
+
+    const totalOutstanding = summary.reduce(
+      (sum, fee) => sum + fee.remainingBalance,
+      0
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        student: fees[0]?.studentId,
+        fees: summary,
+        totalOutstanding,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting partial payment summary:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 };
