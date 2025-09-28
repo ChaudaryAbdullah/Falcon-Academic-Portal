@@ -1316,12 +1316,7 @@ Falcon House School Administration
                             )}
                           </div>
                           <span className="font-semibold text-sm sm:text-base">
-                            Rs.{" "}
-                            {fee.tutionFee +
-                              fee.examFee +
-                              fee.miscFee -
-                              fee.discount +
-                              (lateFees[fee.id] || 0)}
+                            Rs. {fee.remainingBalance + (lateFees[fee.id] || 0)}
                           </span>
                         </div>
                       ))}
@@ -1340,10 +1335,7 @@ Falcon House School Administration
                             .reduce(
                               (sum, fee) =>
                                 sum +
-                                (fee.tutionFee +
-                                  fee.examFee +
-                                  fee.miscFee -
-                                  fee.discount) +
+                                fee.remainingBalance +
                                 (lateFees[fee.id] || 0),
                               0
                             )}
