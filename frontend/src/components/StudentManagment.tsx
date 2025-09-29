@@ -9,10 +9,10 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
+} from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import {
   Table,
   TableBody,
@@ -20,16 +20,21 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+} from "../components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../components/ui/tabs";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { Badge } from "./ui/badge";
+} from "../components/ui/select";
+import { Badge } from "../components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,11 +42,21 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-} from "./ui/dropdown-menu";
-import { Plus, Search, Filter, X, Settings, Upload, User } from "lucide-react";
+} from "../components/ui/dropdown-menu";
+import {
+  Plus,
+  Search,
+  Filter,
+  X,
+  Settings,
+  Upload,
+  User,
+  Edit,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
-const BACKEND = import.meta.env.VITE_BACKEND; // your backend URL
+const BACKEND = import.meta.env.VITE_BACKEND;
 
 interface Student {
   _id: string;
@@ -99,6 +114,7 @@ interface ColumnVisibility {
   motherOccupation: boolean;
   mPhoneNumber: boolean;
   address: boolean;
+  actions: boolean;
 }
 
 export function StudentManagement({
@@ -126,9 +142,10 @@ export function StudentManagement({
     password: "",
   });
 
-  // State for image handling
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("add");
 
   const [currentPage, setCurrentPage] = useState(1);
   const studentsPerPage = 30;
@@ -158,19 +175,17 @@ export function StudentManagement({
     motherOccupation: false,
     mPhoneNumber: false,
     address: false,
+    actions: true,
   });
 
-  // Handle image file selection
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith("image/")) {
         toast.error("Please select a valid image file");
         return;
       }
 
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         toast.error("Image size should be less than 5MB");
         return;
@@ -178,7 +193,6 @@ export function StudentManagement({
 
       setSelectedImage(file);
 
-      // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target?.result as string);
@@ -187,87 +201,137 @@ export function StudentManagement({
     }
   };
 
-  // Clear image selection
   const clearImage = () => {
     setSelectedImage(null);
     setImagePreview(null);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      rollNumber: "",
+      studentName: "",
+      fatherName: "",
+      fatherCnic: "",
+      bform: "",
+      dob: "",
+      section: "",
+      gender: "",
+      fPhoneNumber: "",
+      mPhoneNumber: "",
+      motherCnic: "",
+      fatherOccupation: "",
+      motherName: "",
+      motherOccupation: "",
+      class: "",
+      address: "",
+      email: "",
+      password: "",
+    });
+    clearImage();
+    setEditingStudentId(null);
+  };
+
+  const handleEdit = (student: Student) => {
+    const dobFormatted = student.dob
+      ? new Date(student.dob).toISOString().split("T")[0]
+      : "";
+
+    setFormData({
+      rollNumber: student.rollNumber,
+      studentName: student.studentName,
+      fatherName: student.fatherName,
+      fatherCnic: student.fatherCnic,
+      bform: student.bform,
+      dob: dobFormatted,
+      section: student.section,
+      gender: student.gender,
+      fPhoneNumber: student.fPhoneNumber,
+      mPhoneNumber: student.mPhoneNumber,
+      motherCnic: student.motherCnic || "",
+      fatherOccupation: student.fatherOccupation,
+      motherName: student.motherName || "",
+      motherOccupation: student.motherOccupation || "",
+      class: student.class,
+      address: student.address,
+      email: student.email || "",
+      password: "",
+    });
+
+    if (student.img?.data) {
+      setImagePreview(
+        `data:${student.img.contentType};base64,${student.img.data}`
+      );
+    }
+
+    setEditingStudentId(student._id);
+    setActiveTab("add");
+  };
+
+  const handleCancelEdit = () => {
+    resetForm();
+    toast.info("Edit cancelled");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      // Create FormData for multipart form submission
       const formDataObj = new FormData();
 
-      // Append all form fields
       Object.entries(formData).forEach(([key, value]) => {
         if (key === "class") {
-          formDataObj.append(key, String(value)); // keep as string
+          formDataObj.append(key, String(value));
         } else if (key === "dob") {
           formDataObj.append(key, new Date(String(value)).toISOString());
-        } else {
-          formDataObj.append(
-            key,
-            typeof value === "string" ? value : JSON.stringify(value)
-          );
+        } else if (value !== "" && value !== null && value !== undefined) {
+          formDataObj.append(key, String(value));
         }
       });
 
-      // Append image if selected
       if (selectedImage) {
         formDataObj.append("image", selectedImage);
       }
 
-      // Send formData to backend API
-      const response = await axios.post(
-        `${BACKEND}/api/students`,
-        formDataObj,
-        {
+      let response;
+      if (editingStudentId) {
+        response = await axios.put(
+          `${BACKEND}/api/students/${editingStudentId}`,
+          formDataObj,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+        toast.success("Student updated successfully!");
+
+        const updatedStudent = response.data.data;
+        setStudents(
+          students.map((s) => (s._id === editingStudentId ? updatedStudent : s))
+        );
+      } else {
+        response = await axios.post(`${BACKEND}/api/students`, formDataObj, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
-        }
-      );
-      toast.success("Student added successfully!");
-      // Backend returns created student object
-      const createdStudent = response.data.data;
+        });
+        toast.success("Student added successfully!");
 
-      // Update local state with newly created student
-      setStudents([...students, createdStudent]);
+        const createdStudent = response.data.data;
+        setStudents([...students, createdStudent]);
+      }
 
-      // Reset form and image
-      setFormData({
-        rollNumber: "",
-        studentName: "",
-        fatherName: "",
-        fatherCnic: "",
-        bform: "",
-        dob: "",
-        section: "",
-        gender: "",
-        fPhoneNumber: "",
-        mPhoneNumber: "",
-        motherCnic: "",
-        fatherOccupation: "",
-        motherName: "",
-        motherOccupation: "",
-        class: "",
-        address: "",
-        email: "",
-        password: "",
-      });
-      clearImage();
+      resetForm();
     } catch (error) {
-      console.error("Error adding student:", error);
+      console.error("Error saving student:", error);
       if (axios.isAxiosError(error) && error.response) {
         toast.error(
-          `Failed to add student: ${
+          `Failed to save student: ${
             error.response.data.message || "Please try again."
           }`
         );
       } else {
-        toast.error("Failed to add student. Please try again.");
+        toast.error("Failed to save student. Please try again.");
       }
     }
   };
@@ -281,7 +345,6 @@ export function StudentManagement({
 
   const handleFilterChange = (field: keyof Filters, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
-    // Reset to page 1 when filters change
     setCurrentPage(1);
   };
 
@@ -320,9 +383,9 @@ export function StudentManagement({
     motherOccupation: "Mother Occupation",
     mPhoneNumber: "Whatsapp Number",
     address: "Address",
+    actions: "Actions",
   };
 
-  // Function to get image URL for display
   const getImageUrl = (student: Student) => {
     if (student.img?.data) {
       return `data:${student.img.contentType};base64,${student.img.data}`;
@@ -330,18 +393,16 @@ export function StudentManagement({
     return null;
   };
 
-  // Get unique values for filter dropdowns - with null safety
   const getUniqueValues = (field: keyof Student) => {
     const values = students
       .map((student) => student[field])
       .filter((value) => value != null && value !== "")
-      .map(String); // Convert all to strings for consistency
+      .map(String);
     return [...new Set(values)].sort();
   };
 
   const activeFiltersCount = Object.values(filters).filter(Boolean).length;
 
-  // Safe string conversion and null checking for search
   const safeToString = (value: any): string => {
     if (value == null) return "";
     return String(value);
@@ -349,7 +410,6 @@ export function StudentManagement({
 
   const filteredStudents = students.filter((student) => {
     try {
-      // Search filter with null safety
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch =
         !searchTerm ||
@@ -372,7 +432,6 @@ export function StudentManagement({
           safeToString(field).toLowerCase().includes(searchLower)
         );
 
-      // Field filters with type-safe comparisons
       const matchesClass =
         !filters.class || safeToString(student.class) === filters.class;
       const matchesSection =
@@ -400,7 +459,6 @@ export function StudentManagement({
     }
   });
 
-  // Get current students with pagination bounds checking
   const indexOfLastStudent = currentPage * studentsPerPage;
   const indexOfFirstStudent = indexOfLastStudent - studentsPerPage;
   const currentStudents = filteredStudents.slice(
@@ -408,7 +466,6 @@ export function StudentManagement({
     indexOfLastStudent
   );
 
-  // Total pages calculation with safety check
   const totalPages = Math.max(
     1,
     Math.ceil(filteredStudents.length / studentsPerPage)
@@ -420,10 +477,9 @@ export function StudentManagement({
     }
   };
 
-  // Handle search term change with page reset
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
-    setCurrentPage(1); // Reset to first page when searching
+    setCurrentPage(1);
   };
 
   return (
@@ -435,21 +491,42 @@ export function StudentManagement({
         <p className="text-muted-foreground">Add and manage student records</p>
       </div>
 
-      <Tabs defaultValue="add" className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="add">Add Student</TabsTrigger>
+          <TabsTrigger value="add">
+            {editingStudentId ? "Edit Student" : "Add Student"}
+          </TabsTrigger>
           <TabsTrigger value="list">View Students</TabsTrigger>
         </TabsList>
 
         <TabsContent value="add">
           <Card>
             <CardHeader>
-              <CardTitle>Add New Student</CardTitle>
-              <CardDescription>Enter student information below</CardDescription>
+              <CardTitle>
+                {editingStudentId ? "Edit Student" : "Add New Student"}
+              </CardTitle>
+              <CardDescription>
+                {editingStudentId
+                  ? "Update student information below"
+                  : "Enter student information below"}
+              </CardDescription>
+              {editingStudentId && (
+                <Button
+                  variant="outline"
+                  onClick={handleCancelEdit}
+                  className="w-full sm:w-auto"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Cancel Edit
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Image Upload Section */}
                 <div className="space-y-4 border border-dashed border-gray-300 rounded-lg p-4">
                   <Label>Student Photo</Label>
                   <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4">
@@ -662,7 +739,7 @@ export function StudentManagement({
                     <Input
                       id="fatherOccupation"
                       value={formData.fatherOccupation}
-                      onChange={(e) =>
+                      onChange={(e: { target: { value: string } }) =>
                         handleInputChange("fatherOccupation", e.target.value)
                       }
                       required
@@ -674,7 +751,7 @@ export function StudentManagement({
                     <Input
                       id="motherName"
                       value={formData.motherName}
-                      onChange={(e) =>
+                      onChange={(e: { target: { value: string } }) =>
                         handleInputChange("motherName", e.target.value)
                       }
                     />
@@ -684,7 +761,7 @@ export function StudentManagement({
                     <Input
                       id="motherCnic"
                       value={formData.motherCnic}
-                      onChange={(e) =>
+                      onChange={(e: { target: { value: string } }) =>
                         handleInputChange("motherCnic", e.target.value)
                       }
                       placeholder="12345-1234567-1"
@@ -696,15 +773,24 @@ export function StudentManagement({
                     <Input
                       id="motherOccupation"
                       value={formData.motherOccupation}
-                      onChange={(e) =>
+                      onChange={(e: { target: { value: string } }) =>
                         handleInputChange("motherOccupation", e.target.value)
                       }
                     />
                   </div>
                 </div>
                 <Button type="submit" className="w-full bg-blue-600">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Student
+                  {editingStudentId ? (
+                    <>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Update Student
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Student
+                    </>
+                  )}
                 </Button>
               </form>
             </CardContent>
@@ -725,7 +811,6 @@ export function StudentManagement({
                 View and search all registered students
               </CardDescription>
 
-              {/* Search and Filter Controls */}
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center space-x-2 flex-1 w-full sm:w-auto">
@@ -733,12 +818,13 @@ export function StudentManagement({
                     <Input
                       placeholder="Search students..."
                       value={searchTerm}
-                      onChange={(e) => handleSearchChange(e.target.value)}
+                      onChange={(e: { target: { value: string } }) =>
+                        handleSearchChange(e.target.value)
+                      }
                       className="w-full sm:max-w-sm"
                     />
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-                    {/* Column Visibility Dropdown */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-full sm:w-auto">
@@ -767,7 +853,6 @@ export function StudentManagement({
                       </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {/* Filters Button */}
                     <Button
                       variant="outline"
                       onClick={() => setShowFilters(!showFilters)}
@@ -784,14 +869,13 @@ export function StudentManagement({
                   </div>
                 </div>
 
-                {/* Filter Section */}
                 {showFilters && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-4 bg-muted rounded-lg">
                     <div className="space-y-2">
                       <Label htmlFor="classFilter">Class</Label>
                       <Select
                         value={filters.class || "all"}
-                        onValueChange={(value) =>
+                        onValueChange={(value: string) =>
                           handleFilterChange(
                             "class",
                             value === "all" ? "" : value
@@ -816,7 +900,7 @@ export function StudentManagement({
                       <Label htmlFor="sectionFilter">Section</Label>
                       <Select
                         value={filters.section || "all"}
-                        onValueChange={(value) =>
+                        onValueChange={(value: string) =>
                           handleFilterChange(
                             "section",
                             value === "all" ? "" : value
@@ -841,7 +925,7 @@ export function StudentManagement({
                       <Label htmlFor="GenderFilter">Gender</Label>
                       <Select
                         value={filters.gender || "all"}
-                        onValueChange={(value) =>
+                        onValueChange={(value: string) =>
                           handleFilterChange(
                             "gender",
                             value === "all" ? "" : value
@@ -868,7 +952,7 @@ export function StudentManagement({
                       </Label>
                       <Select
                         value={filters.fatherOccupation || "all"}
-                        onValueChange={(value) =>
+                        onValueChange={(value: string) =>
                           handleFilterChange(
                             "fatherOccupation",
                             value === "all" ? "" : value
@@ -897,7 +981,7 @@ export function StudentManagement({
                       </Label>
                       <Select
                         value={filters.motherOccupation || "all"}
-                        onValueChange={(value) =>
+                        onValueChange={(value: string) =>
                           handleFilterChange(
                             "motherOccupation",
                             value === "all" ? "" : value
@@ -935,7 +1019,6 @@ export function StudentManagement({
                   </div>
                 )}
 
-                {/* Active Filters Display */}
                 {activeFiltersCount > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {filters.class && (
@@ -959,6 +1042,19 @@ export function StudentManagement({
                           size="sm"
                           className="h-4 w-4 p-0 ml-1 hover:bg-transparent"
                           onClick={() => handleFilterChange("section", "")}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    )}
+                    {filters.gender && (
+                      <Badge variant="secondary" className="text-xs">
+                        Gender: {filters.gender}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-4 w-4 p-0 ml-1 hover:bg-transparent"
+                          onClick={() => handleFilterChange("gender", "")}
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -1071,6 +1167,9 @@ export function StudentManagement({
                       )}
                       {columnVisibility.address && (
                         <TableHead className="min-w-[200px]">Address</TableHead>
+                      )}
+                      {columnVisibility.actions && (
+                        <TableHead className="min-w-[100px]">Actions</TableHead>
                       )}
                     </TableRow>
                   </TableHeader>
@@ -1196,12 +1295,24 @@ export function StudentManagement({
                               {safeToString(student.address)}
                             </TableCell>
                           )}
+                          {columnVisibility.actions && (
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEdit(student)}
+                                className="w-full sm:w-auto"
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))
                     )}
                   </TableBody>
                 </Table>
-                {/* Pagination Controls */}
                 {totalPages > 1 && (
                   <div className="flex flex-col sm:flex-row justify-center items-center mt-4 space-y-2 sm:space-y-0 sm:space-x-2">
                     <Button
