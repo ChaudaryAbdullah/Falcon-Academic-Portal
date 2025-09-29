@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-
 import {
   Table,
   TableBody,
@@ -34,7 +33,10 @@ import {
   DollarSign,
   TrendingUp,
   Loader2,
+  Printer,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -243,52 +245,189 @@ export default function ClassReports() {
     }
   };
 
-  const exportReport = () => {
+  const generatePDF = (action: "download" | "print") => {
     if (reportData.length === 0) {
       toast.error("No data to export");
       return;
     }
 
-    const csvContent = [
-      [
-        "Roll Number",
-        "Student Name",
-        "Father Name",
-        "Class",
-        "Section",
-        "Total Fee",
-        "Paid Amount",
-        "Pending Amount",
-        "Last Payment",
-        "Status",
+    // Create new PDF document in landscape orientation
+    const doc = new jsPDF("landscape", "mm", "a4");
+
+    // Add title
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("Class Fee Collection Report", 14, 20);
+
+    // Add report filters information
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    const filters = [
+      `Report Type: ${reportFilters.reportType}`,
+      reportFilters.class ? `Class: ${reportFilters.class}` : "",
+      reportFilters.section ? `Section: ${reportFilters.section}` : "",
+      `Month: ${reportFilters.month}`,
+      `Year: ${reportFilters.year}`,
+    ].filter(Boolean);
+
+    // Display filters in two columns
+    filters.forEach((filter, index) => {
+      doc.text(filter, index < 3 ? 14 : 150, 35 + (index % 3) * 7);
+    });
+
+    // Add summary information
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Summary", 14, 60);
+
+    const summary = getReportSummary();
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+
+    // Display summary in two columns
+    doc.text(`Total Fee: Rs. ${summary.totalFee.toLocaleString()}`, 14, 70);
+    doc.text(
+      `Amount Collected: Rs. ${summary.totalCollected.toLocaleString()}`,
+      120,
+      70
+    );
+    doc.text(
+      `Remaining Fee: Rs. ${summary.totalRemaining.toLocaleString()}`,
+      14,
+      77
+    );
+    doc.text(`Collection Rate: ${summary.collectionPercentage}%`, 120, 77);
+
+    // Prepare table data
+    const tableData = reportData.map((record, index) => [
+      (index + 1).toString(),
+      record.rollNumber || "N/A",
+      record.studentName || "N/A",
+      record.fatherName || "N/A",
+      record.class || "N/A",
+      record.section || "N/A",
+      `Rs. ${(record.totalFee || 0).toLocaleString()}`,
+      `Rs. ${(record.paidAmount || 0).toLocaleString()}`,
+      `Rs. ${(record.pendingAmount || 0).toLocaleString()}`,
+      (record.pendingAmount || 0) === 0 ? "Paid" : "Pending",
+    ]);
+
+    // Add table
+    autoTable(doc, {
+      head: [
+        [
+          "S.No",
+          "Roll No.",
+          "Student Name",
+          "Father Name",
+          "Class",
+          "Section",
+          "Total Fee",
+          "Paid Amount",
+          "Pending",
+          "Status",
+        ],
       ],
-      ...reportData.map((record) => [
-        record.rollNumber || "N/A",
-        record.studentName || "N/A",
-        record.fatherName || "N/A",
-        record.class || "N/A",
-        record.section || "N/A",
-        record.totalFee?.toString() || "0",
-        record.paidAmount?.toString() || "0",
-        record.pendingAmount?.toString() || "0",
-        record.lastPayment || "N/A",
-        record.status || "N/A",
-      ]),
-    ]
-      .map((row) => row.join(","))
-      .join("\n");
+      body: tableData,
+      startY: 85,
+      theme: "grid",
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: 255,
+        fontSize: 10,
+        fontStyle: "bold",
+        halign: "center",
+      },
+      bodyStyles: {
+        fontSize: 9,
+        halign: "center",
+      },
+      columnStyles: {
+        0: { cellWidth: 15 }, // S.No
+        1: { cellWidth: 25 }, // Roll No
+        2: { cellWidth: 40 }, // Student Name
+        3: { cellWidth: 40 }, // Father Name
+        4: { cellWidth: 20 }, // Class
+        5: { cellWidth: 20 }, // Section
+        6: { cellWidth: 30 }, // Total Fee
+        7: { cellWidth: 30 }, // Paid Amount
+        8: { cellWidth: 30 }, // Pending
+        9: { cellWidth: 30 }, // Last Payment
+        10: { cellWidth: 20 }, // Status
+      },
+      didDrawPage: function (data) {
+        // Header
+        doc.setFontSize(20);
+        doc.setFont("helvetica", "bold");
+        doc.text("Class Fee Collection Report", 14, 20);
 
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `fee-report-${new Date().toISOString().split("T")[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+        // Filters and summary on new pages
+        if (data.pageNumber > 1) {
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.text(
+            `Class: ${reportFilters.class || "All"} | Section: ${
+              reportFilters.section || "All"
+            } | Month: ${reportFilters.month} | Year: ${reportFilters.year}`,
+            14,
+            25
+          );
+        }
 
-    toast.success("Report exported successfully");
+        // Footer
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        doc.text(
+          `Page ${data.pageNumber} of ${doc.internal.getNumberOfPages()}`,
+          doc.internal.pageSize.width - 20,
+          doc.internal.pageSize.height - 10,
+          { align: "right" }
+        );
+
+        // Generation timestamp on last page
+        if (data.pageNumber === doc.internal.getNumberOfPages()) {
+          doc.text(
+            `Report generated on: ${new Date().toLocaleString()}`,
+            14,
+            doc.internal.pageSize.height - 10
+          );
+        }
+      },
+      margin: { top: 30 },
+    });
+
+    if (action === "download") {
+      // Save the PDF
+      doc.save(
+        `class-fee-report-${reportFilters.class || "all"}-${
+          reportFilters.month
+        }-${reportFilters.year}.pdf`
+      );
+      toast.success("PDF report downloaded successfully");
+    } else {
+      try {
+        // Open PDF in a new window and print
+        const pdfData = doc.output("bloburl");
+        const printWindow = window.open(pdfData as string);
+
+        if (printWindow) {
+          printWindow.onload = () => {
+            try {
+              printWindow.print();
+              toast.success("Print dialog opened successfully");
+            } catch (error) {
+              console.error("Print error:", error);
+              toast.error("Failed to open print dialog");
+            }
+          };
+        } else {
+          toast.error("Please allow popups to print the report");
+        }
+      } catch (error) {
+        console.error("Print error:", error);
+        toast.error("Failed to print report");
+      }
+    }
   };
 
   return (
@@ -413,7 +552,7 @@ export default function ClassReports() {
         <div className="flex gap-2">
           <Button
             onClick={generateReport}
-            className="flex items-center gap-2"
+            className="flex bg-blue-600 hover:bg-blue-500 items-center gap-2"
             disabled={loading}
           >
             {loading ? (
@@ -425,12 +564,21 @@ export default function ClassReports() {
           </Button>
           <Button
             variant="outline"
-            onClick={exportReport}
+            onClick={() => generatePDF("download")}
             className="flex items-center gap-2 bg-transparent"
             disabled={reportData.length === 0}
           >
             <Download className="w-4 h-4" />
-            Export CSV
+            Download PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => generatePDF("print")}
+            className="flex items-center gap-2 bg-transparent"
+            disabled={reportData.length === 0}
+          >
+            <Printer className="w-4 h-4" />
+            Print Report
           </Button>
         </div>
 

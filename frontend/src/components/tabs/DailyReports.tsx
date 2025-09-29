@@ -29,9 +29,13 @@ import {
   TrendingUp,
   Loader2,
   CalendarDays,
+  Printer,
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 interface DailyReportData {
   date: string;
   totalExpected: number;
@@ -80,48 +84,172 @@ export default function DailyReports() {
     }
   };
 
-  const exportDailyReport = () => {
+  const generatePDF = (action: "download" | "print") => {
     if (!dailyReportData || dailyReportData.students.length === 0) {
       toast.error("No data to export");
       return;
     }
 
-    const csvContent = [
-      [
-        "Date",
-        "Roll Number",
-        "Student Name",
-        "Class",
-        "Section",
-        "Amount Paid",
-        "Challan ID",
-        "Payment Time",
+    const doc = new jsPDF();
+
+    // Add title
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("Daily Fee Collection Report", 14, 20);
+
+    // Add date
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    const reportDate = new Date(dailyReportData.date).toLocaleDateString(
+      "en-US",
+      {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }
+    );
+    doc.text(`Date: ${reportDate}`, 14, 30);
+
+    // Add summary information
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Summary", 14, 45);
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `Total Collected: Rs. ${dailyReportData.totalCollected.toLocaleString()}`,
+      14,
+      55
+    );
+    doc.text(
+      `Total Transactions: ${dailyReportData.totalTransactions}`,
+      14,
+      62
+    );
+    doc.text(
+      `Average Payment: Rs. ${
+        dailyReportData.totalTransactions > 0
+          ? Math.round(
+              dailyReportData.totalCollected / dailyReportData.totalTransactions
+            ).toLocaleString()
+          : 0
+      }`,
+      14,
+      69
+    );
+
+    // Prepare table data
+    const tableData = dailyReportData.students.map((student, index) => [
+      (index + 1).toString(),
+      new Date(student.paymentTime).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      student.rollNumber || "N/A",
+      student.studentName || "N/A",
+      `${student.class}-${student.section}`,
+      `Rs. ${student.amount.toLocaleString()}`,
+      student.challanId || "N/A",
+    ]);
+
+    // Add table
+    autoTable(doc, {
+      head: [
+        [
+          "S.No",
+          "Time",
+          "Roll No.",
+          "Student Name",
+          "Class-Sec",
+          "Amount",
+          "Challan ID",
+        ],
       ],
-      ...dailyReportData.students.map((student) => [
-        dailyReportData.date,
-        student.rollNumber || "N/A",
-        student.studentName || "N/A",
-        student.class || "N/A",
-        student.section || "N/A",
-        student.amount?.toString() || "0",
-        student.challanId || "N/A",
-        student.paymentTime || "N/A",
-      ]),
-    ]
-      .map((row) => row.join(","))
-      .join("\n");
+      body: tableData,
+      startY: 80,
+      theme: "grid",
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: 255,
+        fontSize: 10,
+        fontStyle: "bold",
+      },
+      bodyStyles: {
+        fontSize: 9,
+      },
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 50 },
+        4: { cellWidth: 25 },
+        5: { cellWidth: 30 },
+        6: { cellWidth: 25 },
+      },
+      didDrawPage: function (data) {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        doc.text(
+          `Page ${data.pageNumber} of ${doc.internal.getNumberOfPages()}`,
+          data.settings.margin.left,
+          doc.internal.pageSize.height - 10
+        );
+      },
+    });
 
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `daily-fee-report-${selectedDate}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    // Add total at the end
+    const finalY = (doc as any).lastAutoTable.finalY || 80;
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.line(14, finalY + 5, 196, finalY + 5);
+    doc.text(
+      `Total Amount Collected: Rs. ${dailyReportData.totalCollected.toLocaleString()}`,
+      14,
+      finalY + 12
+    );
+    doc.text(
+      `Total Transactions: ${dailyReportData.totalTransactions}`,
+      14,
+      finalY + 19
+    );
 
-    toast.success("Daily report exported successfully");
+    // Add generation timestamp
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "italic");
+    doc.text(
+      `Report generated on: ${new Date().toLocaleString()}`,
+      14,
+      doc.internal.pageSize.height - 20
+    );
+
+    if (action === "download") {
+      doc.save(`daily-fee-report-${selectedDate}.pdf`);
+      toast.success("PDF report downloaded successfully");
+    } else {
+      try {
+        const pdfData = doc.output("bloburl");
+        const printWindow = window.open(pdfData as string);
+
+        if (printWindow) {
+          printWindow.onload = () => {
+            try {
+              printWindow.print();
+              toast.success("Print dialog opened successfully");
+            } catch (error) {
+              console.error("Print error:", error);
+              toast.error("Failed to open print dialog");
+            }
+          };
+        } else {
+          toast.error("Please allow popups to print the report");
+        }
+      } catch (error) {
+        console.error("Print error:", error);
+        toast.error("Failed to print report");
+      }
+    }
   };
 
   return (
@@ -151,7 +279,7 @@ export default function DailyReports() {
           <div className="flex gap-2 flex-col sm:flex-row">
             <Button
               onClick={() => loadDailyReport(selectedDate)}
-              className="flex items-center justify-center gap-2 w-full sm:w-auto"
+              className="flex items-center bg-blue-600 hover:bg-blue-500 justify-center gap-2 w-full sm:w-auto"
               disabled={loading}
             >
               {loading ? (
@@ -163,14 +291,25 @@ export default function DailyReports() {
             </Button>
             <Button
               variant="outline"
-              onClick={exportDailyReport}
+              onClick={() => generatePDF("download")}
               className="flex items-center justify-center gap-2 bg-transparent w-full sm:w-auto"
               disabled={
                 !dailyReportData || dailyReportData.students.length === 0
               }
             >
               <Download className="w-4 h-4" />
-              Export CSV
+              Download PDF
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => generatePDF("print")}
+              className="flex items-center justify-center gap-2 bg-transparent w-full sm:w-auto"
+              disabled={
+                !dailyReportData || dailyReportData.students.length === 0
+              }
+            >
+              <Printer className="w-4 h-4" />
+              Print Report
             </Button>
           </div>
         </div>
