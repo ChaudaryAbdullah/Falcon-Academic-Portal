@@ -51,6 +51,8 @@ export default function StudentDiscountPage({
   const [discounts, setDiscounts] = useState<StudentDiscount[]>([]);
   const [tabValue, setTabValue] = useState("add-discount");
   const [discountSearch, setDiscountSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Fetch all discounts
   useEffect(() => {
@@ -86,6 +88,17 @@ export default function StudentDiscountPage({
       d.studentId?._id?.includes(discountSearch) ||
       d.discount.toString().includes(discountSearch)
   );
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredDiscounts.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedDiscounts = filteredDiscounts.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [discountSearch]);
 
   const handleStudentSelect = (student: Student) => {
     setSelectedStudent(student);
@@ -279,87 +292,147 @@ export default function StudentDiscountPage({
               </div>
 
               <div className="space-y-4">
-                {filteredDiscounts.length > 0 ? (
-                  filteredDiscounts.map((discount) => (
-                    <Card
-                      key={discount._id}
-                      className="border-l-4 border-l-green-500"
-                    >
-                      <CardContent className="pt-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                              <User className="w-6 h-6 text-green-600" />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-gray-900">
-                                {discount.studentId.studentName}
-                              </h3>
-                              <p className="text-sm text-gray-600">
-                                Roll Number: {discount.studentId.rollNumber}
-                              </p>
-                              <p className="text-sm text-gray-600">
-                                Father: {discount.studentId.fatherName}
-                              </p>
-                              <p className="text-sm text-gray-600">
-                                Class: {discount.studentId.class}
-                              </p>
+                {paginatedDiscounts.length > 0 ? (
+                  <>
+                    {paginatedDiscounts.map((discount) => (
+                      <Card
+                        key={discount._id}
+                        className="border-l-4 border-l-green-500"
+                      >
+                        <CardContent className="pt-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                <User className="w-6 h-6 text-green-600" />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-gray-900">
+                                  {discount.studentId.studentName}
+                                </h3>
+                                <p className="text-sm text-gray-600">
+                                  Roll Number: {discount.studentId.rollNumber}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  Father: {discount.studentId.fatherName}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  Class: {discount.studentId.class}
+                                </p>
 
-                              <div className="flex items-center gap-2 mt-1">
-                                <Phone className="w-3 h-3 text-gray-400" />
-                                <span className="text-xs text-gray-500">
-                                  {discount.studentId.mPhoneNumber}
-                                </span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Phone className="w-3 h-3 text-gray-400" />
+                                  <span className="text-xs text-gray-500">
+                                    {discount.studentId.mPhoneNumber}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-green-600">
+                                Rs. {discount.discount}
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                Added on{" "}
+                                {new Date(
+                                  discount.createdAt
+                                ).toLocaleDateString()}
+                              </p>
+                              <div className="flex gap-2 mt-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingDiscount(discount);
+                                    setSelectedStudent(discount.studentId);
+                                    setSearchQuery(
+                                      discount.studentId.studentName
+                                    );
+                                    setDiscountAmount(
+                                      discount.discount.toString()
+                                    );
+                                    setTabValue("add-discount");
+                                  }}
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    handleDeleteDiscount(discount._id)
+                                  }
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
                               </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-green-600">
-                              Rs. {discount.discount}
-                            </div>
-                            <p className="text-xs text-gray-500">
-                              Added on{" "}
-                              {new Date(
-                                discount.createdAt
-                              ).toLocaleDateString()}
-                            </p>
-                            <div className="flex gap-2 mt-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setEditingDiscount(discount);
-                                  setSelectedStudent(discount.studentId);
-                                  setSearchQuery(
-                                    discount.studentId.studentName
-                                  );
-                                  setDiscountAmount(
-                                    discount.discount.toString()
-                                  );
-                                  setTabValue("add-discount");
-                                }}
-                              >
-                                <Edit className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  handleDeleteDiscount(discount._id)
-                                }
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </>
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                     <p>No discounts found</p>
+                  </div>
+                )}
+
+                {/* Pagination Controls */}
+                {filteredDiscounts.length > 0 && totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-4 border-t">
+                    <div className="text-sm text-gray-600">
+                      Showing {startIndex + 1} to{" "}
+                      {Math.min(endIndex, filteredDiscounts.length)} of{" "}
+                      {filteredDiscounts.length} discounts
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                          .filter(
+                            (page) =>
+                              page === 1 ||
+                              page === totalPages ||
+                              Math.abs(page - currentPage) <= 1
+                          )
+                          .map((page, index, array) => (
+                            <div key={page} className="flex items-center">
+                              {index > 0 && array[index - 1] !== page - 1 && (
+                                <span className="px-2 text-gray-400">...</span>
+                              )}
+                              <Button
+                                variant={
+                                  currentPage === page ? "default" : "outline"
+                                }
+                                size="sm"
+                                onClick={() => setCurrentPage(page)}
+                              >
+                                {page}
+                              </Button>
+                            </div>
+                          ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
