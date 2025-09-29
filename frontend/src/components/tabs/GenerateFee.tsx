@@ -981,13 +981,13 @@ export function GenerateFeeTab({
                         Select Date
                       </Label>
                       <div className="relative">
-                        <Calendar className="absolute left-3 top-3 h-4 w-4 text-blue-400" />
+                        <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-blue-400 hidden sm:block" />
                         <Input
                           id="printClassDate"
                           type="date"
                           value={printClassDate}
                           onChange={(e) => setPrintClassDate(e.target.value)}
-                          className="pl-10 border-blue-300 focus:border-blue-500"
+                          className="pl-4 sm:pl-6 md:pl-8 lg:pl-10  border-blue-300 focus:border-blue-500"
                         />
                       </div>
                     </div>
@@ -1079,13 +1079,13 @@ export function GenerateFeeTab({
                         Select Date
                       </Label>
                       <div className="relative">
-                        <Calendar className="absolute left-3 top-3 h-4 w-4 text-orange-400" />
+                        <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-orange-400 hidden sm:block" />
                         <Input
                           id="printSectionDate"
                           type="date"
                           value={printClassDate}
                           onChange={(e) => setPrintClassDate(e.target.value)}
-                          className="pl-10 border-orange-300 focus:border-orange-500"
+                          className="pl-4 sm:pl-6 md:pl-8 lg:pl-10 border-orange-300 focus:border-orange-500"
                         />
                       </div>
                     </div>
@@ -1129,13 +1129,13 @@ export function GenerateFeeTab({
                         Select Date
                       </Label>
                       <div className="relative mt-1">
-                        <Calendar className="absolute left-3 top-3 h-4 w-4 text-purple-400" />
+                        <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-purple-400 hidden sm:block" />
                         <Input
                           id="printDate"
                           type="date"
                           value={printDate}
                           onChange={(e) => setPrintDate(e.target.value)}
-                          className="pl-10 border-purple-300 focus:border-purple-500"
+                          className="pl-4 sm:pl-6 md:pl-8 lg:pl-10 border-purple-300 focus:border-purple-500"
                         />
                       </div>
                       <p className="text-xs text-purple-600 mt-1">

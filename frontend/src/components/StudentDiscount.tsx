@@ -52,7 +52,7 @@ export default function StudentDiscountPage({
   const [tabValue, setTabValue] = useState("add-discount");
   const [discountSearch, setDiscountSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 30;
 
   // Fetch all discounts
   useEffect(() => {
@@ -156,22 +156,34 @@ export default function StudentDiscountPage({
   };
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 pt-20 md:pt-6 relative z-10">
+      <div className="space-y-1 sm:space-y-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
           Student Discount Management
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-sm sm:text-base text-gray-600">
           Add and manage discounts for students
         </p>
       </div>
 
-      <Tabs value={tabValue} onValueChange={setTabValue} className="space-y-6">
+      <Tabs
+        value={tabValue}
+        onValueChange={setTabValue}
+        className="space-y-4 sm:space-y-6"
+      >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="add-discount">
-            {editingDiscount ? "Update Discount" : "Add Discount"}
+            <span className="hidden sm:inline">
+              {editingDiscount ? "Update Discount" : "Add Discount"}
+            </span>
+            <span className="sm:hidden">
+              {editingDiscount ? "Update" : "Add"}
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="view-discounts">View All Discounts</TabsTrigger>
+          <TabsTrigger value="view-discounts">
+            <span className="hidden sm:inline">View All Discounts</span>
+            <span className="sm:hidden">View All</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* Add / Update Discount Tab */}
@@ -179,16 +191,18 @@ export default function StudentDiscountPage({
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Plus className="w-5 h-5" />
-                {editingDiscount
-                  ? "Update Student Discount"
-                  : "Add Student Discount"}
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-base sm:text-lg">
+                  {editingDiscount
+                    ? "Update Student Discount"
+                    : "Add Student Discount"}
+                </span>
               </CardTitle>
               <CardDescription>
                 Search for a student and add a discount amount in rupees
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 sm:space-y-6">
               {/* Student Search */}
               <div className="space-y-2">
                 <Label htmlFor="student-search">Search Student</Label>
@@ -208,34 +222,36 @@ export default function StudentDiscountPage({
                     className="pl-10"
                   />
                   {showSearchResults && searchQuery && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 sm:max-h-60 overflow-auto">
                       {filteredStudents.length > 0 ? (
                         filteredStudents.slice(0, 10).map((student) => (
                           <div
                             key={student._id}
-                            className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            className="p-2 sm:p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                             onClick={() => handleStudentSelect(student)}
                           >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="font-medium text-gray-900">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <div className="space-y-0.5">
+                                <p className="font-medium text-sm sm:text-base text-gray-900">
                                   {student.studentName}
                                 </p>
-                                <p className="text-sm text-gray-500">
+                                <p className="text-xs sm:text-sm text-gray-500">
                                   Father: {student.fatherName}
                                 </p>
-                                <p className="text-sm text-gray-500">
+                                <p className="text-xs sm:text-sm text-gray-500">
                                   Class: {student.class}
                                 </p>
                               </div>
                               <Badge variant="outline">
-                                Roll Number: {student.rollNumber}
+                                <span className="text-xs">
+                                  Roll: {student.rollNumber}
+                                </span>
                               </Badge>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <div className="p-3 text-center text-gray-500">
+                        <div className="p-3 text-center text-sm text-gray-500">
                           No students found
                         </div>
                       )}
@@ -272,26 +288,28 @@ export default function StudentDiscountPage({
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                All Student Discounts
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-base sm:text-lg">
+                  All Student Discounts
+                </span>
               </CardTitle>
               <CardDescription>
                 View and manage all student discounts
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* 🔍 Search Bar */}
+              {/* Search Bar */}
               <div className="relative mb-4">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search discounts by name, roll number, father, or ID..."
+                  placeholder="Search discounts..."
                   value={discountSearch}
                   onChange={(e) => setDiscountSearch(e.target.value)}
                   className="pl-10"
                 />
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {paginatedDiscounts.length > 0 ? (
                   <>
                     {paginatedDiscounts.map((discount) => (
@@ -299,45 +317,51 @@ export default function StudentDiscountPage({
                         key={discount._id}
                         className="border-l-4 border-l-green-500"
                       >
-                        <CardContent className="pt-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                                <User className="w-6 h-6 text-green-600" />
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                            <div className="flex items-start gap-3 sm:gap-4 flex-1">
+                              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <User className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                               </div>
-                              <div>
-                                <h3 className="font-semibold text-gray-900">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-sm sm:text-base text-gray-900 truncate">
                                   {discount.studentId.studentName}
                                 </h3>
-                                <p className="text-sm text-gray-600">
-                                  Roll Number: {discount.studentId.rollNumber}
-                                </p>
-                                <p className="text-sm text-gray-600">
-                                  Father: {discount.studentId.fatherName}
-                                </p>
-                                <p className="text-sm text-gray-600">
-                                  Class: {discount.studentId.class}
-                                </p>
-
-                                <div className="flex items-center gap-2 mt-1">
-                                  <Phone className="w-3 h-3 text-gray-400" />
-                                  <span className="text-xs text-gray-500">
-                                    {discount.studentId.mPhoneNumber}
-                                  </span>
+                                <div className="space-y-0.5 mt-1">
+                                  <p className="text-xs sm:text-sm text-gray-600">
+                                    Roll: {discount.studentId.rollNumber}
+                                  </p>
+                                  <p className="text-xs sm:text-sm text-gray-600 truncate">
+                                    Father: {discount.studentId.fatherName}
+                                  </p>
+                                  <p className="text-xs sm:text-sm text-gray-600">
+                                    Class: {discount.studentId.class}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Phone className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                    <span className="text-xs text-gray-500">
+                                      {discount.studentId.mPhoneNumber}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-bold text-green-600">
-                                Rs. {discount.discount}
+                            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:text-right">
+                              <div>
+                                <div className="text-xl sm:text-2xl font-bold text-green-600">
+                                  Rs. {discount.discount}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {new Date(
+                                    discount.createdAt
+                                  ).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  })}
+                                </p>
                               </div>
-                              <p className="text-xs text-gray-500">
-                                Added on{" "}
-                                {new Date(
-                                  discount.createdAt
-                                ).toLocaleDateString()}
-                              </p>
-                              <div className="flex gap-2 mt-2">
+                              <div className="flex gap-2">
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -373,20 +397,20 @@ export default function StudentDiscountPage({
                   </>
                 ) : (
                   <div className="text-center py-8 text-gray-500">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p>No discounts found</p>
+                    <Users className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-sm sm:text-base">No discounts found</p>
                   </div>
                 )}
 
                 {/* Pagination Controls */}
                 {filteredDiscounts.length > 0 && totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <div className="text-sm text-gray-600">
-                      Showing {startIndex + 1} to{" "}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t">
+                    <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+                      Showing {startIndex + 1}-
                       {Math.min(endIndex, filteredDiscounts.length)} of{" "}
-                      {filteredDiscounts.length} discounts
+                      {filteredDiscounts.length}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2 items-center">
                       <Button
                         variant="outline"
                         size="sm"
@@ -394,10 +418,11 @@ export default function StudentDiscountPage({
                           setCurrentPage((p) => Math.max(1, p - 1))
                         }
                         disabled={currentPage === 1}
+                        className="w-full sm:w-auto"
                       >
                         Previous
                       </Button>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 overflow-x-auto max-w-full">
                         {Array.from({ length: totalPages }, (_, i) => i + 1)
                           .filter(
                             (page) =>
@@ -408,7 +433,9 @@ export default function StudentDiscountPage({
                           .map((page, index, array) => (
                             <div key={page} className="flex items-center">
                               {index > 0 && array[index - 1] !== page - 1 && (
-                                <span className="px-2 text-gray-400">...</span>
+                                <span className="px-1 sm:px-2 text-gray-400 text-sm">
+                                  ...
+                                </span>
                               )}
                               <Button
                                 variant={
@@ -416,6 +443,9 @@ export default function StudentDiscountPage({
                                 }
                                 size="sm"
                                 onClick={() => setCurrentPage(page)}
+                                className={`${
+                                  currentPage === page ? "bg-blue-500" : ""
+                                } min-w-[2rem]`}
                               >
                                 {page}
                               </Button>
@@ -429,6 +459,7 @@ export default function StudentDiscountPage({
                           setCurrentPage((p) => Math.min(totalPages, p + 1))
                         }
                         disabled={currentPage === totalPages}
+                        className="w-full sm:w-auto"
                       >
                         Next
                       </Button>
