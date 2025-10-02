@@ -261,7 +261,10 @@ Falcon House School Administration
 
   const generateFeeChallanHTML = (
     selectedFees: FeeChallan[],
-    lateFees: { [key: string]: number }
+    lateFees: { [key: string]: number },
+    isPartialPayment: boolean = false,
+    partialPaymentAmount: string = "",
+    paymentSummaryData: PaymentSummary | null = null
   ) => {
     const totalTuitionFee = selectedFees.reduce(
       (sum, fee) => sum + fee.tutionFee,
@@ -283,25 +286,64 @@ Falcon House School Administration
       (sum, fee) => sum + fee,
       0
     );
+
+    // For partial payment, use the actual amount paid
     const grandTotal =
+      isPartialPayment && partialPaymentAmount
+        ? parseFloat(partialPaymentAmount)
+        : totalTuitionFee +
+          totalExamFee +
+          totalMiscFee +
+          totalLateFees -
+          totalDiscount;
+
+    const totalOutstanding =
       totalTuitionFee +
       totalExamFee +
       totalMiscFee +
       totalLateFees -
       totalDiscount;
+    const remainingBalance = isPartialPayment
+      ? totalOutstanding - grandTotal
+      : 0;
 
     const monthsString = selectedFees
       .map((fee) => `${fee.month} ${fee.year}`)
       .join(", ");
 
     const reciptId = Math.random().toString(36).substr(2, 9).toUpperCase();
+
+    // Generate partial payment breakdown HTML
+    const partialPaymentBreakdownHTML =
+      isPartialPayment && paymentSummaryData
+        ? `
+    <div style="margin-top: 2mm; padding: 2mm; background-color: #fffbeb; border: 1px solid #fbbf24; border-radius: 1mm;">
+      <p style="font-size: 11pt; font-weight: bold; margin-bottom: 1mm;">Payment Allocation:</p>
+      ${paymentSummaryData.breakdown
+        .map(
+          (item) => `
+        <div style="font-size: 10pt; margin-bottom: 0.5mm;">
+          <span>${item.month} ${item.year}:</span>
+          <span style="float: right;">Rs. ${item.paymentAmount.toLocaleString()} ${
+            item.status === "paid" ? "(Full)" : "(Partial)"
+          }</span>
+        </div>
+      `
+        )
+        .join("")}
+    </div>
+  `
+        : "";
+
     return `
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Fee Payment Receipt - 4 Per Page</title>
+    <title>Fee Payment Receipt - ${
+      isPartialPayment ? "Partial Payment" : "Full Payment"
+    }</title>
     <style>
-        /* Reset margins and ensure exact A4 size */
+        /* Your existing styles remain the same */
         * {
             margin: 0;
             padding: 0;
@@ -315,9 +357,9 @@ Falcon House School Administration
         
         body {
             font-family: Arial, sans-serif;
-            width: 210mm;
-            height: 297mm;
-            font-size: 7pt;
+            width: 205mm;
+            height: 280mm;
+            font-size: 14pt;
             position: relative;
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -326,8 +368,8 @@ Falcon House School Administration
         }
 
         .receipt-container {
-            width: 105mm; /* Half A4 width */
-            height: 148.5mm; /* Half A4 height */
+            width: 105mm;
+            height: 140mm;
             padding: 3mm;
             position: relative;
             border: 1px dashed #999;
@@ -345,19 +387,34 @@ Falcon House School Administration
         }
         
         .header h1 {
-            font-size: 9pt;
+            font-size: 17pt;
             margin-bottom: 0.5mm;
             font-weight: bold;
         }
         
         .header h2 {
-            font-size: 7pt;
+            font-size: 14pt;
             font-weight: normal;
         }
         
+        .payment-type-badge {
+            display: inline-block;
+            padding: 1mm 2mm;
+            border-radius: 1mm;
+            font-size: 11pt;
+            font-weight: bold;
+            margin-top: 1mm;
+        }
+        
+        .payment-info-0 {
+            gap: 0.5mm;
+            margin-bottom: 2mm;
+            flex-shrink: 0;
+        }
+
         .payment-info {
             display: grid;
-             grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 0.5mm;
             margin-bottom: 2mm;
             flex-shrink: 0;
@@ -366,7 +423,7 @@ Falcon House School Administration
         .payment-info p {
             margin: 0;
             line-height: 1.1;
-            font-size: 6pt;
+            font-size: 13pt;
         }
         
         .months-paid {
@@ -375,7 +432,7 @@ Falcon House School Administration
             background-color: #f8f9fa;
             border: 1px solid #ddd;
             border-radius: 1mm;
-            font-size: 6pt;
+            font-size: 12pt;
             flex-shrink: 0;
         }
         
@@ -383,7 +440,7 @@ Falcon House School Administration
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 1mm;
-            font-size: 5pt;
+            font-size: 11pt;
             flex: 1;
         }
         
@@ -398,33 +455,35 @@ Falcon House School Administration
         .fee-details th {
             background-color: #f2f2f2;
             font-weight: bold;
-            font-size: 5pt;
+            font-size: 11pt;
         }
         
         .amount-column {
             text-align: right !important;
-            width: 18mm;
+            width: 22mm;
         }
         
         .grand-total {
             font-weight: bold;
-            font-size: 6pt;
+            font-size: 12pt;
             background-color: #e9ecef;
         }
         
+        .remaining-balance {
+            font-weight: bold;
+        }
+        
         .footer {
-            // position: absolute;
             bottom: 3mm;
             left: 3mm;
             right: 3mm;
             text-align: center;
-            font-size: 4pt;
+            font-size: 11pt;
             color: #666;
             border-top: 0.5pt solid #ddd;
             padding-top: 0.5mm;
         }
 
-        /* Print-specific styles */
         @media print {
             body {
                 -webkit-print-color-adjust: exact;
@@ -434,23 +493,28 @@ Falcon House School Administration
     </style>
 </head>
 <body>
-    <!-- Student 1 - Parents Receipt (Top Left) -->
+    <!-- Parents Receipt (Top Left) -->
     <div class="receipt-container">
         <div class="header">
             <h1>FALCON House School</h1>
             <h2>Fee Payment Receipt (Parents)</h2>
+            <div class="payment-type-badge">${
+              isPartialPayment ? "PARTIAL PAYMENT" : "FULL PAYMENT"
+            }</div>
         </div>
         
-        <div class="payment-info">
-            <p><strong>Student:</strong> ${
+        <div class="payment-info-0">
+            <p><strong>Student name:</strong> ${
               selectedFees[0].studentId.studentName
             }</p>
-            <p><strong>Roll:</strong> ${
-              selectedFees[0].studentId.rollNumber
-            }</p>
-            <p><strong>Father:</strong> ${
+            <p><strong>Father name:</strong> ${
               selectedFees[0].studentId.fatherName
             }</p>
+              </div>
+              <div class="payment-info">
+              <p><strong>Reg No:</strong> ${
+                selectedFees[0].studentId.rollNumber
+              }</p>
             <p><strong>Class:</strong> ${selectedFees[0].studentId.class}-${
       selectedFees[0].studentId.section
     }</p>
@@ -467,6 +531,23 @@ Falcon House School Administration
                 <th>Description</th>
                 <th class="amount-column">Amount</th>
             </tr>
+            ${
+              isPartialPayment
+                ? `
+            <tr>
+                <td>Tuition Fee</td>
+                <td class="amount-column">${totalOutstanding.toLocaleString()}</td>
+            </tr>
+            <tr class="grand-total">
+                <td>Amount Paid</td>
+                <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
+            </tr>
+            <tr class="remaining-balance">
+                <td>Remaining Balance</td>
+                <td class="amount-column">Rs. ${remainingBalance.toLocaleString()}</td>
+            </tr>
+            `
+                : `
             <tr>
                 <td>Tuition Fee</td>
                 <td class="amount-column">${totalTuitionFee.toLocaleString()}</td>
@@ -489,43 +570,44 @@ Falcon House School Administration
             `
                 : ""
             }
-            ${
-              totalDiscount > 0
-                ? `
-            <tr>
-                <td>Discount</td>
-                <td class="amount-column">-${totalDiscount.toLocaleString()}</td>
-            </tr>
-            `
-                : ""
-            }
             <tr class="grand-total">
                 <td>Total Paid</td>
                 <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
             </tr>
-        </table> 
+            `
+            }
+        </table>
+        
+        ${isPartialPayment ? partialPaymentBreakdownHTML : ""}
 
         <div class="footer">
-            <p>This is a computer generated receipt. Thank you for your payment.</p>
+            <p>This is a computer generated ${
+              isPartialPayment ? "partial payment" : ""
+            } receipt. Thank you for your payment.</p>
         </div>
     </div>
 
-    <!-- Student 1 - Admin Receipt (Top Right) -->
+    <!-- Admin Receipt (Top Right) -->
     <div class="receipt-container">
         <div class="header">
-                    <h1>FALCON House School</h1>
+            <h1>FALCON House School</h1>
             <h2>Fee Payment Receipt (Admin)</h2>
+            <div class="payment-type-badge">${
+              isPartialPayment ? "PARTIAL PAYMENT" : "FULL PAYMENT"
+            }</div>
         </div>
         
-        <div class="payment-info">
-            <p><strong>Student:</strong> ${
+        <div class="payment-info-0">
+            <p><strong>Student name:</strong> ${
               selectedFees[0].studentId.studentName
             }</p>
-            <p><strong>Roll:</strong> ${
+               <p><strong>Father name:</strong> ${
+                 selectedFees[0].studentId.fatherName
+               }</p>
+            </div>
+            <div class="payment-info">
+            <p><strong>Reg No:</strong> ${
               selectedFees[0].studentId.rollNumber
-            }</p>
-            <p><strong>Father:</strong> ${
-              selectedFees[0].studentId.fatherName
             }</p>
             <p><strong>Class:</strong> ${selectedFees[0].studentId.class}-${
       selectedFees[0].studentId.section
@@ -543,6 +625,23 @@ Falcon House School Administration
                 <th>Description</th>
                 <th class="amount-column">Amount</th>
             </tr>
+            ${
+              isPartialPayment
+                ? `
+            <tr>
+                <td>Tuition Fee</td>
+                <td class="amount-column">${totalOutstanding.toLocaleString()}</td>
+            </tr>
+            <tr class="grand-total">
+                <td>Amount Paid</td>
+                <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
+            </tr>
+            <tr class="remaining-balance">
+                <td>Remaining Balance</td>
+                <td class="amount-column">Rs. ${remainingBalance.toLocaleString()}</td>
+            </tr>
+            `
+                : `
             <tr>
                 <td>Tuition Fee</td>
                 <td class="amount-column">${totalTuitionFee.toLocaleString()}</td>
@@ -565,33 +664,245 @@ Falcon House School Administration
             `
                 : ""
             }
-            ${
-              totalDiscount > 0
-                ? `
-            <tr>
-                <td>Discount</td>
-                <td class="amount-column">-${totalDiscount.toLocaleString()}</td>
-            </tr>
-            `
-                : ""
-            }
             <tr class="grand-total">
                 <td>Total Paid</td>
                 <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
             </tr>
-        </table> 
+            `
+            }
+        </table>
+        
+        ${isPartialPayment ? partialPaymentBreakdownHTML : ""}
 
         <div class="footer">
-            <p>This is a computer generated receipt. Thank you for your payment.</p>
+            <p>This is a computer generated ${
+              isPartialPayment ? "partial payment" : ""
+            } receipt. Thank you for your payment.</p>
         </div>
     </div>   
 </body>
 </html>
-
   `;
   };
 
-  const printPaymentReceipt = () => {
+  const generateThermalFeeChallanHTML = (
+    selectedFees: FeeChallan[],
+    lateFees: { [key: string]: number },
+    isPartialPayment: boolean = false,
+    partialPaymentAmount: string = "",
+    paymentSummaryData: PaymentSummary | null = null
+  ) => {
+    const totalTuitionFee = selectedFees.reduce(
+      (sum, fee) => sum + fee.tutionFee,
+      0
+    );
+    const totalExamFee = selectedFees.reduce(
+      (sum, fee) => sum + fee.examFee,
+      0
+    );
+    const totalMiscFee = selectedFees.reduce(
+      (sum, fee) => sum + fee.miscFee,
+      0
+    );
+    const totalDiscount = selectedFees.reduce(
+      (sum, fee) => sum + fee.discount,
+      0
+    );
+    const totalLateFees = Object.values(lateFees).reduce(
+      (sum, fee) => sum + fee,
+      0
+    );
+
+    const grandTotal =
+      isPartialPayment && partialPaymentAmount
+        ? parseFloat(partialPaymentAmount)
+        : totalTuitionFee +
+          totalExamFee +
+          totalMiscFee +
+          totalLateFees -
+          totalDiscount;
+
+    const totalOutstanding =
+      totalTuitionFee +
+      totalExamFee +
+      totalMiscFee +
+      totalLateFees -
+      totalDiscount;
+    const remainingBalance = isPartialPayment
+      ? totalOutstanding - grandTotal
+      : 0;
+
+    const monthsString = selectedFees
+      .map((fee) => `${fee.month} ${fee.year}`)
+      .join(", ");
+    const reciptId = Math.random().toString(36).substr(2, 9).toUpperCase();
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fee Receipt - ${
+    isPartialPayment ? "Partial Payment" : "Full Payment"
+  }</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      width: 80mm;
+      padding: 5px;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 1px dashed #000;
+      margin-bottom: 5px;
+    }
+    .header h1 {
+      font-size: 15px;
+      margin-bottom: 2px;
+    }
+    .header h2 {
+      font-size: 13px;
+      font-weight: normal;
+    }
+    .payment-type {
+      font-size: 12px;
+      font-weight: bold;
+      padding: 2px;
+      margin: 3px 0;
+      border: 1px solid #000;
+    }
+    .payment-info {
+      margin-bottom: 5px;
+    }
+    .payment-info p {
+      margin: 2px 0;
+      font-size: 12px;
+    }
+    .months-paid {
+      margin: 5px 0;
+      padding: 3px;
+      border: 1px dashed #333;
+      font-size: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+    th, td {
+      border-bottom: 1px dashed #000;
+      padding: 2px 0;
+    }
+    th { text-align: left; }
+    td.amount { text-align: right; }
+    .grand-total {
+      font-weight: bold;
+      border-top: 1px solid #000;
+      padding-top: 3px;
+    }
+    .remaining {
+      font-weight: bold;
+      background-color: #f0f0f0;
+    }
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      margin-top: 5px;
+      border-top: 1px dashed #000;
+      padding-top: 3px;
+    }
+    @media print {
+      body { margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>FALCON House School</h1>
+    <h2>Fee Receipt (Parent Copy)</h2>
+    ${
+      isPartialPayment
+        ? '<div class="payment-type">*** PARTIAL PAYMENT ***</div>'
+        : ""
+    }
+  </div>
+
+  <div class="payment-info">
+    <p><strong>Student name:</strong> ${
+      selectedFees[0].studentId.studentName
+    }</p>
+    <p><strong>Father name:</strong> ${selectedFees[0].studentId.fatherName}</p>
+    <p><strong>Reg No:</strong> ${selectedFees[0].studentId.rollNumber}</p>
+    <p><strong>Class:</strong> ${selectedFees[0].studentId.class}-${
+      selectedFees[0].studentId.section
+    }</p>
+    <p><strong>Receipt:</strong> ${reciptId}</p>
+    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+  </div>
+
+  <div class="months-paid">
+    <strong>Months:</strong> ${monthsString}
+  </div>
+
+  <table>
+    <tr><th>Description</th><th class="amount">Amount</th></tr>
+    ${
+      isPartialPayment
+        ? `
+    <tr><td>Tuition Fee</td><td class="amount">${totalOutstanding.toLocaleString()}</td></tr>
+    <tr class="grand-total"><td>Amount Paid</td><td class="amount">Rs. ${grandTotal.toLocaleString()}</td></tr>
+    <tr class="remaining"><td>Remaining Balance</td><td class="amount">Rs. ${remainingBalance.toLocaleString()}</td></tr>
+    `
+        : `
+    <tr><td>Tuition Fee</td><td class="amount">${totalTuitionFee.toLocaleString()}</td></tr>
+    <tr><td>Exam Fee</td><td class="amount">${totalExamFee.toLocaleString()}</td></tr>
+    <tr><td>Misc Fee</td><td class="amount">${totalMiscFee.toLocaleString()}</td></tr>
+    ${
+      totalLateFees > 0
+        ? `<tr><td>Late Fee</td><td class="amount">${totalLateFees.toLocaleString()}</td></tr>`
+        : ""
+    }
+    <tr class="grand-total"><td>Total Paid</td><td class="amount">Rs. ${grandTotal.toLocaleString()}</td></tr>
+    `
+    }
+  </table>
+
+  ${
+    isPartialPayment && paymentSummaryData
+      ? `
+  <div style="margin-top: 5px; padding: 3px; border: 1px dashed #000;">
+    <strong>Payment Allocation:</strong>
+    ${paymentSummaryData.breakdown
+      .map(
+        (item) => `
+      <div style="font-size: 11px;">
+        ${item.month} ${
+          item.year
+        }: Rs. ${item.paymentAmount.toLocaleString()} ${
+          item.status === "paid" ? "✓" : "(P)"
+        }
+      </div>
+    `
+      )
+      .join("")}
+  </div>
+  `
+      : ""
+  }
+
+  <div class="footer">
+    <p>This is a computer generated ${
+      isPartialPayment ? "partial payment" : ""
+    } receipt.</p>
+  </div>
+</body>
+</html>
+  `;
+  };
+
+  const printPaymentReceipt = (option: string) => {
     const selectedFees = pendingFees.filter((fee) =>
       selectedPendingFees.includes(fee.id)
     );
@@ -601,7 +912,22 @@ Falcon House School Administration
       return;
     }
 
-    const receiptContent = generateFeeChallanHTML(selectedFees, lateFees);
+    const receiptContent =
+      option == "termal"
+        ? generateThermalFeeChallanHTML(
+            selectedFees,
+            lateFees,
+            partialPaymentMode,
+            partialAmount,
+            paymentSummary
+          )
+        : generateFeeChallanHTML(
+            selectedFees,
+            lateFees,
+            partialPaymentMode,
+            partialAmount,
+            paymentSummary
+          );
 
     // Create a new window for printing
     const printWindow = window.open("", "_blank");
@@ -1563,10 +1889,20 @@ Falcon House School Administration
                       </span>
                     )}
                   </Button>
+                  <Button
+                    onClick={() => printPaymentReceipt("termal")}
+                    variant="outline"
+                    className="w-full h-12 text-sm"
+                    size="lg"
+                    disabled={selectedPendingFees.length === 0}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Print Thermal
+                  </Button>
 
                   <div className="grid grid-cols-2 gap-3">
                     <Button
-                      onClick={printPaymentReceipt}
+                      onClick={() => printPaymentReceipt("regular")}
                       variant="outline"
                       className="h-12 text-sm"
                       size="lg"
@@ -1602,36 +1938,51 @@ Falcon House School Administration
 
                 {/* Tablet View - 2 rows */}
                 <div className="hidden md:flex lg:flex flex-col gap-3">
-                  <Button
-                    onClick={submitFeePayment}
-                    className="w-full h-12 text-sm"
-                    size="lg"
-                    disabled={selectedPendingFees.length === 0}
-                  >
-                    <Receipt className="h-4 w-4 mr-2 flex-shrink-0" />
-                    <span className="flex-1 truncate">
-                      Submit Payment for {selectedPendingFees.length} Challan(s)
-                    </span>
-                    {selectedPendingFees.length > 0 && (
-                      <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-sm font-bold flex-shrink-0">
-                        Rs.{" "}
-                        {pendingFees
-                          .filter((fee) => selectedPendingFees.includes(fee.id))
-                          .reduce(
-                            (sum, fee) =>
-                              sum +
-                              fee.remainingBalance +
-                              (lateFees[fee.id] || 0),
-                            0
-                          )
-                          .toLocaleString()}
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={submitFeePayment}
+                      className=" flex-1 h-11 text-sm"
+                      size="lg"
+                      disabled={selectedPendingFees.length === 0}
+                    >
+                      <Receipt className="h-4 w-4 mr-2 flex-shrink-0" />
+                      <span className="flex-1 truncate">
+                        Submit Payment for {selectedPendingFees.length}{" "}
+                        Challan(s)
                       </span>
-                    )}
-                  </Button>
+                      {selectedPendingFees.length > 0 && (
+                        <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-sm font-bold flex-shrink-0">
+                          Rs.{" "}
+                          {pendingFees
+                            .filter((fee) =>
+                              selectedPendingFees.includes(fee.id)
+                            )
+                            .reduce(
+                              (sum, fee) =>
+                                sum +
+                                fee.remainingBalance +
+                                (lateFees[fee.id] || 0),
+                              0
+                            )
+                            .toLocaleString()}
+                        </span>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={() => printPaymentReceipt("termal")}
+                      variant="outline"
+                      className="flex-1 h-11 text-sm"
+                      size="lg"
+                      disabled={selectedPendingFees.length === 0}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Print Thermal Receipt
+                    </Button>
+                  </div>
 
                   <div className="flex gap-3">
                     <Button
-                      onClick={printPaymentReceipt}
+                      onClick={() => printPaymentReceipt("regular")}
                       variant="outline"
                       className="flex-1 h-11 text-sm"
                       size="lg"
