@@ -1938,10 +1938,10 @@ Falcon House School Administration
 
                 {/* Tablet View - 2 rows */}
                 <div className="hidden md:flex lg:flex flex-col gap-3">
-                  <div className="flex gap-3">
+                  <div className="lg:flex gap-3">
                     <Button
                       onClick={submitFeePayment}
-                      className=" flex-1 h-11 text-sm"
+                      className=" flex-1 h-11 text-sm md:mb-2 md:w-full"
                       size="lg"
                       disabled={selectedPendingFees.length === 0}
                     >
@@ -1971,7 +1971,7 @@ Falcon House School Administration
                     <Button
                       onClick={() => printPaymentReceipt("termal")}
                       variant="outline"
-                      className="flex-1 h-11 text-sm"
+                      className="flex-1 h-11 md:w-full text-sm"
                       size="lg"
                       disabled={selectedPendingFees.length === 0}
                     >
