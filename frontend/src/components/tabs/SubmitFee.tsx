@@ -749,7 +749,8 @@ Falcon House School Administration
     body {
       font-family: Arial, sans-serif;
       font-size: 13px;
-      width: 80mm;
+      width: 72mm;
+      height:150mm;
       padding: 5px;
     }
     .header {
@@ -758,15 +759,15 @@ Falcon House School Administration
       margin-bottom: 5px;
     }
     .header h1 {
-      font-size: 15px;
+      font-size: 17px;
       margin-bottom: 2px;
     }
     .header h2 {
-      font-size: 13px;
+      font-size: 15px;
       font-weight: normal;
     }
     .payment-type {
-      font-size: 12px;
+      font-size: 14px;
       font-weight: bold;
       padding: 2px;
       margin: 3px 0;
@@ -776,19 +777,20 @@ Falcon House School Administration
       margin-bottom: 5px;
     }
     .payment-info p {
-      margin: 2px 0;
-      font-size: 12px;
+      margin: 2px 1px;
+
+      font-size: 14px;
     }
     .months-paid {
       margin: 5px 0;
       padding: 3px;
       border: 1px dashed #333;
-      font-size: 12px;
+      font-size: 14px;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
+      font-size: 15px;
       margin-bottom: 5px;
     }
     th, td {
@@ -808,7 +810,7 @@ Falcon House School Administration
     }
     .footer {
       text-align: center;
-      font-size: 11px;
+      font-size: 13px;
       margin-top: 5px;
       border-top: 1px dashed #000;
       padding-top: 3px;
@@ -1938,10 +1940,10 @@ Falcon House School Administration
 
                 {/* Tablet View - 2 rows */}
                 <div className="hidden md:flex lg:flex flex-col gap-3">
-                  <div className="flex gap-3">
+                  <div className="lg:flex gap-3">
                     <Button
                       onClick={submitFeePayment}
-                      className=" flex-1 h-11 text-sm"
+                      className=" flex-1 h-11 text-sm md:mb-2 md:w-full"
                       size="lg"
                       disabled={selectedPendingFees.length === 0}
                     >
@@ -1971,7 +1973,7 @@ Falcon House School Administration
                     <Button
                       onClick={() => printPaymentReceipt("termal")}
                       variant="outline"
-                      className="flex-1 h-11 text-sm"
+                      className="flex-1 h-11 md:w-full text-sm"
                       size="lg"
                       disabled={selectedPendingFees.length === 0}
                     >
