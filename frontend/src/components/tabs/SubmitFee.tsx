@@ -223,7 +223,7 @@ Thank you for your payment! Here are the details:
 
 *Student Information:*
 • Name: ${student.studentName}
-• Roll Number: ${student.rollNumber}
+• Registration Number: ${student.rollNumber}
 • Class: ${student.class}-${student.section}
 
 *Payment Details:*
@@ -235,7 +235,6 @@ Thank you for your payment! Here are the details:
 • Exam Fee: Rs. ${totalExamFee.toLocaleString()}
 • Miscellaneous Fee: Rs. ${totalMiscFee.toLocaleString()}
 ${totalLateFees > 0 ? `• Late Fee: Rs. ${totalLateFees.toLocaleString()}` : ""}
-${totalDiscount > 0 ? `• Discount: Rs. -${totalDiscount.toLocaleString()}` : ""}
 
 *Total Paid: Rs. ${grandTotal.toLocaleString()}*
 
@@ -748,75 +747,98 @@ Falcon House School Administration
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: Arial, sans-serif;
-      font-size: 13px;
-      width: 72mm;
-      height:150mm;
-      padding: 5px;
+      font-size: 15px;
+      width: 70mm;
+      height: 150mm;
+      padding: 3mm;
+      margin: 0;
     }
     .header {
       text-align: center;
       border-bottom: 1px dashed #000;
-      margin-bottom: 5px;
+      margin-bottom: 3mm;
+      padding-bottom: 2mm;
     }
     .header h1 {
-      font-size: 17px;
+      font-size: 18px;
       margin-bottom: 2px;
     }
     .header h2 {
-      font-size: 15px;
+      font-size: 16px;
       font-weight: normal;
     }
     .payment-type {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: bold;
       padding: 2px;
-      margin: 3px 0;
+      margin: 2mm 0;
       border: 1px solid #000;
+      text-align: center;
     }
     .payment-info {
-      margin-bottom: 5px;
+      margin-bottom: 3mm;
     }
     .payment-info p {
-      margin: 2px 1px;
-
-      font-size: 14px;
+      margin: 1.5mm 0;
+      font-size: 15px;
+      line-height: 1.3;
     }
     .months-paid {
-      margin: 5px 0;
-      padding: 3px;
+      margin: 3mm 0;
+      padding: 2mm;
       border: 1px dashed #333;
-      font-size: 14px;
+      font-size: 15px;
     }
     table {
       width: 100%;
       border-collapse: collapse;
       font-size: 15px;
-      margin-bottom: 5px;
+      margin-bottom: 3mm;
     }
     th, td {
       border-bottom: 1px dashed #000;
-      padding: 2px 0;
+      padding: 2mm 0;
     }
-    th { text-align: left; }
-    td.amount { text-align: right; }
+    th { 
+      text-align: left;
+      padding-right: 2mm;
+    }
+    td.amount { 
+      text-align: right;
+      white-space: nowrap;
+    }
     .grand-total {
       font-weight: bold;
       border-top: 1px solid #000;
-      padding-top: 3px;
+      padding-top: 2mm;
     }
     .remaining {
       font-weight: bold;
       background-color: #f0f0f0;
     }
+    .allocation {
+      margin-top: 3mm;
+      padding: 2mm;
+      border: 1px dashed #000;
+      font-size: 13px;
+    }
+    .allocation-item {
+      font-size: 13px;
+      line-height: 1.4;
+      margin: 1mm 0;
+    }
     .footer {
       text-align: center;
       font-size: 13px;
-      margin-top: 5px;
+      margin-top: 3mm;
       border-top: 1px dashed #000;
-      padding-top: 3px;
+      padding-top: 2mm;
     }
     @media print {
-      body { margin: 0; }
+      body { 
+        margin: 0;
+        padding: 3mm;
+      }
     }
   </style>
 </head>
@@ -874,12 +896,12 @@ Falcon House School Administration
   ${
     isPartialPayment && paymentSummaryData
       ? `
-  <div style="margin-top: 5px; padding: 3px; border: 1px dashed #000;">
+  <div class="allocation">
     <strong>Payment Allocation:</strong>
     ${paymentSummaryData.breakdown
       .map(
         (item) => `
-      <div style="font-size: 11px;">
+      <div class="allocation-item">
         ${item.month} ${
           item.year
         }: Rs. ${item.paymentAmount.toLocaleString()} ${
@@ -1169,7 +1191,7 @@ Thank you for your partial payment!
 
 *Student Information:*
 • Name: ${student.studentName}
-• Roll Number: ${student.rollNumber}
+• Registration Number: ${student.rollNumber}
 • Class: ${student.class}-${student.section}
 
 *Payment Details:*
