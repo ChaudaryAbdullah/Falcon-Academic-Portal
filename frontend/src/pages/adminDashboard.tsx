@@ -19,6 +19,7 @@ import axios from "axios";
 import { Toaster } from "sonner";
 import FeeReports from "../components/FeeReports";
 import { PaperFundManagement } from "../components/PaperFundManagement";
+import ResultsManagement from "../components/ResultManagement";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -116,6 +117,66 @@ interface paperFundChallan {
   sentToWhatsApp: boolean;
   paidDate?: string;
 }
+interface Subject {
+  _id: string;
+  subjectName: string;
+  subjectCode: string;
+  totalMarks: number;
+  passingMarks: number;
+  classes: string[];
+  isActive: boolean;
+}
+
+interface Exam {
+  _id: string;
+  examName: string;
+  examType: string;
+  academicYear: string;
+  startDate: string;
+  endDate: string;
+  classes: string[];
+  status: "scheduled" | "ongoing" | "completed" | "cancelled";
+  isActive: boolean;
+}
+
+interface Result {
+  _id: string;
+  studentId: {
+    _id: string;
+    studentName: string;
+    fatherName: string;
+    rollNumber: string;
+    class: string;
+    section: string;
+  };
+  examId: {
+    _id: string;
+    examName: string;
+    examType: string;
+    academicYear: string;
+  };
+  class: string;
+  section: string;
+  subjects: {
+    subjectId: {
+      _id: string;
+      subjectName: string;
+      subjectCode: string;
+    };
+    totalMarks: number;
+    obtainedMarks: number;
+    passingMarks: number;
+    grade: string;
+    remarks: string;
+  }[];
+  totalMarks: number;
+  totalObtainedMarks: number;
+  percentage: number;
+  grade: string;
+  result: "Pass" | "Fail" | "Pending";
+  position?: number;
+  isPublished: boolean;
+}
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -127,8 +188,13 @@ export default function AdminDashboard() {
   const [paperFundChallans, setPaperFundChallans] = useState<
     paperFundChallan[]
   >([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [results, setResults] = useState<Result[]>([]);
+
   useEffect(() => {
     const fetchStudents = async () => {
+      console.log(BACKEND);
       const res = await axios.get(`${BACKEND}/api/students`, {
         withCredentials: true,
       });
@@ -203,6 +269,35 @@ export default function AdminDashboard() {
     fetchPaperFund();
   }, []);
 
+  useEffect(() => {
+    const fetchResultsData = async () => {
+      try {
+        // Fetch subjects
+        const subjectsRes = await axios.get(`${BACKEND}/api/subjects`, {
+          params: { isActive: true },
+          withCredentials: true,
+        });
+        setSubjects(subjectsRes.data.data);
+
+        // Fetch exams
+        const examsRes = await axios.get(`${BACKEND}/api/exams`, {
+          params: { isActive: true },
+          withCredentials: true,
+        });
+        setExams(examsRes.data.data);
+
+        // Fetch results
+        const resultsRes = await axios.get(`${BACKEND}/api/results`, {
+          withCredentials: true,
+        });
+        setResults(resultsRes.data.data);
+      } catch (error) {
+        console.error("Error fetching results data:", error);
+      }
+    };
+    fetchResultsData();
+  }, []);
+
   const renderContent = () => {
     switch (activeTab) {
       case "students":
@@ -244,6 +339,18 @@ export default function AdminDashboard() {
         return <StudentDiscount students={students} />;
       case "fee-reports":
         return <FeeReports students={students} />;
+      case "results":
+        return (
+          <ResultsManagement
+            students={students}
+            subjects={subjects}
+            setSubjects={setSubjects}
+            exams={exams}
+            setExams={setExams}
+            results={results}
+            setResults={setResults}
+          />
+        );
       default:
         return (
           <div className="space-y-6  p-4 sm:p-6 pt-20 md:pt-6 relative z-10">

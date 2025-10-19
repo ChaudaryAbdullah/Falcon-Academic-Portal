@@ -596,7 +596,6 @@ export function StudentManagement({
                       onChange={(e) =>
                         handleInputChange("bform", e.target.value)
                       }
-                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -742,7 +741,6 @@ export function StudentManagement({
                       onChange={(e: { target: { value: string } }) =>
                         handleInputChange("fatherOccupation", e.target.value)
                       }
-                      required
                     />
                   </div>
 

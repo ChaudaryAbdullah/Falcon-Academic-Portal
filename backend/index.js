@@ -11,6 +11,9 @@ import teacherRoutes from "./routes/teacherRoutes.js";
 import feeStructureRoutes from "./routes/feeStructureRoutes.js";
 import studentDiscountRoutes from "./routes/studentDiscountRoutes.js";
 import PaperFundRoutes from "./routes/paperFundRoutes.js";
+import resultRoutes from "./routes/resultRoutes.js";
+import subjectRoutes from "./routes/subjectRoutes.js";
+import examRoutes from "./routes/examRoutes.js";
 
 dotenv.config();
 const FRONTEND = process.env.FRONTEND;
@@ -76,6 +79,9 @@ app.use("/api/teachers", teacherRoutes);
 app.use("/api/fee-structures", feeStructureRoutes);
 app.use("/api/student-discounts", studentDiscountRoutes);
 app.use("/api/paperFund", PaperFundRoutes);
+app.use("/api/results", resultRoutes);
+app.use("/api/subjects", subjectRoutes);
+app.use("/api/exams", examRoutes);
 
 app.get("/", (req, res) => {
   res.send("Welcome to Falcon Academic Portal API!");
