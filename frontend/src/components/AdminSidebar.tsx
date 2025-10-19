@@ -72,6 +72,11 @@ export default function AdminSidebar({
       label: "Paper Fund Management",
       value: "paperFund",
     },
+    {
+      icon: <GraduationCap className="w-4 h-4 mr-3" />,
+      label: "Results Management",
+      value: "results",
+    },
   ];
 
   // Enhanced screen size detection
