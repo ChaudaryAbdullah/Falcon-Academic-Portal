@@ -549,10 +549,10 @@ export default function ClassReports() {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button
             onClick={generateReport}
-            className="flex bg-blue-600 hover:bg-blue-500 items-center gap-2"
+            className="flex bg-blue-600 hover:bg-blue-500 items-center justify-center gap-2 w-full sm:w-auto"
             disabled={loading}
           >
             {loading ? (
@@ -565,7 +565,7 @@ export default function ClassReports() {
           <Button
             variant="outline"
             onClick={() => generatePDF("download")}
-            className="flex items-center gap-2 bg-transparent"
+            className="flex items-center justify-center gap-2 bg-transparent w-full sm:w-auto"
             disabled={reportData.length === 0}
           >
             <Download className="w-4 h-4" />
@@ -574,7 +574,7 @@ export default function ClassReports() {
           <Button
             variant="outline"
             onClick={() => generatePDF("print")}
-            className="flex items-center gap-2 bg-transparent"
+            className="flex items-center justify-center gap-2 bg-transparent w-full sm:w-auto"
             disabled={reportData.length === 0}
           >
             <Printer className="w-4 h-4" />
