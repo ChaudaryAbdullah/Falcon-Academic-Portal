@@ -16,11 +16,10 @@ import {
   getTopPerformers,
   deleteResult,
   bulkDeleteResults,
+  calculateResults,
 } from "../controllers/resultController.js";
 
 const router = express.Router();
-
-// IMPORTANT: Put specific routes BEFORE parameterized routes
 
 // Bulk operations (must come before /:id routes)
 router.post("/bulk", bulkCreateResults);
@@ -52,4 +51,5 @@ router.get("/:id", getResultById);
 router.put("/:id", updateResult);
 router.delete("/:id", deleteResult);
 
+router.post("/calculate", calculateResults);
 export default router;
