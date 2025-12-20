@@ -52,16 +52,7 @@ export const classes = [
   { value: "10", label: "Class 10" },
 ];
 
-export const sections = [
-  { value: "Red", label: "Red" },
-  { value: "Blue", label: "Blue" },
-  { value: "Pink", label: "Pink" },
-  { value: "Green", label: "Green" },
-  { value: "Yellow", label: "Yellow" },
-  { value: "White", label: "White" },
-];
-
-export const examTypes = ["1st Term", "Mid Term", "Final Term"];
+const examTypes = ["1st Term", "Mid Term", "Final Term"];
 
 interface Exam {
   _id: string;

@@ -57,7 +57,7 @@ interface ReportRecord {
 
 export const BACKEND = import.meta.env.VITE_BACKEND;
 
-export const months = [
+const months = [
   { value: "all", label: "All Months" },
   { value: "January", label: "January" },
   { value: "February", label: "February" },
@@ -73,7 +73,7 @@ export const months = [
   { value: "December", label: "December" },
 ];
 
-export const classes = [
+const classes = [
   { value: "Play", label: "Play" },
   { value: "Nursery", label: "Nursery" },
   { value: "Prep", label: "Prep" },
@@ -89,13 +89,14 @@ export const classes = [
   { value: "10", label: "Class 10" },
 ];
 
-export const sections = [
+const sections = [
   { value: "Red", label: "Red" },
   { value: "Blue", label: "Blue" },
   { value: "Pink", label: "Pink" },
   { value: "Green", label: "Green" },
   { value: "Yellow", label: "Yellow" },
   { value: "White", label: "White" },
+  { value: "Purple", label: "Purple" },
 ];
 
 export const generateYears = () => {
@@ -407,8 +408,8 @@ export default function ClassReports() {
     } else {
       try {
         // Open PDF in a new window and print
-        const pdfData = doc.output("bloburl");
-        const printWindow = window.open(pdfData as string);
+        const blobUrl = doc.output("bloburl");
+        const printWindow = window.open(blobUrl);
 
         if (printWindow) {
           printWindow.onload = () => {

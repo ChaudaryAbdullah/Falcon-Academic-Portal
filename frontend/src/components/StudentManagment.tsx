@@ -665,6 +665,7 @@ export function StudentManagement({
                       <option value="Green">Green</option>
                       <option value="Yellow">Yellow</option>
                       <option value="White">White</option>
+                      <option value="Purple">Purple</option>
                     </select>
                   </div>
 
