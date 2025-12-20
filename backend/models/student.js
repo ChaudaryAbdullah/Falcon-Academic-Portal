@@ -98,14 +98,25 @@ const studentSchema = mongoose.Schema(
   { timestamps: true }
 );
 
-// Auto-generate roll number atomically
+// ============ COMPOUND UNIQUE INDEX ============
+// Prevents duplicate entries with same DOB + Father CNIC combination
+// This means: Same father cannot have two children with the same date of birth
+studentSchema.index(
+  { dob: 1, fatherCnic: 1 },
+  {
+    unique: true,
+    name: "unique_dob_fatherCnic",
+    background: true, // Create index in background (won't block other operations)
+  }
+);
+
+// ============ PRE-SAVE MIDDLEWARE ============
 studentSchema.pre("save", async function (next) {
   try {
     if (this.isNew && !this.rollNumber) {
-      const year = new Date().getFullYear().toString().slice(-2); // e.g. "25"
+      const year = new Date().getFullYear().toString().slice(-2);
       const prefix = `${year}-F`;
 
-      // Atomic increment in Counter collection
       const counter = await Counter.findOneAndUpdate(
         { _id: prefix },
         { $inc: { seq: 1 } },
@@ -116,7 +127,6 @@ studentSchema.pre("save", async function (next) {
       this.rollNumber = `${prefix}-${nextNumber}`;
     }
 
-    // Hash password if modified or new
     if (this.isModified("password")) {
       const salt = await bcrypt.genSalt(10);
       this.password = await bcrypt.hash(this.password, salt);
@@ -128,14 +138,63 @@ studentSchema.pre("save", async function (next) {
   }
 });
 
+// ============ PRE-VALIDATE MIDDLEWARE (Optional - Better Error Messages) ============
+studentSchema.pre("validate", async function (next) {
+  // Only check on new documents or when dob/fatherCnic is modified
+  if (this.isNew || this.isModified("dob") || this.isModified("fatherCnic")) {
+    try {
+      const existingStudent = await mongoose.model("Student").findOne({
+        dob: this.dob,
+        fatherCnic: this.fatherCnic,
+        _id: { $ne: this._id }, // Exclude current document (for updates)
+      });
+
+      if (existingStudent) {
+        const error = new Error(
+          `A student with the same Date of Birth and Father's CNIC already exists. ` +
+            `Existing student: ${existingStudent.studentName} (Roll: ${existingStudent.rollNumber})`
+        );
+        error.name = "DuplicateStudentError";
+        error.code = 11000; // MongoDB duplicate key error code
+        return next(error);
+      }
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
+
 // Compare password method
 studentSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-// Create indexes manually (run this once)
-// studentSchema.index({ rollNumber: 1 }, { unique: true, sparse: false });
-// studentSchema.index({ bform: 1 }, { unique: true });
-// studentSchema.index({ email: 1 }, { unique: true });
+// ============ ERROR HANDLING FOR DUPLICATE KEY ============
+studentSchema.post("save", function (error, doc, next) {
+  if (error.name === "MongoServerError" && error.code === 11000) {
+    // Check which field caused the duplicate error
+    const keyPattern = error.keyPattern || {};
+
+    if (keyPattern.dob && keyPattern.fatherCnic) {
+      next(
+        new Error(
+          "A student with the same Date of Birth and Father's CNIC already exists. " +
+            "This could be a duplicate entry."
+        )
+      );
+    } else if (keyPattern.rollNumber) {
+      next(new Error("Roll number already exists."));
+    } else if (keyPattern.bform) {
+      next(new Error("B-Form number already exists."));
+    } else if (keyPattern.email) {
+      next(new Error("Email already exists."));
+    } else {
+      next(new Error("Duplicate entry detected."));
+    }
+  } else {
+    next(error);
+  }
+});
 
 export const Student = mongoose.model("Student", studentSchema);
