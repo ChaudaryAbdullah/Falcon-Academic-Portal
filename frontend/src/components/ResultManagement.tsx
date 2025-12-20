@@ -208,9 +208,7 @@ export default function ResultsManagement({
   setExams,
 }: ResultsManagementProps) {
   // Shared State
-  const [selectedExam, setSelectedExam] = useState("");
-  const [selectedClass, setSelectedClass] = useState("all");
-  const [selectedSection, setSelectedSection] = useState("all");
+
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("manage-subjects");
 
@@ -220,18 +218,6 @@ export default function ResultsManagement({
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [classStats, setClassStats] = useState<ClassStats | null>(null);
   const [topPerformers, setTopPerformers] = useState<any[]>([]);
-
-  // Shared Props for all tabs
-  const sharedProps = {
-    loading,
-    setLoading,
-    selectedExam,
-    setSelectedExam,
-    selectedClass,
-    setSelectedClass,
-    selectedSection,
-    setSelectedSection,
-  };
 
   return (
     <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">

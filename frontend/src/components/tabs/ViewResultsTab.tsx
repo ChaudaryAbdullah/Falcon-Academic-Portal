@@ -365,7 +365,7 @@ const generateResultCardHTML = (
   const academicYear =
     result.examId?.academicYear || new Date().getFullYear().toString();
   const groups = groupSubjectsByCode(result.subjects);
-
+  serialNumber = serialNumber || 1;
   // Generate subject rows
   let subjectRowsHTML = "";
   let rowIndex = 0;
@@ -1170,28 +1170,6 @@ export default function ViewResultsTab({
       toast.error(err.response?.data?.message || "Failed to publish results");
     } finally {
       setPublishing(false);
-    }
-  };
-
-  const openPrintWindow = (content: string, title: string) => {
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(content);
-      printWindow.document.close();
-      printWindow.document.title = title;
-
-      printWindow.onload = function () {
-        printWindow.print();
-        printWindow.onafterprint = function () {
-          printWindow.close();
-        };
-      };
-
-      toast.success(`Opening print dialog for ${title.toLowerCase()}`);
-    } else {
-      toast.error(
-        "Unable to open print window. Please check your browser settings."
-      );
     }
   };
 
