@@ -1268,7 +1268,7 @@ export default function ViewResultsTab({
     toast.info("Generating PDF... Please wait.");
 
     try {
-      const { jsPDF } = await import("jspdf");
+      const { default: jsPDF } = await import("jspdf");
       const html2canvas = (await import("html2canvas")).default;
 
       const pdf = new jsPDF({
