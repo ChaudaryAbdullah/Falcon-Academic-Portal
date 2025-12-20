@@ -76,6 +76,7 @@ const sections = [
   { value: "Green", label: "Green" },
   { value: "Yellow", label: "Yellow" },
   { value: "White", label: "White" },
+  { value: "Purple", label: "Purple" },
 ];
 
 // ==================== INTERFACES ====================
@@ -185,12 +186,6 @@ const getNextClass = (currentClass: string): string => {
   if (currentIndex === -1 || currentIndex === classOrder.length - 1)
     return currentClass;
   return classOrder[currentIndex + 1];
-};
-
-const getOrdinalSuffix = (n: number): string => {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return s[(v - 20) % 10] || s[v] || s[0];
 };
 
 // Calculate grade based on percentage
@@ -524,7 +519,7 @@ const generateResultCardHTML = (
         <div style="font-size: 12pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Needs Improvement</div>
         <div style="font-size: 9pt; margin: 8px 0; opacity: 0.9;">Don't give up! Work harder and you'll succeed!</div>
         <div style="background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; display: inline-block; margin-top: 5px;">
-          <span style="font-size: 10pt; font-weight: 600;">💪 Stay in: ${getClassLabel(
+          <span style="font-size: 10pt; font-weight: 600;"> Stay in: ${getClassLabel(
             result.class
           )}</span>
         </div>
@@ -585,7 +580,7 @@ const generateResultCardHTML = (
               <div style="width: auto; height: auto; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); overflow: hidden;">
                 <img src="${
                   SCHOOL_CONFIG.logo
-                }" alt="Logo" style="width: 60px; height: 60px; object-fit: contain;" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size: 28pt; color: #3b82f6;\\'>🏫</span>';" />
+                }" alt="Logo" style="width: auto; height: 100px; object-fit: contain;" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size: 28pt; color: #3b82f6;\\'>🏫</span>';" />
               </div>
               <div>
                 <h1 style="margin: 0; font-size: 20pt; font-weight: 800; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.2); letter-spacing: 0.5px;">
@@ -599,10 +594,10 @@ const generateResultCardHTML = (
             </div>
             
             <!-- Title -->
-            <div style="text-align: center; z-index: 1;">
+            <div style="text-align: center; z-index: 1; transform: translateX(-40px);">
               <div style="background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); padding: 10px 30px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2);">
                 <div style="font-size: 16pt; font-weight: 800; color: white; text-transform: uppercase; letter-spacing: 3px;">
-                  📋 Result Card
+                  📋 Performance Report
                 </div>
                 <div style="font-size: 10pt; color: rgba(255,255,255,0.9); margin-top: 4px; font-weight: 500;">
                   ${examName} — ${academicYear}
@@ -754,39 +749,14 @@ const generateResultCardHTML = (
                       result.grade
                     )};">${result.grade}</span>
                   </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #86efac; padding-top: 8px; margin-top: 4px;">
-                    <span style="font-size: 8pt; color: #166534;">Position</span>
-                    <span style="font-size: 14pt; font-weight: 800; color: #f59e0b;">
-                      ${
-                        result.position
-                          ? `${result.position}${getOrdinalSuffix(
-                              result.position
-                            )}`
-                          : "—"
-                      }
-                    </span>
-                  </div>
+            
                 </div>
               </div>
               
               <!-- Result Message -->
               ${resultMessageHTML}
               
-              <!-- Grading Scale -->
-              <div style="background: #f8fafc; border-radius: 10px; padding: 12px; border: 1px solid #e2e8f0; flex: 1;">
-                <h4 style="margin: 0 0 8px 0; font-size: 8pt; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                  📋 Grading Scale
-                </h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3px; font-size: 7pt;">
-                  <span style="color: #059669; font-weight: 600;">A+ : 90-100%</span>
-                  <span style="color: #10b981; font-weight: 600;">A : 80-89%</span>
-                  <span style="color: #3b82f6; font-weight: 600;">B : 70-79%</span>
-                  <span style="color: #8b5cf6; font-weight: 600;">C : 60-69%</span>
-                  <span style="color: #f59e0b; font-weight: 600;">D : 50-59%</span>
-                  <span style="color: #f97316; font-weight: 600;">E : 40-49%</span>
-                  <span style="color: #ef4444; font-weight: 600;">F : Below 40%</span>
-                </div>
-              </div>
+             
               
             </div>
           </div>

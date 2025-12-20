@@ -140,16 +140,17 @@ export const classes = [
   { value: "10", label: "Class 10" },
 ];
 
-export const sections = [
+ const sections = [
   { value: "Red", label: "Red" },
   { value: "Blue", label: "Blue" },
   { value: "Pink", label: "Pink" },
   { value: "Green", label: "Green" },
   { value: "Yellow", label: "Yellow" },
   { value: "White", label: "White" },
+  { value: "Purple", label: "Purple" },
 ];
 
-export const examTypes = ["1st Term", "Mid Term", "Final Term"];
+ 
 
 // ==================== HELPER FUNCTIONS (Export for use in other files) ====================
 

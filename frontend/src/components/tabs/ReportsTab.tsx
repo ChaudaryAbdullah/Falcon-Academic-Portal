@@ -60,6 +60,7 @@ const sections = [
   { value: "Green", label: "Green" },
   { value: "Yellow", label: "Yellow" },
   { value: "White", label: "White" },
+  { value: "Purple", label: "Purple" },
 ];
 
 interface ClassStats {
