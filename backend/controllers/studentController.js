@@ -1,11 +1,13 @@
 import { Student } from "../models/student.js";
 import bcrypt from "bcrypt";
 import multer from "multer";
+import path from "path";
 
 // Configure multer for handling file uploads
-const storage = multer.memoryStorage();
+const storage = multer.memoryStorage(); // Store files in memory as Buffer
 
 const fileFilter = (req, file, cb) => {
+  // Check if the file is an image
   if (file.mimetype.startsWith("image/")) {
     cb(null, true);
   } else {
@@ -21,54 +23,7 @@ export const upload = multer({
   fileFilter: fileFilter,
 });
 
-// ============ HELPER FUNCTION FOR DUPLICATE ERROR MESSAGES ============
-const getDuplicateErrorMessage = (error) => {
-  const keyPattern = error.keyPattern || {};
-  const keyValue = error.keyValue || {};
-
-  // Check for compound index (dob + fatherCnic)
-  if (keyPattern.dob && keyPattern.fatherCnic) {
-    return {
-      message:
-        "A student with the same Date of Birth and Father's CNIC already exists. " +
-        "This could be a duplicate entry. Please verify the student details.",
-      field: "dob_fatherCnic",
-      errorType: "DUPLICATE_STUDENT",
-    };
-  }
-
-  // Check for individual field duplicates
-  const field = Object.keys(keyPattern)[0];
-  const value = keyValue[field];
-
-  const fieldMessages = {
-    rollNumber: {
-      message: `Roll number '${value}' already exists.`,
-      field: "rollNumber",
-      errorType: "DUPLICATE_ROLL_NUMBER",
-    },
-    bform: {
-      message: `B-Form number '${value}' already exists. A student with this B-Form is already registered.`,
-      field: "bform",
-      errorType: "DUPLICATE_BFORM",
-    },
-    email: {
-      message: `Email '${value}' already exists. Please use a different email address.`,
-      field: "email",
-      errorType: "DUPLICATE_EMAIL",
-    },
-  };
-
-  return (
-    fieldMessages[field] || {
-      message: `${field} '${value}' already exists. Please use a different value.`,
-      field: field,
-      errorType: "DUPLICATE_KEY",
-    }
-  );
-};
-
-// ============ CREATE STUDENT ============
+// Create Student with Image Upload
 export const createStudent = async (req, res) => {
   try {
     // Handle empty email and password
@@ -103,11 +58,7 @@ export const createStudent = async (req, res) => {
       responseStudent.img.data = responseStudent.img.data.toString("base64");
     }
 
-    res.status(201).json({
-      success: true,
-      message: "Student created successfully",
-      data: responseStudent,
-    });
+    res.status(201).json({ success: true, data: responseStudent });
   } catch (error) {
     console.error("Error creating student:", error);
 
@@ -137,22 +88,16 @@ export const createStudent = async (req, res) => {
       });
     }
 
-    // Handle duplicate key error (including compound index)
+    // Duplicate key error
     if (error.code === 11000) {
-      const duplicateError = getDuplicateErrorMessage(error);
+      const field = Object.keys(error.keyPattern)[0];
+      const value = error.keyValue[field];
       return res.status(400).json({
         success: false,
-        ...duplicateError,
-      });
-    }
-
-    // Handle custom duplicate student error from pre-validate hook
-    if (error.name === "DuplicateStudentError") {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-        field: "dob_fatherCnic",
-        errorType: "DUPLICATE_STUDENT",
+        message: `${field} '${value}' already exists. Please use a different ${field}.`,
+        field,
+        value,
+        errorType: "DUPLICATE_KEY",
       });
     }
 
@@ -165,8 +110,7 @@ export const createStudent = async (req, res) => {
       }));
       return res.status(400).json({
         success: false,
-        message:
-          "Validation failed: " + errors.map((e) => e.message).join(", "),
+        message: "Validation failed",
         errors,
         errorType: "VALIDATION_ERROR",
       });
@@ -180,10 +124,10 @@ export const createStudent = async (req, res) => {
   }
 };
 
-// ============ GET ALL STUDENTS ============
+// Get All Students with Images
 export const getStudents = async (req, res) => {
   try {
-    const students = await Student.find().sort({ createdAt: -1 });
+    const students = await Student.find();
 
     // Convert image buffers to base64 for all students
     const studentsWithImages = students.map((student) => {
@@ -200,15 +144,14 @@ export const getStudents = async (req, res) => {
   }
 };
 
-// ============ GET SINGLE STUDENT ============
+// Get Single Student with Image
 export const getStudentById = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: "Student not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
     }
 
     // Convert image buffer to base64
@@ -223,15 +166,10 @@ export const getStudentById = async (req, res) => {
   }
 };
 
-// ============ UPDATE STUDENT ============
+// Update Student with Optional Image Upload
 export const updateStudent = async (req, res) => {
   try {
     let updateData = { ...req.body };
-
-    // Handle empty email
-    if (updateData.email === "" || updateData.email === null) {
-      updateData.email = undefined;
-    }
 
     // Handle image upload if a new image is provided
     if (req.file) {
@@ -242,12 +180,9 @@ export const updateStudent = async (req, res) => {
     }
 
     // If password is being updated, hash it before saving
-    if (updateData.password && updateData.password !== "") {
+    if (updateData.password) {
       const salt = await bcrypt.genSalt(10);
       updateData.password = await bcrypt.hash(updateData.password, salt);
-    } else {
-      // Don't update password if empty
-      delete updateData.password;
     }
 
     const student = await Student.findByIdAndUpdate(req.params.id, updateData, {
@@ -256,10 +191,9 @@ export const updateStudent = async (req, res) => {
     });
 
     if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: "Student not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
     }
 
     // Convert image buffer to base64 for response
@@ -268,14 +202,8 @@ export const updateStudent = async (req, res) => {
       responseStudent.img.data = responseStudent.img.data.toString("base64");
     }
 
-    res.status(200).json({
-      success: true,
-      message: "Student updated successfully",
-      data: responseStudent,
-    });
+    res.status(200).json({ success: true, data: responseStudent });
   } catch (error) {
-    console.error("Error updating student:", error);
-
     // Handle multer errors
     if (error instanceof multer.MulterError) {
       if (error.code === "LIMIT_FILE_SIZE") {
@@ -292,120 +220,52 @@ export const updateStudent = async (req, res) => {
       });
     }
 
-    // Handle duplicate key errors (including compound index)
+    // Handle duplicate key errors
     if (error.code === 11000) {
-      const duplicateError = getDuplicateErrorMessage(error);
+      const field = Object.keys(error.keyPattern)[0];
+      const value = error.keyValue[field];
       return res.status(400).json({
         success: false,
-        ...duplicateError,
+        message: `${field} '${value}' already exists. Please use a different ${field}.`,
+        field,
+        value,
+        errorType: "DUPLICATE_KEY",
       });
     }
 
-    // Validation error
-    if (error.name === "ValidationError") {
-      const errors = Object.values(error.errors).map((err) => ({
-        field: err.path,
-        message: err.message,
-        value: err.value,
-      }));
-      return res.status(400).json({
-        success: false,
-        message:
-          "Validation failed: " + errors.map((e) => e.message).join(", "),
-        errors,
-        errorType: "VALIDATION_ERROR",
-      });
-    }
-
-    res.status(400).json({
-      success: false,
-      message: error.message,
-      errorType: "UNKNOWN_ERROR",
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
-// ============ DELETE STUDENT ============
+// Delete Student
 export const deleteStudent = async (req, res) => {
   try {
     const student = await Student.findByIdAndDelete(req.params.id);
     if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: "Student not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
     }
-    res.status(200).json({
-      success: true,
-      message: "Student deleted successfully",
-    });
+    res
+      .status(200)
+      .json({ success: true, message: "Student deleted successfully" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ============ GET STUDENT IMAGE ============
+// Get Student Image by ID (optional endpoint for serving images directly)
 export const getStudentImage = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student || !student.img || !student.img.data) {
-      return res.status(404).json({
-        success: false,
-        message: "Image not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Image not found" });
     }
 
     res.set("Content-Type", student.img.contentType);
     res.send(student.img.data);
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// ============ CHECK FOR DUPLICATE (Optional - for frontend validation) ============
-export const checkDuplicate = async (req, res) => {
-  try {
-    const { dob, fatherCnic, studentId } = req.query;
-
-    if (!dob || !fatherCnic) {
-      return res.status(400).json({
-        success: false,
-        message: "DOB and Father CNIC are required",
-      });
-    }
-
-    const query = {
-      dob: new Date(dob),
-      fatherCnic: fatherCnic.trim(),
-    };
-
-    // Exclude current student if updating
-    if (studentId) {
-      query._id = { $ne: studentId };
-    }
-
-    const existingStudent = await Student.findOne(query).select(
-      "studentName rollNumber fatherName"
-    );
-
-    if (existingStudent) {
-      return res.status(200).json({
-        success: true,
-        isDuplicate: true,
-        message: `A student with the same DOB and Father's CNIC already exists: ${existingStudent.studentName} (Roll: ${existingStudent.rollNumber})`,
-        existingStudent: {
-          name: existingStudent.studentName,
-          rollNumber: existingStudent.rollNumber,
-          fatherName: existingStudent.fatherName,
-        },
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      isDuplicate: false,
-      message: "No duplicate found",
-    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
