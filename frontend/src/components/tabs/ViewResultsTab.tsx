@@ -376,17 +376,17 @@ const generateResultCardHTML = (
   const isCompact = totalRows > 8;
   const isVeryCompact = totalRows > 12;
 
-  const tableFontSize = isVeryCompact ? "7pt" : isCompact ? "8pt" : "9pt";
+  const tableFontSize = isVeryCompact ? "8pt" : isCompact ? "11pt" : "12pt";
   const cellPadding = isVeryCompact
-    ? "4px 6px"
+    ? "5px 7px"
     : isCompact
-    ? "5px 8px"
-    : "6px 10px";
+    ? "9px 12px"
+    : "10px 14px";
   const headerPadding = isVeryCompact
-    ? "6px 6px"
+    ? "7px 7px"
     : isCompact
-    ? "8px 8px"
-    : "10px 10px";
+    ? "12px 12px"
+    : "14px 14px";
 
   // Generate subject rows
   let subjectRowsHTML = "";
