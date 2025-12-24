@@ -128,7 +128,7 @@ interface Result {
     rollNumber: string;
     class: string;
     section: string;
-    photo?: string;
+    img?: string;
   };
   examId: {
     _id: string;
@@ -361,13 +361,39 @@ const generateResultCardHTML = (
     result.examId?.academicYear || new Date().getFullYear().toString();
   const groups = groupSubjectsByCode(result.subjects);
   serialNumber = serialNumber || 1;
+
+  // Calculate total rows for dynamic sizing
+  let totalRows = 0;
+  groups.forEach((group) => {
+    if (group.isGrouped) {
+      totalRows += group.subjects.length + 1; // subjects + total row
+    } else {
+      totalRows += 1;
+    }
+  });
+
+  // Dynamic font sizing based on number of rows
+  const isCompact = totalRows > 8;
+  const isVeryCompact = totalRows > 12;
+
+  const tableFontSize = isVeryCompact ? "7pt" : isCompact ? "8pt" : "9pt";
+  const cellPadding = isVeryCompact
+    ? "4px 6px"
+    : isCompact
+    ? "5px 8px"
+    : "6px 10px";
+  const headerPadding = isVeryCompact
+    ? "6px 6px"
+    : isCompact
+    ? "8px 8px"
+    : "10px 10px";
+
   // Generate subject rows
   let subjectRowsHTML = "";
   let rowIndex = 0;
 
   groups.forEach((group) => {
     if (!group.isGrouped) {
-      // Single subject
       const s = group.subjects[0];
       const pct =
         s.totalMarks > 0
@@ -380,33 +406,37 @@ const generateResultCardHTML = (
 
       subjectRowsHTML += `
         <tr style="background-color: ${bgColor};">
-          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 500; color: #1e293b;">
+          <td style="padding: ${cellPadding}; border-bottom: 1px solid #e2e8f0; font-weight: 500; color: #1e293b; font-size: ${tableFontSize};">
             ${s.subjectId?.subjectName || group.code}
           </td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; color: #64748b;">
+          <td style="padding: ${cellPadding}; border-bottom: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: ${tableFontSize};">
             ${s.totalMarks}
           </td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; font-weight: 700; color: #0f172a; font-size: 11pt;">
+          <td style="padding: ${cellPadding}; border-bottom: 1px solid #e2e8f0; text-align: center; font-weight: 700; color: #0f172a; font-size: ${tableFontSize};">
             ${s.obtainedMarks?.toFixed(1) ?? "-"}
           </td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; color: #64748b;">
+          <td style="padding: ${cellPadding}; border-bottom: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: ${tableFontSize};">
             ${pct}%
           </td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+          <td style="padding: ${cellPadding}; border-bottom: 1px solid #e2e8f0; text-align: center;">
             <span style="background-color: ${getGradeColor(
               displayGrade
             )}15; color: ${getGradeColor(
         displayGrade
-      )}; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 9pt;">
+      )}; padding: 1px 6px; border-radius: 3px; font-weight: 600; font-size: ${
+        isVeryCompact ? "7pt" : "8pt"
+      };">
               ${displayGrade}
             </span>
           </td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+          <td style="padding: ${cellPadding}; border-bottom: 1px solid #e2e8f0; text-align: center;">
             <span style="background-color: ${
               isPassed ? "#dcfce7" : "#fee2e2"
             }; color: ${
         isPassed ? "#166534" : "#991b1b"
-      }; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 8pt; text-transform: uppercase;">
+      }; padding: 2px 6px; border-radius: 10px; font-weight: 600; font-size: ${
+        isVeryCompact ? "6pt" : "7pt"
+      }; text-transform: uppercase;">
               ${isPassed ? "✓ Pass" : "✗ Fail"}
             </span>
           </td>
@@ -424,35 +454,57 @@ const generateResultCardHTML = (
 
         subjectRowsHTML += `
           <tr style="background-color: #f0f9ff;">
-            <td style="padding: 6px 12px; padding-left: ${
-              isFirst ? "12px" : "28px"
-            }; border-bottom: 1px solid #e0f2fe; color: #0369a1; font-size: 9pt;">
+            <td style="padding: ${
+              isVeryCompact ? "3px 6px" : "4px 8px"
+            }; padding-left: ${
+          isFirst ? "8px" : "20px"
+        }; border-bottom: 1px solid #e0f2fe; color: #0369a1; font-size: ${
+          isVeryCompact ? "7pt" : "8pt"
+        };">
               ${
                 isFirst
-                  ? `<span style="font-weight: 700; color: #0c4a6e; font-size: 10pt;">📚 ${group.code}</span><br/>`
+                  ? `<span style="font-weight: 700; color: #0c4a6e; font-size: ${tableFontSize};">📚 ${group.code}</span><br/>`
                   : ""
               }
               <span style="color: #0284c7;">↳ ${
                 s.subjectId?.subjectName || ""
               }</span>
             </td>
-            <td style="padding: 6px 12px; border-bottom: 1px solid #e0f2fe; text-align: center; color: #64748b; font-size: 9pt;">
+            <td style="padding: ${
+              isVeryCompact ? "3px 6px" : "4px 8px"
+            }; border-bottom: 1px solid #e0f2fe; text-align: center; color: #64748b; font-size: ${
+          isVeryCompact ? "7pt" : "8pt"
+        };">
               ${s.totalMarks}
             </td>
-            <td style="padding: 6px 12px; border-bottom: 1px solid #e0f2fe; text-align: center; font-weight: 600; color: #0f172a; font-size: 10pt;">
+            <td style="padding: ${
+              isVeryCompact ? "3px 6px" : "4px 8px"
+            }; border-bottom: 1px solid #e0f2fe; text-align: center; font-weight: 600; color: #0f172a; font-size: ${tableFontSize};">
               ${s.obtainedMarks?.toFixed(1) ?? "-"}
             </td>
-            <td style="padding: 6px 12px; border-bottom: 1px solid #e0f2fe; text-align: center; color: #64748b; font-size: 9pt;">
+            <td style="padding: ${
+              isVeryCompact ? "3px 6px" : "4px 8px"
+            }; border-bottom: 1px solid #e0f2fe; text-align: center; color: #64748b; font-size: ${
+          isVeryCompact ? "7pt" : "8pt"
+        };">
               ${pct}%
             </td>
-            <td style="padding: 6px 12px; border-bottom: 1px solid #e0f2fe; text-align: center;">
+            <td style="padding: ${
+              isVeryCompact ? "3px 6px" : "4px 8px"
+            }; border-bottom: 1px solid #e0f2fe; text-align: center;">
               <span style="color: ${getGradeColor(
                 individualGrade
-              )}; font-size: 9pt; font-weight: 500;">
+              )}; font-size: ${
+          isVeryCompact ? "7pt" : "8pt"
+        }; font-weight: 500;">
                 ${individualGrade}
               </span>
             </td>
-            <td style="padding: 6px 12px; border-bottom: 1px solid #e0f2fe; text-align: center; color: #94a3b8; font-size: 8pt;">
+            <td style="padding: ${
+              isVeryCompact ? "3px 6px" : "4px 8px"
+            }; border-bottom: 1px solid #e0f2fe; text-align: center; color: #94a3b8; font-size: ${
+          isVeryCompact ? "6pt" : "7pt"
+        };">
               —
             </td>
           </tr>
@@ -465,29 +517,33 @@ const generateResultCardHTML = (
 
       subjectRowsHTML += `
         <tr style="background-color: #0ea5e9; color: white;">
-          <td style="padding: 8px 12px; border-bottom: 2px solid #0284c7; font-weight: 700;">
-            ${group.code} — Combined Total
+          <td style="padding: ${cellPadding}; border-bottom: 2px solid #0284c7; font-weight: 700; font-size: ${tableFontSize};">
+            ${group.code} — Total
           </td>
-          <td style="padding: 8px 12px; border-bottom: 2px solid #0284c7; text-align: center; font-weight: 600;">
+          <td style="padding: ${cellPadding}; border-bottom: 2px solid #0284c7; text-align: center; font-weight: 600; font-size: ${tableFontSize};">
             ${group.totalMaxMarks}
           </td>
-          <td style="padding: 8px 12px; border-bottom: 2px solid #0284c7; text-align: center; font-weight: 700; font-size: 11pt;">
+          <td style="padding: ${cellPadding}; border-bottom: 2px solid #0284c7; text-align: center; font-weight: 700; font-size: ${tableFontSize};">
             ${group.totalObtainedMarks.toFixed(1)}
           </td>
-          <td style="padding: 8px 12px; border-bottom: 2px solid #0284c7; text-align: center; font-weight: 600;">
+          <td style="padding: ${cellPadding}; border-bottom: 2px solid #0284c7; text-align: center; font-weight: 600; font-size: ${tableFontSize};">
             ${groupPct}%
           </td>
-          <td style="padding: 8px 12px; border-bottom: 2px solid #0284c7; text-align: center;">
-            <span style="background-color: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px; font-weight: 700;">
+          <td style="padding: ${cellPadding}; border-bottom: 2px solid #0284c7; text-align: center;">
+            <span style="background-color: rgba(255,255,255,0.2); padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: ${
+              isVeryCompact ? "7pt" : "8pt"
+            };">
               ${group.grade}
             </span>
           </td>
-          <td style="padding: 8px 12px; border-bottom: 2px solid #0284c7; text-align: center;">
+          <td style="padding: ${cellPadding}; border-bottom: 2px solid #0284c7; text-align: center;">
             <span style="background-color: ${
               group.isPassed ? "rgba(255,255,255,0.9)" : "rgba(254,202,202,0.9)"
             }; color: ${
         group.isPassed ? "#166534" : "#991b1b"
-      }; padding: 3px 10px; border-radius: 12px; font-weight: 700; font-size: 8pt;">
+      }; padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: ${
+        isVeryCompact ? "6pt" : "7pt"
+      };">
               ${group.isPassed ? "✓ PASS" : "✗ FAIL"}
             </span>
           </td>
@@ -496,43 +552,74 @@ const generateResultCardHTML = (
     }
   });
 
-  // Promotion/Result Message
+  // Promotion/Result Message - Compact version
+  const showPromotionMessage = [
+    "Play",
+    "Nursery",
+    "Prep",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+  ].includes(result.class);
+
   let resultMessageHTML = "";
   if (result.result === "Pass") {
-    const nextClass = getNextClass(result.class);
-    resultMessageHTML = `
-      <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding: 15px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
-        <div style="font-size: 24pt; margin-bottom: 5px;">🎉</div>
-        <div style="font-size: 12pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Congratulations!</div>
-        <div style="font-size: 9pt; margin: 8px 0; opacity: 0.9;">Outstanding performance! Keep up the great work!</div>
-        <div style="background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; display: inline-block; margin-top: 5px;">
-          <span style="font-size: 10pt; font-weight: 600;">📈 Promoted to: ${getClassLabel(
+    if (showPromotionMessage) {
+      const nextClass = getNextClass(result.class);
+      resultMessageHTML = `
+      <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding: 10px; border-radius: 10px; text-align: center; color: white;">
+        <div style="font-size: 16pt; margin-bottom: 3px;">🎉</div>
+        <div style="font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Congratulations!</div>
+        <div style="font-size: 7pt; margin: 4px 0; opacity: 0.9;">Outstanding performance!</div>
+        <div style="background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 15px; display: inline-block; margin-top: 3px;">
+          <span style="font-size: 8pt; font-weight: 600;">📈 Promoted to: ${getClassLabel(
             nextClass
           )}</span>
         </div>
       </div>
     `;
+    } else {
+      resultMessageHTML = `
+      <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding: 10px; border-radius: 10px; text-align: center; color: white;">
+        <div style="font-size: 16pt; margin-bottom: 3px;">🎉</div>
+        <div style="font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Congratulations!</div>
+        <div style="font-size: 7pt; margin: 4px 0; opacity: 0.9;">Outstanding performance!</div>
+      </div>
+    `;
+    }
   } else if (result.result === "Fail") {
-    resultMessageHTML = `
-      <div style="background: linear-gradient(135deg, #dc2626 0%, #f87171 100%); padding: 15px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(220, 38, 38, 0.3);">
-        <div style="font-size: 24pt; margin-bottom: 5px;">📚</div>
-        <div style="font-size: 12pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Needs Improvement</div>
-        <div style="font-size: 9pt; margin: 8px 0; opacity: 0.9;">Don't give up! Work harder and you'll succeed!</div>
-        <div style="background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; display: inline-block; margin-top: 5px;">
-          <span style="font-size: 10pt; font-weight: 600;"> Stay in: ${getClassLabel(
+    if (showPromotionMessage) {
+      resultMessageHTML = `
+      <div style="background: linear-gradient(135deg, #dc2626 0%, #f87171 100%); padding: 10px; border-radius: 10px; text-align: center; color: white;">
+        <div style="font-size: 16pt; margin-bottom: 3px;">📚</div>
+        <div style="font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Needs Improvement</div>
+        <div style="font-size: 7pt; margin: 4px 0; opacity: 0.9;">Work harder!</div>
+        <div style="background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 15px; display: inline-block; margin-top: 3px;">
+          <span style="font-size: 8pt; font-weight: 600;">📚 Stay in: ${getClassLabel(
             result.class
           )}</span>
         </div>
       </div>
     `;
-  } else {
-    resultMessageHTML = `
-      <div style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); padding: 15px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);">
-        <div style="font-size: 24pt; margin-bottom: 5px;">⏳</div>
-        <div style="font-size: 14pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Result Pending</div>
-        <div style="font-size: 9pt; margin: 8px 0; opacity: 0.9;">Some marks are yet to be entered</div>
+    } else {
+      resultMessageHTML = `
+      <div style="background: linear-gradient(135deg, #dc2626 0%, #f87171 100%); padding: 10px; border-radius: 10px; text-align: center; color: white;">
+        <div style="font-size: 16pt; margin-bottom: 3px;">📚</div>
+        <div style="font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Needs Improvement</div>
+        <div style="font-size: 7pt; margin: 4px 0; opacity: 0.9;">Work harder!</div>
       </div>
     `;
+    }
+  } else {
+    resultMessageHTML = `
+    <div style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); padding: 10px; border-radius: 10px; text-align: center; color: white;">
+      <div style="font-size: 16pt; margin-bottom: 3px;">⏳</div>
+      <div style="font-size: 10pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Result Pending</div>
+      <div style="font-size: 7pt; margin: 4px 0; opacity: 0.9;">Marks yet to be entered</div>
+    </div>
+  `;
   }
 
   return `
@@ -546,137 +633,169 @@ const generateResultCardHTML = (
           margin: 0; 
         }
         @media print {
-          body { 
-            margin: 0; 
-            padding: 0; 
+          html, body {
+            width: 297mm;
+            height: 210mm;
+            margin: 0;
+            padding: 0;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+          }
+          .page-container {
+            page-break-after: avoid;
+            page-break-inside: avoid;
           }
         }
         * { 
           box-sizing: border-box; 
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          margin: 0;
+          padding: 0;
+        }
+        html, body {
+          width: 297mm;
+          height: 210mm;
+          overflow: hidden;
         }
       </style>
     </head>
     <body>
-      <div style="width: 297mm; height: 210mm; padding: 10mm; margin: 0 auto; background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%); position: relative; overflow: hidden;">
+      <div class="page-container" style="width: 297mm; height: 210mm; padding: 6mm; background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%); position: relative; overflow: hidden;">
         
         <!-- Decorative Elements -->
-        <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 50%; opacity: 0.1;"></div>
-        <div style="position: absolute; bottom: -30px; left: -30px; width: 150px; height: 150px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; opacity: 0.1;"></div>
+        <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 50%; opacity: 0.1;"></div>
+        <div style="position: absolute; bottom: -30px; left: -30px; width: 100px; height: 100px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; opacity: 0.1;"></div>
         
         <!-- Main Card -->
-        <div style="background: white; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); height: 100%; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #e2e8f0;">
+        <div style="background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); height: 100%; display: flex; flex-direction: column; border: 1px solid #e2e8f0; overflow: hidden;">
           
           <!-- Header -->
-          <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); padding: 15px 25px; display: flex; align-items: center; justify-content: space-between; position: relative;">
-            
-            <!-- Decorative pattern -->
-            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.1; background-image: url('data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 80 80\"><path fill=\"white\" d=\"M0 0h80v80H0z\"/><path fill=\"none\" stroke=\"white\" stroke-width=\"1\" d=\"M0 40h80M40 0v80\"/></svg>'</div>
+          <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); padding: 8px 15px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
             
             <!-- Logo & School Info -->
-            <div style="display: flex; align-items: center; gap: 15px; z-index: 1;">
-              <div style="width: auto; height: auto; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); overflow: hidden;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: auto; height: auto; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
                 <img src="${
                   SCHOOL_CONFIG.logo
-                }" alt="Logo" style="width: auto; height: 100px; object-fit: contain;" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size: 28pt; color: #3b82f6;\\'>🏫</span>';" />
+                }" alt="Logo" style="width: auto; height: 60px; object-fit: contain;" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size: 20pt; color: #3b82f6;\\'>🏫</span>';" />
               </div>
               <div>
-                <h1 style="margin: 0; font-size: 20pt; font-weight: 800; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.2); letter-spacing: 0.5px;">
+                <h1 style="margin: 0; font-size: 14pt; font-weight: 800; color: white; letter-spacing: 0.5px;">
                   ${SCHOOL_CONFIG.name}
                 </h1>
-                <p style="margin: 3px 0 0 0; font-size: 9pt; color: rgba(255,255,255,0.9);">
+                <p style="margin: 2px 0 0 0; font-size: 7pt; color: rgba(255,255,255,0.9);">
                   📍 ${SCHOOL_CONFIG.address}
                 </p>
-               
               </div>
             </div>
             
             <!-- Title -->
-            <div style="text-align: center; z-index: 1; transform: translateX(-40px);">
-              <div style="background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); padding: 10px 30px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2);">
-                <div style="font-size: 16pt; font-weight: 800; color: white; text-transform: uppercase; letter-spacing: 3px;">
+            <div style="text-align: center;">
+              <div style="background: rgba(255,255,255,0.15); padding: 6px 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
+                <div style="font-size: 12pt; font-weight: 800; color: white; text-transform: uppercase; letter-spacing: 2px;">
                   📋 Performance Report
                 </div>
-                <div style="font-size: 10pt; color: rgba(255,255,255,0.9); margin-top: 4px; font-weight: 500;">
+                <div style="font-size: 8pt; color: rgba(255,255,255,0.9); margin-top: 2px; font-weight: 500;">
                   ${examName} — ${academicYear}
                 </div>
               </div>
             </div>
             
             <!-- Student Photo -->
-            <div style="z-index: 1;">
-              <div style="width: 85px; height: 100px; background: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); overflow: hidden; border: 3px solid rgba(255,255,255,0.3);">
-                ${
-                  result.studentId?.photo
-                    ? `<img src="${result.studentId.photo}" alt="Photo" style="width: 100%; height: 100%; object-fit: cover;" />`
-                    : `<div style="text-align: center; color: #94a3b8;"><div style="font-size: 28pt;">👤</div><div style="font-size: 7pt;">Photo</div></div>`
-                }
+            <div>
+              <div style="width: 55px; height: 65px; background: white; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid rgba(255,255,255,0.3);">
+                ${(() => {
+                  const imgData = result.studentId?.img;
+                  if (!imgData) {
+                    return `<div style="text-align: center; color: #94a3b8;"><div style="font-size: 20pt;">👤</div></div>`;
+                  }
+
+                  if (
+                    imgData &&
+                    typeof imgData === "object" &&
+                    "data" in imgData
+                  ) {
+                    const safeImg = imgData as {
+                      data: string;
+                      contentType?: string;
+                    };
+                    const base64Data = safeImg.data;
+                    const contentType = safeImg.contentType || "image/jpeg";
+                    return `<img src="data:${contentType};base64,${base64Data}" alt="Photo" style="width: 100%; height: 100%; object-fit: cover;" />`;
+                  }
+
+                  if (typeof imgData === "string") {
+                    const imgSrc = imgData.startsWith("data:")
+                      ? imgData
+                      : `data:image/jpeg;base64,${imgData}`;
+                    return `<img src="${imgSrc}" alt="Photo" style="width: 100%; height: 100%; object-fit: cover;" />`;
+                  }
+
+                  return `<div style="text-align: center; color: #94a3b8;"><div style="font-size: 20pt;">👤</div></div>`;
+                })()}
               </div>
             </div>
           </div>
           
           <!-- Student Info Bar -->
-          <div style="background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%); padding: 12px 25px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; border-bottom: 2px solid #e2e8f0;">
+          <div style="background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%); padding: 6px 15px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;">
             <div style="display: flex; flex-direction: column;">
-              <span style="font-size: 7pt; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Student Name</span>
-              <span style="font-size: 11pt; color: #0f172a; font-weight: 700; margin-top: 2px;">${
+              <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Student Name</span>
+              <span style="font-size: 9pt; color: #0f172a; font-weight: 700;">${
                 result.studentId?.studentName || "-"
               }</span>
             </div>
             <div style="display: flex; flex-direction: column;">
-              <span style="font-size: 7pt; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Father's Name</span>
-              <span style="font-size: 10pt; color: #334155; font-weight: 500; margin-top: 2px;">${
+              <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Father's Name</span>
+              <span style="font-size: 8pt; color: #334155; font-weight: 500;">${
                 result.studentId?.fatherName || "-"
               }</span>
             </div>
             <div style="display: flex; flex-direction: column;">
-              <span style="font-size: 7pt; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Reg Number</span>
-              <span style="font-size: 11pt; color: #0f172a; font-weight: 700; margin-top: 2px;">${
+              <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Reg Number</span>
+              <span style="font-size: 9pt; color: #0f172a; font-weight: 700;">${
                 result.studentId?.rollNumber || "-"
               }</span>
             </div>
             <div style="display: flex; flex-direction: column;">
-              <span style="font-size: 7pt; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Class & Section</span>
-              <span style="font-size: 11pt; color: #0f172a; font-weight: 700; margin-top: 2px;">${getClassLabel(
+              <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Class & Section</span>
+              <span style="font-size: 9pt; color: #0f172a; font-weight: 700;">${getClassLabel(
                 result.class
               )} — ${getSectionLabel(result.section)}</span>
             </div>
-
             <div style="display: flex; flex-direction: column;">
-              <span style="font-size: 7pt; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Exam Type</span>
-              <span style="font-size: 10pt; color: #334155; font-weight: 500; margin-top: 2px;">${
+              <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Exam Type</span>
+              <span style="font-size: 8pt; color: #334155; font-weight: 500;">${
                 result.examId?.examType || "Annual"
               }</span>
             </div>
           </div>
           
           <!-- Main Content -->
-          <div style="flex: 1; display: flex; gap: 20px; padding: 15px 25px; min-height: 0; overflow: hidden;">
+          <div style="flex: 1; display: flex; gap: 12px; padding: 8px 15px; min-height: 0; overflow: hidden;">
             
             <!-- Marks Table -->
-            <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
-              <div style="flex: 1; overflow: auto; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-                <table style="width: 100%; border-collapse: collapse; font-size: 9pt;">
-                  <thead>
+            <div style="flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden;">
+              <div style="flex: 1; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; display: flex; flex-direction: column;">
+                <table style="width: 100%; border-collapse: collapse; font-size: ${tableFontSize}; table-layout: fixed;">
+                  <thead style="flex-shrink: 0;">
                     <tr style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
-                      <th style="padding: 12px 12px; text-align: left; color: white; font-weight: 600; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5px;">
+                      <th style="padding: ${headerPadding}; text-align: left; color: white; font-weight: 600; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; width: 35%;">
                         Subject
                       </th>
-                      <th style="padding: 12px 12px; text-align: center; color: white; font-weight: 600; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5px; width: 70px;">
+                      <th style="padding: ${headerPadding}; text-align: center; color: white; font-weight: 600; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; width: 12%;">
                         Total
                       </th>
-                      <th style="padding: 12px 12px; text-align: center; color: white; font-weight: 600; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5px; width: 80px;">
+                      <th style="padding: ${headerPadding}; text-align: center; color: white; font-weight: 600; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; width: 14%;">
                         Obtained
                       </th>
-                      <th style="padding: 12px 12px; text-align: center; color: white; font-weight: 600; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5px; width: 70px;">
+                      <th style="padding: ${headerPadding}; text-align: center; color: white; font-weight: 600; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; width: 12%;">
                         %
                       </th>
-                      <th style="padding: 12px 12px; text-align: center; color: white; font-weight: 600; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5px; width: 60px;">
+                      <th style="padding: ${headerPadding}; text-align: center; color: white; font-weight: 600; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; width: 12%;">
                         Grade
                       </th>
-                      <th style="padding: 12px 12px; text-align: center; color: white; font-weight: 600; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5px; width: 80px;">
+                      <th style="padding: ${headerPadding}; text-align: center; color: white; font-weight: 600; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; width: 15%;">
                         Status
                       </th>
                     </tr>
@@ -686,33 +805,33 @@ const generateResultCardHTML = (
                   </tbody>
                   <tfoot>
                     <tr style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
-                      <td style="padding: 12px 12px; color: white; font-weight: 700; font-size: 11pt;">
+                      <td style="padding: ${headerPadding}; color: white; font-weight: 700; font-size: 9pt;">
                         🏆 GRAND TOTAL
                       </td>
-                      <td style="padding: 12px 12px; text-align: center; color: white; font-weight: 600; font-size: 11pt;">
+                      <td style="padding: ${headerPadding}; text-align: center; color: white; font-weight: 600; font-size: 9pt;">
                         ${result.totalMarks}
                       </td>
-                      <td style="padding: 12px 12px; text-align: center; color: #fbbf24; font-weight: 800; font-size: 13pt;">
+                      <td style="padding: ${headerPadding}; text-align: center; color: #fbbf24; font-weight: 800; font-size: 10pt;">
                         ${result.totalObtainedMarks?.toFixed(1)}
                       </td>
-                      <td style="padding: 12px 12px; text-align: center; color: #fbbf24; font-weight: 700; font-size: 11pt;">
+                      <td style="padding: ${headerPadding}; text-align: center; color: #fbbf24; font-weight: 700; font-size: 9pt;">
                         ${result.percentage?.toFixed(1)}%
                       </td>
-                      <td style="padding: 12px 12px; text-align: center;">
+                      <td style="padding: ${headerPadding}; text-align: center;">
                         <span style="background: ${getGradeColor(
                           result.grade
-                        )}; color: white; padding: 4px 12px; border-radius: 6px; font-weight: 700; font-size: 11pt;">
+                        )}; color: white; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 9pt;">
                           ${result.grade}
                         </span>
                       </td>
-                      <td style="padding: 12px 12px; text-align: center;">
+                      <td style="padding: ${headerPadding}; text-align: center;">
                         <span style="background: ${
                           result.result === "Pass"
                             ? "#10b981"
                             : result.result === "Fail"
                             ? "#ef4444"
                             : "#f59e0b"
-                        }; color: white; padding: 5px 14px; border-radius: 20px; font-weight: 700; font-size: 10pt; text-transform: uppercase;">
+                        }; color: white; padding: 3px 10px; border-radius: 15px; font-weight: 700; font-size: 8pt; text-transform: uppercase;">
                           ${result.result}
                         </span>
                       </td>
@@ -723,79 +842,71 @@ const generateResultCardHTML = (
             </div>
             
             <!-- Right Panel -->
-            <div style="width: 200px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="width: 160px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
               
               <!-- Performance Card -->
-              <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 15px; border: 1px solid #bbf7d0;">
-                <h4 style="margin: 0 0 12px 0; font-size: 11pt; color: #166534; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+              <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 8px; padding: 10px; border: 1px solid #bbf7d0; flex: 1;">
+                <h4 style="margin: 0 0 8px 0; font-size: 9pt; color: #166534; font-weight: 700; display: flex; align-items: center; gap: 4px;">
                   📊 Performance
                 </h4>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 8pt; color: #166534;">Total Marks</span>
-                    <span style="font-size: 11pt; font-weight: 700; color: #14532d;">${result.totalObtainedMarks?.toFixed(
+                    <span style="font-size: 7pt; color: #166534;">Total Marks</span>
+                    <span style="font-size: 9pt; font-weight: 700; color: #14532d;">${result.totalObtainedMarks?.toFixed(
                       1
                     )} / ${result.totalMarks}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 8pt; color: #166534;">Percentage</span>
-                    <span style="font-size: 14pt; font-weight: 800; color: #14532d;">${result.percentage?.toFixed(
-                      2
+                    <span style="font-size: 7pt; color: #166534;">Percentage</span>
+                    <span style="font-size: 12pt; font-weight: 800; color: #14532d;">${result.percentage?.toFixed(
+                      1
                     )}%</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 8pt; color: #166534;">Grade</span>
-                    <span style="font-size: 18pt; font-weight: 800; color: ${getGradeColor(
+                    <span style="font-size: 7pt; color: #166534;">Grade</span>
+                    <span style="font-size: 14pt; font-weight: 800; color: ${getGradeColor(
                       result.grade
                     )};">${result.grade}</span>
                   </div>
-            
                 </div>
               </div>
               
               <!-- Result Message -->
               ${resultMessageHTML}
               
-             
-              
             </div>
           </div>
           
           <!-- Footer -->
-          <div style="background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%); padding: 12px 25px; border-top: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end;">
+          <div style="background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%); padding: 8px 15px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; flex-shrink: 0;">
             
             <!-- Signatures -->
-            <div style="display: flex; gap: 50px;">
+            <div style="display: flex; gap: 30px;">
               <div style="text-align: center;">
-                <div style="width: 120px; border-top: 2px solid #1e293b; padding-top: 5px;">
-                  <span style="font-size: 8pt; color: #475569; font-weight: 600;">Class Teacher</span>
+                <div style="width: 80px; border-top: 1.5px solid #1e293b; padding-top: 3px;">
+                  <span style="font-size: 6pt; color: #475569; font-weight: 600;">Class Teacher</span>
                 </div>
               </div>
               <div style="text-align: center;">
-                <div style="width: 120px; border-top: 2px solid #1e293b; padding-top: 5px;">
-                  <span style="font-size: 8pt; color: #475569; font-weight: 600;">Principal</span>
+                <div style="width: 80px; border-top: 1.5px solid #1e293b; padding-top: 3px;">
+                  <span style="font-size: 6pt; color: #475569; font-weight: 600;">Principal</span>
                 </div>
               </div>
               <div style="text-align: center;">
-                <div style="width: 120px; border-top: 2px solid #1e293b; padding-top: 5px;">
-                  <span style="font-size: 8pt; color: #475569; font-weight: 600;">Parent's Signature</span>
+                <div style="width: 80px; border-top: 1.5px solid #1e293b; padding-top: 3px;">
+                  <span style="font-size: 6pt; color: #475569; font-weight: 600;">Parent Sign</span>
                 </div>
               </div>
             </div>
             
             <!-- Print Info -->
             <div style="text-align: right;">
-              <div style="font-size: 7pt; color: #94a3b8;">
-                <div>🖨️ Computer Generated Result Card</div>
-                <div>📅 Printed: ${new Date().toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })} at ${new Date().toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}</div>
-                <div style="margin-top: 3px; color: #64748b; font-weight: 500;">"${
+              <div style="font-size: 6pt; color: #94a3b8;">
+                <div>🖨️ Computer Generated | 📅 ${new Date().toLocaleDateString(
+                  "en-GB",
+                  { day: "2-digit", month: "short", year: "numeric" }
+                )}</div>
+                <div style="margin-top: 2px; color: #64748b; font-weight: 500;">"${
                   SCHOOL_CONFIG.motto
                 }"</div>
               </div>
