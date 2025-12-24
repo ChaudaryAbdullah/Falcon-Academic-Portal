@@ -373,20 +373,20 @@ const generateResultCardHTML = (
   });
 
   // Dynamic font sizing based on number of rows
-  const isCompact = totalRows > 12;
+  const isCompact = totalRows > 13;
   const isVeryCompact = totalRows > 16;
 
   const tableFontSize = isVeryCompact ? "8pt" : isCompact ? "11pt" : "12pt";
   const cellPadding = isVeryCompact
     ? "5px 7px"
     : isCompact
-    ? "9px 12px"
-    : "10px 14px";
+    ? "10px 13px"
+    : "12px 15px";
   const headerPadding = isVeryCompact
     ? "7px 7px"
     : isCompact
-    ? "12px 12px"
-    : "14px 14px";
+    ? "13px 13px"
+    : "15px 15px";
 
   // Generate subject rows
   let subjectRowsHTML = "";
