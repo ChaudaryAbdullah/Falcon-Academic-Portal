@@ -1346,7 +1346,7 @@ export default function ViewResultsTab({
       return;
     }
 
-    toast.info("Generating PDF... Please wait.");
+    toast.info("Generating PDF... This may take a moment.");
 
     try {
       const { default: jsPDF } = await import("jspdf");
@@ -1357,49 +1357,130 @@ export default function ViewResultsTab({
         unit: "mm",
         format: "a4",
       });
+
       const pageWidth = 297;
       const pageHeight = 210;
 
+      // Create a visible container (but off-screen)
       const container = document.createElement("div");
-      container.style.position = "absolute";
-      container.style.left = "-9999px";
-      container.style.top = "0";
+      container.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 297mm;
+      height: 210mm;
+      z-index: -9999;
+      opacity: 0;
+      pointer-events: none;
+      overflow: visible;
+    `;
       document.body.appendChild(container);
 
       for (let i = 0; i < viewResults.length; i++) {
         const result = viewResults[i];
-        if (i > 0) pdf.addPage();
 
-        const cardContainer = document.createElement("div");
-        cardContainer.innerHTML = generateResultCardHTML(result, i + 1);
-        container.appendChild(cardContainer);
+        // Show progress
+        toast.info(`Processing ${i + 1} of ${viewResults.length}...`);
 
-        const cardElement = cardContainer.querySelector(
-          ".result-card-landscape"
+        // Create iframe for isolated rendering
+        const iframe = document.createElement("iframe");
+        iframe.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 297mm;
+        height: 210mm;
+        border: none;
+        z-index: -9999;
+        opacity: 0;
+      `;
+        document.body.appendChild(iframe);
+
+        // Write HTML to iframe
+        const htmlContent = generateResultCardHTML(result, i + 1);
+        const iframeDoc =
+          iframe.contentDocument || iframe.contentWindow?.document;
+
+        if (!iframeDoc) {
+          console.error("Could not access iframe document");
+          document.body.removeChild(iframe);
+          continue;
+        }
+
+        iframeDoc.open();
+        iframeDoc.write(htmlContent);
+        iframeDoc.close();
+
+        // Wait for content to render
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Wait for images to load
+        const images = iframeDoc.querySelectorAll("img");
+        await Promise.all(
+          Array.from(images).map(
+            (img) =>
+              new Promise((resolve) => {
+                if (img.complete) {
+                  resolve(true);
+                } else {
+                  img.onload = () => resolve(true);
+                  img.onerror = () => resolve(true);
+                }
+              })
+          )
+        );
+
+        // Additional delay for fonts and styles
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        // Get the page container element
+        const cardElement = iframeDoc.querySelector(
+          ".page-container"
         ) as HTMLElement;
 
         if (cardElement) {
-          const canvas = await html2canvas(cardElement, {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            backgroundColor: "#ffffff",
-            width: 1122,
-            height: 793,
-          });
-          const imgData = canvas.toDataURL("image/jpeg", 0.95);
-          pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, pageHeight);
+          try {
+            const canvas = await html2canvas(cardElement, {
+              scale: 1,
+              useCORS: true,
+              allowTaint: true,
+              logging: false,
+              backgroundColor: "#f8fafc",
+              width: 1122, // 297mm at 96dpi
+              height: 793, // 210mm at 96dpi
+              windowWidth: 1122,
+              windowHeight: 793,
+            });
+
+            const imgData = canvas.toDataURL("image/jpeg", 0.95);
+
+            if (i > 0) {
+              pdf.addPage();
+            }
+
+            pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, pageHeight);
+          } catch (canvasError) {
+            console.error(
+              `Error capturing canvas for result ${i + 1}:`,
+              canvasError
+            );
+          }
+        } else {
+          console.error(`Could not find .page-container for result ${i + 1}`);
         }
 
-        container.removeChild(cardContainer);
-        toast.info(`Processing ${i + 1}/${viewResults.length}...`);
+        // Clean up iframe
+        document.body.removeChild(iframe);
       }
 
+      // Clean up container
       document.body.removeChild(container);
 
+      // Save the PDF
       const fileName = `Results_${
         currentExam?.examName?.replace(/\s+/g, "_") || "Exam"
       }_${new Date().toISOString().split("T")[0]}.pdf`;
+
       pdf.save(fileName);
       toast.success("PDF exported successfully!");
     } catch (error) {
