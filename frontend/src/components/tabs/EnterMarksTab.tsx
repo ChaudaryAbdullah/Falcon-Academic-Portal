@@ -95,9 +95,7 @@ interface Exam {
   isActive: boolean;
 }
 
-
-
- interface ResultSubject {
+interface ResultSubject {
   subjectId: {
     _id: string;
     subjectName: string;
@@ -110,7 +108,7 @@ interface Exam {
   remarks: string;
 }
 
- interface SubjectGroup {
+interface SubjectGroup {
   code: string;
   displayName: string;
   subjects: ResultSubject[];
@@ -167,6 +165,14 @@ interface EnterMarksTabProps {
   setStudentsMarks: React.Dispatch<React.SetStateAction<Result[]>>;
 }
 
+const sortResultsByRollNumber = (results: Result[]): Result[] => {
+  return [...results].sort((a, b) => {
+    const rollA = parseInt(a.studentId?.rollNumber || "0");
+    const rollB = parseInt(b.studentId?.rollNumber || "0");
+    return rollA - rollB;
+  });
+};
+
 const getClassLabel = (value: string): string => {
   const classObj = allClasses.find((c) => c.value === value);
   return classObj ? classObj.label : value;
@@ -177,9 +183,8 @@ const getSectionLabel = (value: string): string => {
   return sectionObj ? sectionObj.label : value;
 };
 
-
 // Calculate grade based on percentage
- const calculateGrade = (percentage: number): string => {
+const calculateGrade = (percentage: number): string => {
   if (percentage >= 90) return "A+";
   if (percentage >= 80) return "A";
   if (percentage >= 70) return "B";
@@ -190,9 +195,7 @@ const getSectionLabel = (value: string): string => {
 };
 
 // Group subjects by subject code
- const groupSubjectsByCode = (
-  subjects: ResultSubject[]
-): SubjectGroup[] => {
+const groupSubjectsByCode = (subjects: ResultSubject[]): SubjectGroup[] => {
   if (!subjects || subjects.length === 0) return [];
 
   const groupMap = new Map<string, SubjectGroup>();
@@ -237,14 +240,12 @@ const getSectionLabel = (value: string): string => {
 };
 
 // Check if marks are entered (0 is valid, null/undefined is not)
- const isMarksEntered = (
-  obtainedMarks: number | null | undefined
-): boolean => {
+const isMarksEntered = (obtainedMarks: number | null | undefined): boolean => {
   return obtainedMarks !== null && obtainedMarks !== undefined;
 };
 
 // Calculate overall result using GROUPED LOGIC
- const calculateOverallResult = (
+const calculateOverallResult = (
   subjects: ResultSubject[]
 ): "Pass" | "Fail" | "Pending" => {
   if (!subjects || subjects.length === 0) return "Pending";
@@ -620,6 +621,7 @@ export default function EnterMarksTab({
         return;
       }
 
+      // Step 1: Get existing results
       const resultsResponse = await axios.get(
         `${BACKEND}/api/results/exam-class`,
         {
@@ -632,69 +634,166 @@ export default function EnterMarksTab({
         }
       );
 
-      if (resultsResponse.data.data && resultsResponse.data.data.length > 0) {
-        setStudentsMarks([...resultsResponse.data.data]);
-        toast.success(
-          `Results loaded for ${resultsResponse.data.data.length} students!`
+      const existingResults = resultsResponse.data.data || [];
+
+      // Step 2: Check if all students have results
+      const existingStudentIds = new Set(
+        existingResults.map((r: Result) => r.studentId._id)
+      );
+
+      const missingStudents = studentsInClass.filter(
+        (s) => !existingStudentIds.has(s._id)
+      );
+
+      // Step 3: If there are missing students, create results for them
+      if (missingStudents.length > 0) {
+        console.log(
+          `Creating results for ${missingStudents.length} new students`
         );
-      } else {
+
         const classSubjects = subjects.filter((s) =>
           s.classes.includes(selectedClass)
         );
 
         if (classSubjects.length === 0) {
           toast.error("No subjects assigned to this class");
+          if (existingResults.length > 0) {
+            setStudentsMarks(sortResultsByRollNumber(existingResults));
+          }
           setLoading(false);
           return;
         }
 
-        const bulkData = {
-          examId: selectedExam,
-          class: selectedClass,
-          section: selectedSection,
-          subjects: classSubjects.map((s) => ({
-            subjectId: s._id,
-            totalMarks: s.totalMarks,
-            passingMarks: s.passingMarks,
-          })),
-        };
+        // Create results for missing students one by one
+        const createPromises = missingStudents.map(async (student) => {
+          try {
+            const createData = {
+              studentId: student._id,
+              examId: selectedExam,
+              class: selectedClass,
+              section: selectedSection,
+              subjects: classSubjects.map((s) => ({
+                subjectId: s._id,
+                totalMarks: s.totalMarks,
+                passingMarks: s.passingMarks,
+              })),
+            };
 
-        const createResponse = await axios.post(
-          `${BACKEND}/api/results/bulk`,
-          bulkData,
-          { withCredentials: true }
+            const response = await axios.post(
+              `${BACKEND}/api/results`,
+              createData,
+              { withCredentials: true }
+            );
+
+            return response.data.data;
+          } catch (error) {
+            console.error(
+              `Failed to create result for student ${student._id}:`,
+              error
+            );
+            return null;
+          }
+        });
+
+        const newResults = await Promise.all(createPromises);
+        const successfulResults = newResults.filter((r) => r !== null);
+
+        if (successfulResults.length > 0) {
+          toast.success(
+            `Created results for ${successfulResults.length} new students!`
+          );
+        }
+
+        // Step 4: Reload all results
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        const updatedResultsResponse = await axios.get(
+          `${BACKEND}/api/results/exam-class`,
+          {
+            params: {
+              examId: selectedExam,
+              class: selectedClass,
+              section: selectedSection,
+            },
+            withCredentials: true,
+          }
         );
 
-        if (createResponse.data.data && createResponse.data.data.length > 0) {
-          setStudentsMarks([...createResponse.data.data]);
+        const allResults = updatedResultsResponse.data.data || [];
+        setStudentsMarks(sortResultsByRollNumber(allResults));
+
+        toast.success(
+          `Loaded ${allResults.length} total students (${missingStudents.length} newly added)`
+        );
+      } else {
+        // All students already have results
+        if (existingResults.length > 0) {
+          setStudentsMarks(sortResultsByRollNumber(existingResults));
           toast.success(
-            `Created results for ${createResponse.data.data.length} students!`
+            `Results loaded for ${existingResults.length} students!`
           );
         } else {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-
-          const newResultsResponse = await axios.get(
-            `${BACKEND}/api/results/exam-class`,
-            {
-              params: {
-                examId: selectedExam,
-                class: selectedClass,
-                section: selectedSection,
-              },
-              withCredentials: true,
-            }
+          // No results exist at all - create for all students
+          const classSubjects = subjects.filter((s) =>
+            s.classes.includes(selectedClass)
           );
 
-          if (
-            newResultsResponse.data.data &&
-            newResultsResponse.data.data.length > 0
-          ) {
-            setStudentsMarks([...newResultsResponse.data.data]);
+          if (classSubjects.length === 0) {
+            toast.error("No subjects assigned to this class");
+            setLoading(false);
+            return;
+          }
+
+          const bulkData = {
+            examId: selectedExam,
+            class: selectedClass,
+            section: selectedSection,
+            subjects: classSubjects.map((s) => ({
+              subjectId: s._id,
+              totalMarks: s.totalMarks,
+              passingMarks: s.passingMarks,
+            })),
+          };
+
+          const createResponse = await axios.post(
+            `${BACKEND}/api/results/bulk`,
+            bulkData,
+            { withCredentials: true }
+          );
+
+          if (createResponse.data.data && createResponse.data.data.length > 0) {
+            setStudentsMarks(sortResultsByRollNumber(createResponse.data.data));
             toast.success(
-              `Loaded ${newResultsResponse.data.data.length} student records!`
+              `Created results for ${createResponse.data.data.length} students!`
             );
           } else {
-            toast.error("Failed to load results after creation");
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            const newResultsResponse = await axios.get(
+              `${BACKEND}/api/results/exam-class`,
+              {
+                params: {
+                  examId: selectedExam,
+                  class: selectedClass,
+                  section: selectedSection,
+                },
+                withCredentials: true,
+              }
+            );
+
+            if (
+              newResultsResponse.data.data &&
+              newResultsResponse.data.data.length > 0
+            ) {
+              setStudentsMarks(
+                sortResultsByRollNumber(newResultsResponse.data.data)
+              );
+              toast.success(
+                `Loaded ${newResultsResponse.data.data.length} student records!`
+              );
+            } else {
+              toast.error("Failed to load results after creation");
+            }
           }
         }
       }
@@ -708,60 +807,62 @@ export default function EnterMarksTab({
   };
 
   // Update marks in parent state
-const updateMarks = (resultId: string, subjectId: string, marks: number) => {
-  setStudentsMarks((prev) =>
-    prev.map((result) => {
-      if (result._id === resultId) {
-        // Update the specific subject
-        const updatedSubjects = result.subjects.map((subject) => {
-          if (subject.subjectId._id === subjectId) {
-            const subjectPercentage =
-              subject.totalMarks > 0 ? (marks / subject.totalMarks) * 100 : 0;
-            return {
-              ...subject,
-              obtainedMarks: marks,
-              grade: calculateGrade(subjectPercentage),
-              // Individual remarks - but these don't determine overall result for grouped
-              remarks: marks >= subject.passingMarks ? "Pass" : "Fail",
-            };
-          }
-          return subject;
-        });
+  const updateMarks = (resultId: string, subjectId: string, marks: number) => {
+    setStudentsMarks((prev) => {
+      const updated = prev.map((result) => {
+        if (result._id === resultId) {
+          // Update the specific subject
+          const updatedSubjects = result.subjects.map((subject) => {
+            if (subject.subjectId._id === subjectId) {
+              const subjectPercentage =
+                subject.totalMarks > 0 ? (marks / subject.totalMarks) * 100 : 0;
+              return {
+                ...subject,
+                obtainedMarks: marks,
+                grade: calculateGrade(subjectPercentage),
+                remarks: marks >= subject.passingMarks ? "Pass" : "Fail",
+              };
+            }
+            return subject;
+          });
 
-        // Calculate totals
-        const subjectsWithMarks = updatedSubjects.filter((s) =>
-          isMarksEntered(s.obtainedMarks)
-        );
+          // Calculate totals
+          const subjectsWithMarks = updatedSubjects.filter((s) =>
+            isMarksEntered(s.obtainedMarks)
+          );
 
-        const totalMarks = updatedSubjects.reduce(
-          (sum, s) => sum + s.totalMarks,
-          0
-        );
-        const totalObtainedMarks = subjectsWithMarks.reduce(
-          (sum, s) => sum + (s.obtainedMarks ?? 0),
-          0
-        );
-        const percentage =
-          totalMarks > 0 ? (totalObtainedMarks / totalMarks) * 100 : 0;
-        const grade = calculateGrade(percentage);
+          const totalMarks = updatedSubjects.reduce(
+            (sum, s) => sum + s.totalMarks,
+            0
+          );
+          const totalObtainedMarks = subjectsWithMarks.reduce(
+            (sum, s) => sum + (s.obtainedMarks ?? 0),
+            0
+          );
+          const percentage =
+            totalMarks > 0 ? (totalObtainedMarks / totalMarks) * 100 : 0;
+          const grade = calculateGrade(percentage);
 
-        // Determine result status using GROUPED LOGIC
-        const resultStatus = calculatePartialResult(updatedSubjects);
+          // Determine result status using GROUPED LOGIC
+          const resultStatus = calculatePartialResult(updatedSubjects);
 
-        return {
-          ...result,
-          subjects: updatedSubjects,
-          totalMarks,
-          totalObtainedMarks,
-          percentage,
-          grade,
-          result: resultStatus,
-        };
-      }
-      return result;
-    })
-  );
-};
+          return {
+            ...result,
+            subjects: updatedSubjects,
+            totalMarks,
+            totalObtainedMarks,
+            percentage,
+            grade,
+            result: resultStatus,
+          };
+        }
+        return result;
+      });
+
+      // Maintain sorting after update
+      return sortResultsByRollNumber(updated);
+    });
+  };
 
   const handleSubmitResults = async () => {
     if (!isClassValidForExam) {
@@ -769,7 +870,6 @@ const updateMarks = (resultId: string, subjectId: string, marks: number) => {
       return;
     }
 
-    // Check if any marks have been entered
     const hasAnyMarks = studentsMarks.some((r) =>
       r.subjects.some(
         (s) => s.obtainedMarks !== undefined && s.obtainedMarks !== null
@@ -790,7 +890,6 @@ const updateMarks = (resultId: string, subjectId: string, marks: number) => {
         resultId: result._id,
         subjects: result.subjects.map((s) => ({
           subjectId: s.subjectId._id,
-          // Send null if not entered, otherwise send the actual value (including 0)
           obtainedMarks:
             s.obtainedMarks !== undefined && s.obtainedMarks !== null
               ? s.obtainedMarks
@@ -815,7 +914,7 @@ const updateMarks = (resultId: string, subjectId: string, marks: number) => {
       );
 
       toast.success("Results submitted and calculated successfully!");
-      await loadStudents();
+      await loadStudents(); // This will reload and sort automatically
     } catch (err: any) {
       console.error("Error submitting results:", err);
       toast.error(err.response?.data?.message || "Failed to submit results");
@@ -823,7 +922,6 @@ const updateMarks = (resultId: string, subjectId: string, marks: number) => {
       setLoading(false);
     }
   };
-
   const totalPages = Math.ceil(studentsMarks.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;

@@ -43,7 +43,10 @@ export const createResult = async (req, res) => {
     const result = await Result.create(req.body);
 
     const populatedResult = await Result.findById(result._id)
-      .populate("studentId", "studentName fatherName rollNumber class section")
+      .populate(
+        "studentId",
+        "studentName fatherName rollNumber class section img"
+      )
       .populate("examId", "examName examType academicYear")
       .populate("subjects.subjectId", "subjectName subjectCode")
       .lean();
@@ -228,7 +231,10 @@ export const bulkCreateResults = async (req, res) => {
 
     // Populate the results
     const populatedResults = await Result.find({ _id: { $in: insertedIds } })
-      .populate("studentId", "studentName fatherName rollNumber class section")
+      .populate(
+        "studentId",
+        "studentName fatherName rollNumber class section img"
+      )
       .populate("examId", "examName examType academicYear")
       .populate("subjects.subjectId", "subjectName subjectCode")
       .lean();
@@ -311,7 +317,10 @@ export const updateResult = async (req, res) => {
     await result.save();
 
     const populatedResult = await Result.findById(result._id)
-      .populate("studentId", "studentName fatherName rollNumber class section")
+      .populate(
+        "studentId",
+        "studentName fatherName rollNumber class section img"
+      )
       .populate("examId", "examName examType academicYear")
       .populate("subjects.subjectId", "subjectName subjectCode")
       .lean();
@@ -438,7 +447,10 @@ export const bulkUpdateResults = async (req, res) => {
     await Promise.allSettled(updatePromises);
 
     const populatedResults = await Result.find({ _id: { $in: updatedIds } })
-      .populate("studentId", "studentName fatherName rollNumber class section")
+      .populate(
+        "studentId",
+        "studentName fatherName rollNumber class section img"
+      )
       .populate("examId", "examName examType academicYear")
       .populate("subjects.subjectId", "subjectName subjectCode")
       .lean();
@@ -479,7 +491,10 @@ export const getResultsByExamAndClass = async (req, res) => {
     if (section && section !== "all") query.section = section;
 
     const results = await Result.find(query)
-      .populate("studentId", "studentName fatherName rollNumber class section")
+      .populate(
+        "studentId",
+        "studentName fatherName rollNumber class section img"
+      )
       .populate("examId", "examName examType academicYear")
       .populate("subjects.subjectId", "subjectName subjectCode totalMarks")
       .sort({ "studentId.rollNumber": 1, position: 1 })
@@ -539,7 +554,10 @@ export const getResultById = async (req, res) => {
     }
 
     const result = await Result.findById(id)
-      .populate("studentId", "studentName fatherName rollNumber class section")
+      .populate(
+        "studentId",
+        "studentName fatherName rollNumber class section img"
+      )
       .populate("examId", "examName examType academicYear")
       .populate("subjects.subjectId", "subjectName subjectCode")
       .lean();
@@ -1083,7 +1101,10 @@ export const getTopPerformers = async (req, res) => {
     if (section && section !== "all") query.section = section;
 
     const topPerformers = await Result.find(query)
-      .populate("studentId", "studentName fatherName rollNumber class section")
+      .populate(
+        "studentId",
+        "studentName fatherName rollNumber class section img"
+      )
       .populate("examId", "examName examType")
       .select(
         "studentId examId percentage totalObtainedMarks totalMarks grade position class section"
