@@ -373,8 +373,8 @@ const generateResultCardHTML = (
   });
 
   // Dynamic font sizing based on number of rows
-  const isCompact = totalRows > 8;
-  const isVeryCompact = totalRows > 12;
+  const isCompact = totalRows > 12;
+  const isVeryCompact = totalRows > 16;
 
   const tableFontSize = isVeryCompact ? "8pt" : isCompact ? "11pt" : "12pt";
   const cellPadding = isVeryCompact
