@@ -46,7 +46,7 @@ const BACKEND = import.meta.env.VITE_BACKEND;
 // School Configuration
 const SCHOOL_CONFIG = {
   name: "Falcon House High School System",
-  address: "P-1443 St # 7 Nisar Colony Faisalabad",
+  address: "P-1446 St # 7 Nisar Colony Faisalabad",
   phone: "+92-41-1234567",
   email: "info@falconhouse.edu.pk",
   logo: "/results.jpeg", // Path to your logo in public folder
@@ -351,7 +351,6 @@ export const calculatePartialResult = (
 };
 
 // ==================== GENERATE RESULT CARD HTML ====================
-
 const generateResultCardHTML = (
   result: Result,
   serialNumber: number
@@ -373,20 +372,20 @@ const generateResultCardHTML = (
   });
 
   // Dynamic font sizing based on number of rows
-  const isCompact = totalRows > 13;
-  const isVeryCompact = totalRows > 16;
+  const isCompact = totalRows > 12;
+  const isVeryCompact = totalRows > 15;
 
-  const tableFontSize = isVeryCompact ? "8pt" : isCompact ? "11pt" : "12pt";
+  const tableFontSize = isVeryCompact ? "6pt" : isCompact ? "10pt" : "12pt";
   const cellPadding = isVeryCompact
     ? "5px 7px"
     : isCompact
-    ? "10px 13px"
-    : "12px 15px";
+    ? "8px 11px"
+    : "12px 14px";
   const headerPadding = isVeryCompact
     ? "7px 7px"
     : isCompact
-    ? "13px 13px"
-    : "15px 15px";
+    ? "11px 11px"
+    : "14px 14px";
 
   // Generate subject rows
   let subjectRowsHTML = "";
@@ -424,7 +423,7 @@ const generateResultCardHTML = (
             )}15; color: ${getGradeColor(
         displayGrade
       )}; padding: 1px 6px; border-radius: 3px; font-weight: 600; font-size: ${
-        isVeryCompact ? "7pt" : "8pt"
+        isVeryCompact ? "8pt" : "10pt"
       };">
               ${displayGrade}
             </span>
@@ -622,6 +621,30 @@ const generateResultCardHTML = (
   `;
   }
 
+  // Generate student photo HTML
+  const studentPhotoHTML = (() => {
+    const imgData = result.studentId?.img;
+    if (!imgData) {
+      return `<div style="text-align: center; color: #94a3b8;"><div style="font-size: 32pt;">👤</div><div style="font-size: 7pt; margin-top: 4px;">No Photo</div></div>`;
+    }
+
+    if (imgData && typeof imgData === "object" && "data" in imgData) {
+      const safeImg = imgData as { data: string; contentType?: string };
+      const base64Data = safeImg.data;
+      const contentType = safeImg.contentType || "image/jpeg";
+      return `<img src="data:${contentType};base64,${base64Data}" alt="Photo" style="width: 100%; height: 100%; object-fit: cover;" />`;
+    }
+
+    if (typeof imgData === "string") {
+      const imgSrc = imgData.startsWith("data:")
+        ? imgData
+        : `data:image/jpeg;base64,${imgData}`;
+      return `<img src="${imgSrc}" alt="Photo" style="width: 100%; height: 100%; object-fit: cover;" />`;
+    }
+
+    return `<div style="text-align: center; color: #94a3b8;"><div style="font-size: 32pt;">👤</div><div style="font-size: 7pt; margin-top: 4px;">No Photo</div></div>`;
+  })();
+
   return `
     <!DOCTYPE html>
     <html>
@@ -669,105 +692,91 @@ const generateResultCardHTML = (
         <!-- Main Card -->
         <div style="background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); height: 100%; display: flex; flex-direction: column; border: 1px solid #e2e8f0; overflow: hidden;">
           
-          <!-- Header -->
-          <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); padding: 8px 15px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+          <!-- Combined Header & Student Info Section with Spanning Photo -->
+          <div style="display: flex; flex-shrink: 0;">
             
-            <!-- Logo & School Info -->
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <div style="width: auto; height: auto; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <img src="${
-                  SCHOOL_CONFIG.logo
-                }" alt="Logo" style="width: auto; height: 60px; object-fit: contain;" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size: 20pt; color: #3b82f6;\\'>🏫</span>';" />
-              </div>
-              <div>
-                <h1 style="margin: 0; font-size: 14pt; font-weight: 800; color: white; letter-spacing: 0.5px;">
-                  ${SCHOOL_CONFIG.name}
-                </h1>
-                <p style="margin: 2px 0 0 0; font-size: 7pt; color: rgba(255,255,255,0.9);">
-                  📍 ${SCHOOL_CONFIG.address}
-                </p>
-              </div>
-            </div>
-            
-            <!-- Title -->
-            <div style="text-align: center;">
-              <div style="background: rgba(255,255,255,0.15); padding: 6px 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
-                <div style="font-size: 12pt; font-weight: 800; color: white; text-transform: uppercase; letter-spacing: 2px;">
-                  📋 Performance Report
+            <!-- Left Content Area -->
+            <div style="flex: 1; display: flex; flex-direction: column;">
+              
+              <!-- Header - Split into Logo (white) and Rest (blue) -->
+              <div style="display: flex; align-items: stretch;">
+                
+                <!-- Logo Section - White Background -->
+                <div style="background: white; padding: 8px 15px; display: flex; align-items: center; border-bottom: 1px solid #e2e8f0;">
+                  <div style="width: auto; height: auto; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    <img src="${
+                      SCHOOL_CONFIG.logo
+                    }" alt="Logo" style="width: auto; height: 70px; object-fit: contain;" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size: 28pt; color: #3b82f6;\\'>🏫</span>';" />
+                  </div>
                 </div>
-                <div style="font-size: 8pt; color: rgba(255,255,255,0.9); margin-top: 2px; font-weight: 500;">
-                  ${examName} — ${academicYear}
+                
+                <!-- School Name & Title Section - Blue Background -->
+                <div style="flex: 1; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); padding: 8px 15px; display: flex; align-items: center; justify-content: space-between;">
+                  
+                  <!-- School Info -->
+                  <div>
+                    <h1 style="margin: 0; font-size: 14pt; font-weight: 800; color: white; letter-spacing: 0.5px;">
+                      ${SCHOOL_CONFIG.name}
+                    </h1>
+                    <p style="margin: 2px 0 0 0; font-size: 7pt; color: rgba(255,255,255,0.9);">
+                      📍 ${SCHOOL_CONFIG.address}
+                    </p>
+                  </div>
+                  
+                  <!-- Title -->
+                  <div style="text-align: center;">
+                    <div style="background: rgba(255,255,255,0.15); padding: 6px 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
+                      <div style="font-size: 12pt; font-weight: 800; color: white; text-transform: uppercase; letter-spacing: 2px;">
+                        📋 Performance Report
+                      </div>
+                      <div style="font-size: 8pt; color: rgba(255,255,255,0.9); margin-top: 2px; font-weight: 500;">
+                        ${examName} — ${academicYear}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Student Info Bar -->
+              <div style="background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%); padding: 8px 15px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; border-bottom: 1px solid #e2e8f0;">
+                <div style="display: flex; flex-direction: column;">
+                  <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Student Name</span>
+                  <span style="font-size: 9pt; color: #0f172a; font-weight: 700;">${
+                    result.studentId?.studentName || "-"
+                  }</span>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                  <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Father's Name</span>
+                  <span style="font-size: 8pt; color: #334155; font-weight: 500;">${
+                    result.studentId?.fatherName || "-"
+                  }</span>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                  <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Reg Number</span>
+                  <span style="font-size: 9pt; color: #0f172a; font-weight: 700;">${
+                    result.studentId?.rollNumber || "-"
+                  }</span>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                  <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Class & Section</span>
+                  <span style="font-size: 9pt; color: #0f172a; font-weight: 700;">${getClassLabel(
+                    result.class
+                  )} — ${getSectionLabel(result.section)}</span>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                  <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Exam Type</span>
+                  <span style="font-size: 8pt; color: #334155; font-weight: 500;">${
+                    result.examId?.examType || "Annual"
+                  }</span>
                 </div>
               </div>
             </div>
             
-            <!-- Student Photo -->
-            <div>
-              <div style="width: 55px; height: 65px; background: white; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid rgba(255,255,255,0.3);">
-                ${(() => {
-                  const imgData = result.studentId?.img;
-                  if (!imgData) {
-                    return `<div style="text-align: center; color: #94a3b8;"><div style="font-size: 20pt;">👤</div></div>`;
-                  }
-
-                  if (
-                    imgData &&
-                    typeof imgData === "object" &&
-                    "data" in imgData
-                  ) {
-                    const safeImg = imgData as {
-                      data: string;
-                      contentType?: string;
-                    };
-                    const base64Data = safeImg.data;
-                    const contentType = safeImg.contentType || "image/jpeg";
-                    return `<img src="data:${contentType};base64,${base64Data}" alt="Photo" style="width: 100%; height: 100%; object-fit: cover;" />`;
-                  }
-
-                  if (typeof imgData === "string") {
-                    const imgSrc = imgData.startsWith("data:")
-                      ? imgData
-                      : `data:image/jpeg;base64,${imgData}`;
-                    return `<img src="${imgSrc}" alt="Photo" style="width: 100%; height: 100%; object-fit: cover;" />`;
-                  }
-
-                  return `<div style="text-align: center; color: #94a3b8;"><div style="font-size: 20pt;">👤</div></div>`;
-                })()}
+             <!-- Spanning Student Photo Column -->
+            <div style="transform: translateX(-5%); padding: 0 15px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <div style="width: 100px; height: 135px; background: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 3px solid rgba(255,255,255,0.6); box-shadow: 0 6px 20px rgba(0,0,0,0.2);">
+                ${studentPhotoHTML}
               </div>
-            </div>
-          </div>
-          
-          <!-- Student Info Bar -->
-          <div style="background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%); padding: 6px 15px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;">
-            <div style="display: flex; flex-direction: column;">
-              <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Student Name</span>
-              <span style="font-size: 9pt; color: #0f172a; font-weight: 700;">${
-                result.studentId?.studentName || "-"
-              }</span>
-            </div>
-            <div style="display: flex; flex-direction: column;">
-              <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Father's Name</span>
-              <span style="font-size: 8pt; color: #334155; font-weight: 500;">${
-                result.studentId?.fatherName || "-"
-              }</span>
-            </div>
-            <div style="display: flex; flex-direction: column;">
-              <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Reg Number</span>
-              <span style="font-size: 9pt; color: #0f172a; font-weight: 700;">${
-                result.studentId?.rollNumber || "-"
-              }</span>
-            </div>
-            <div style="display: flex; flex-direction: column;">
-              <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Class & Section</span>
-              <span style="font-size: 9pt; color: #0f172a; font-weight: 700;">${getClassLabel(
-                result.class
-              )} — ${getSectionLabel(result.section)}</span>
-            </div>
-            <div style="display: flex; flex-direction: column;">
-              <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Exam Type</span>
-              <span style="font-size: 8pt; color: #334155; font-weight: 500;">${
-                result.examId?.examType || "Annual"
-              }</span>
             </div>
           </div>
           
@@ -881,22 +890,18 @@ const generateResultCardHTML = (
           <div style="background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%); padding: 8px 15px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; flex-shrink: 0;">
             
             <!-- Signatures -->
-            <div style="display: flex; gap: 30px;">
+            <div style="display: flex; gap: 150px;">
               <div style="text-align: center;">
-                <div style="width: 80px; border-top: 1.5px solid #1e293b; padding-top: 3px;">
+                <div style="width: 150px; border-top: 1.5px solid #1e293b; padding-top: 3px;">
                   <span style="font-size: 6pt; color: #475569; font-weight: 600;">Class Teacher</span>
                 </div>
               </div>
               <div style="text-align: center;">
-                <div style="width: 80px; border-top: 1.5px solid #1e293b; padding-top: 3px;">
+                <div style="width: 150px; border-top: 1.5px solid #1e293b; padding-top: 3px;">
                   <span style="font-size: 6pt; color: #475569; font-weight: 600;">Principal</span>
                 </div>
               </div>
-              <div style="text-align: center;">
-                <div style="width: 80px; border-top: 1.5px solid #1e293b; padding-top: 3px;">
-                  <span style="font-size: 6pt; color: #475569; font-weight: 600;">Parent Sign</span>
-                </div>
-              </div>
+            
             </div>
             
             <!-- Print Info -->
@@ -919,7 +924,6 @@ const generateResultCardHTML = (
     </html>
   `;
 };
-
 // ==================== PAGINATION COMPONENT ====================
 
 function Pagination({
