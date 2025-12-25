@@ -738,7 +738,7 @@ const generateResultCardHTML = (
               </div>
               
               <!-- Student Info Bar -->
-              <div style="background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%); padding: 8px 15px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; border-bottom: 1px solid #e2e8f0;">
+              <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 8px 15px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; border-bottom: 1px solid #e2e8f0;">
                 <div style="display: flex; flex-direction: column;">
                   <span style="font-size: 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Student Name</span>
                   <span style="font-size: 9pt; color: #0f172a; font-weight: 700;">${
