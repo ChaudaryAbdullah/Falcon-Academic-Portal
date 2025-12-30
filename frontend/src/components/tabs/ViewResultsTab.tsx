@@ -1544,7 +1544,7 @@ export default function ViewResultsTab({
           halign: "center",
           valign: "middle",
         },
-        columnStyles: columnStyles,
+        // columnStyles: columnStyles,
         didParseCell: function (data: any) {
           // Color code results
           if (data.column.index === columns.length - 1) {
