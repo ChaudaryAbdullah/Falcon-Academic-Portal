@@ -1474,7 +1474,7 @@ export default function ViewResultsTab({
       // Prepare columns
       const columns: any[] = [
         { header: "Sr#", dataKey: "sr" },
-        { header: "Roll No", dataKey: "rollNo" },
+        { header: "Reg No", dataKey: "rollNo" },
         { header: "Student Name", dataKey: "name" },
       ];
 
@@ -1888,7 +1888,7 @@ export default function ViewResultsTab({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Roll No</TableHead>
+                    <TableHead>Reg No</TableHead>
                     <TableHead>Student Name</TableHead>
                     <TableHead>Class</TableHead>
                     <TableHead>Total</TableHead>
