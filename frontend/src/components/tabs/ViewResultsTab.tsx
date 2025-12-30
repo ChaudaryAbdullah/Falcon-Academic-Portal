@@ -1360,7 +1360,7 @@ export default function ViewResultsTab({
         orientation: "landscape",
         unit: "mm",
         format: "a4",
-      }) as any;
+      });
 
       // Sort results by roll number in ascending order
       const sortedResults = [...viewResults].sort((a, b) => {
@@ -1379,28 +1379,27 @@ export default function ViewResultsTab({
         return rollA.localeCompare(rollB);
       });
 
-      // Get all unique subjects from first result
+      // Get all unique subjects from first result with consistent keys
       const allSubjects =
-        sortedResults[0]?.subjects.map((s) => ({
-          name: s.subjectId?.subjectName || "Subject",
-          code: s.subjectId?.subjectCode || "",
+        sortedResults[0]?.subjects.map((s, index) => ({
+          name: s.subjectId?.subjectName || `Subject ${index + 1}`,
+          code: s.subjectId?.subjectCode || `SUB${index + 1}`,
           totalMarks: s.totalMarks,
+          // Create a unique consistent key
+          key: `subject_${index}`,
         })) || [];
 
       // Prepare table data
       const tableData = sortedResults.map((result, index) => {
-        const row: any = {
+        const row: Record<string, string | number> = {
           sr: index + 1,
           rollNo: result.studentId?.rollNumber || "-",
           name: result.studentId?.studentName || "-",
         };
 
-        // Add subject marks
-        result.subjects.forEach((subject) => {
-          const key =
-            subject.subjectId?.subjectCode ||
-            subject.subjectId?.subjectName ||
-            "SUB";
+        // Add subject marks using consistent keys
+        result.subjects.forEach((subject, subIndex) => {
+          const key = `subject_${subIndex}`;
           row[key] = subject.obtainedMarks?.toFixed(1) || "0";
         });
 
@@ -1428,35 +1427,31 @@ export default function ViewResultsTab({
 
       // Subject averages
       const subjectAverages: Record<string, number> = {};
-      allSubjects.forEach((subject) => {
-        const key = subject.code || subject.name;
+      allSubjects.forEach((subject, index) => {
         const total = sortedResults.reduce((sum, result) => {
-          const subj = result.subjects.find(
-            (s) =>
-              (s.subjectId?.subjectCode || s.subjectId?.subjectName) === key
-          );
+          const subj = result.subjects[index];
           return sum + (subj?.obtainedMarks || 0);
         }, 0);
-        subjectAverages[key] = total / totalStudents;
+        subjectAverages[subject.code] = total / totalStudents;
       });
 
       // Header
       pdf.setFontSize(16);
-      pdf.setFont(undefined, "bold");
+      pdf.setFont("helvetica", "bold");
       pdf.text(SCHOOL_CONFIG.name, 148.5, 15, { align: "center" });
 
       pdf.setFontSize(10);
-      pdf.setFont(undefined, "normal");
+      pdf.setFont("helvetica", "normal");
       pdf.text(SCHOOL_CONFIG.address, 148.5, 21, { align: "center" });
 
       pdf.setFontSize(14);
-      pdf.setFont(undefined, "bold");
+      pdf.setFont("helvetica", "bold");
       pdf.text("Examination Marks Sheet (All Subjects)", 148.5, 28, {
         align: "center",
       });
 
       pdf.setFontSize(10);
-      pdf.setFont(undefined, "normal");
+      pdf.setFont("helvetica", "normal");
       const examInfo = `${currentExam?.examName || "Exam"} - ${
         currentExam?.academicYear || new Date().getFullYear()
       }`;
@@ -1472,18 +1467,17 @@ export default function ViewResultsTab({
       pdf.text(classInfo, 148.5, 40, { align: "center" });
 
       // Prepare columns
-      const columns: any[] = [
+      const columns: { header: string; dataKey: string }[] = [
         { header: "Sr#", dataKey: "sr" },
         { header: "Reg No", dataKey: "rollNo" },
         { header: "Student Name", dataKey: "name" },
       ];
 
-      // Add subject columns
+      // Add subject columns with consistent keys
       allSubjects.forEach((subject) => {
-        const key = subject.code || subject.name;
         columns.push({
           header: `${subject.code}\n(${subject.totalMarks})`,
-          dataKey: key,
+          dataKey: subject.key,
         });
       });
 
@@ -1495,6 +1489,42 @@ export default function ViewResultsTab({
         { header: "Result", dataKey: "result" }
       );
 
+      // Calculate dynamic column widths
+      const pageWidth = 297; // A4 landscape width in mm
+      const margins = 20; // Total margins
+      const availableWidth = pageWidth - margins;
+
+      const fixedColumnsWidth = 10 + 18 + 40 + 15 + 12 + 12 + 15; // Sr, Roll, Name, Total, %, Grade, Result
+      const subjectColumnWidth = Math.max(
+        12,
+        (availableWidth - fixedColumnsWidth) / allSubjects.length
+      );
+
+      // Generate column styles
+      const columnStyles: Record<
+        number,
+        { halign?: string; cellWidth?: number }
+      > = {
+        0: { halign: "center", cellWidth: 10 }, // Sr#
+        1: { halign: "center", cellWidth: 18 }, // Reg No
+        2: { halign: "left", cellWidth: 40 }, // Name
+      };
+
+      // Add subject column styles
+      allSubjects.forEach((_, index) => {
+        columnStyles[3 + index] = {
+          halign: "center",
+          cellWidth: subjectColumnWidth,
+        };
+      });
+
+      // Add final column styles
+      const lastSubjectIndex = 3 + allSubjects.length;
+      columnStyles[lastSubjectIndex] = { halign: "center", cellWidth: 15 }; // Total
+      columnStyles[lastSubjectIndex + 1] = { halign: "center", cellWidth: 12 }; // %
+      columnStyles[lastSubjectIndex + 2] = { halign: "center", cellWidth: 12 }; // Grade
+      columnStyles[lastSubjectIndex + 3] = { halign: "center", cellWidth: 15 }; // Result
+
       // Generate table
       autoTable(pdf, {
         startY: 45,
@@ -1505,21 +1535,20 @@ export default function ViewResultsTab({
           fontSize: 7,
           cellPadding: 2,
           overflow: "linebreak",
+          halign: "center",
         },
         headStyles: {
           fillColor: [30, 41, 59],
           textColor: [255, 255, 255],
           fontStyle: "bold",
           halign: "center",
+          valign: "middle",
         },
-        columnStyles: {
-          0: { halign: "center", cellWidth: 10 },
-          1: { halign: "center", cellWidth: 18 },
-          2: { halign: "left", cellWidth: 40 },
-        },
+        columnStyles: columnStyles,
         didParseCell: function (data: any) {
           // Color code results
-          if (data.column.dataKey === "result") {
+          if (data.column.index === columns.length - 1) {
+            // Result column
             if (data.cell.raw === "Pass") {
               data.cell.styles.textColor = [22, 163, 74];
               data.cell.styles.fontStyle = "bold";
@@ -1529,8 +1558,13 @@ export default function ViewResultsTab({
             }
           }
           // Color code grades
-          if (data.column.dataKey === "grade") {
+          if (data.column.index === columns.length - 2) {
+            // Grade column
             data.cell.styles.fontStyle = "bold";
+          }
+          // Make name column left aligned
+          if (data.column.index === 2 && data.section === "body") {
+            data.cell.styles.halign = "left";
           }
         },
       });
@@ -1539,10 +1573,10 @@ export default function ViewResultsTab({
       const finalY = (pdf as any).lastAutoTable.finalY + 10;
 
       pdf.setFontSize(9);
-      pdf.setFont(undefined, "bold");
+      pdf.setFont("helvetica", "bold");
       pdf.text("Summary Statistics:", 15, finalY);
 
-      pdf.setFont(undefined, "normal");
+      pdf.setFont("helvetica", "normal");
       let yPos = finalY + 6;
 
       pdf.text(`Total Students: ${totalStudents}`, 15, yPos);
@@ -1551,15 +1585,14 @@ export default function ViewResultsTab({
       pdf.text(`Average %: ${avgPercentage}%`, 180, yPos);
 
       yPos += 6;
-      pdf.setFont(undefined, "bold");
+      pdf.setFont("helvetica", "bold");
       pdf.text("Subject-wise Averages:", 15, yPos);
 
       yPos += 5;
-      pdf.setFont(undefined, "normal");
+      pdf.setFont("helvetica", "normal");
       let xPos = 15;
       allSubjects.forEach((subject, index) => {
-        const key = subject.code || subject.name;
-        const avg = subjectAverages[key]?.toFixed(1) || "0";
+        const avg = subjectAverages[subject.code]?.toFixed(1) || "0";
         pdf.text(`${subject.code}: ${avg}`, xPos, yPos);
         xPos += 45;
         if ((index + 1) % 6 === 0) {
@@ -1570,7 +1603,7 @@ export default function ViewResultsTab({
 
       // Footer
       pdf.setFontSize(7);
-      pdf.setFont(undefined, "italic");
+      pdf.setFont("helvetica", "italic");
       pdf.text(
         `Generated on: ${new Date().toLocaleDateString("en-GB", {
           day: "2-digit",
