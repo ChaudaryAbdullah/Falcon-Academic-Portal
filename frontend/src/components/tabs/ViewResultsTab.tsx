@@ -1350,146 +1350,250 @@ export default function ViewResultsTab({
       return;
     }
 
-    toast.info("Generating PDF... This may take a moment.");
+    toast.info("Generating PDF...");
 
     try {
-      const { default: jsPDF } = await import("jspdf");
-      const html2canvas = (await import("html2canvas")).default;
+      const jsPDF = (await import("jspdf")).default;
+      const autoTable = (await import("jspdf-autotable")).default;
 
       const pdf = new jsPDF({
         orientation: "landscape",
         unit: "mm",
         format: "a4",
+      }) as any;
+
+      // Sort results by roll number in ascending order
+      const sortedResults = [...viewResults].sort((a, b) => {
+        const rollA = a.studentId?.rollNumber || "";
+        const rollB = b.studentId?.rollNumber || "";
+
+        // Try to parse as numbers first
+        const numA = parseInt(rollA);
+        const numB = parseInt(rollB);
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return numA - numB;
+        }
+
+        // Fall back to string comparison
+        return rollA.localeCompare(rollB);
       });
 
-      const pageWidth = 297;
-      const pageHeight = 210;
+      // Get all unique subjects from first result
+      const allSubjects =
+        sortedResults[0]?.subjects.map((s) => ({
+          name: s.subjectId?.subjectName || "Subject",
+          code: s.subjectId?.subjectCode || "",
+          totalMarks: s.totalMarks,
+        })) || [];
 
-      // Create a visible container (but off-screen)
-      const container = document.createElement("div");
-      container.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 297mm;
-      height: 210mm;
-      z-index: -9999;
-      opacity: 0;
-      pointer-events: none;
-      overflow: visible;
-    `;
-      document.body.appendChild(container);
+      // Prepare table data
+      const tableData = sortedResults.map((result, index) => {
+        const row: any = {
+          sr: index + 1,
+          rollNo: result.studentId?.rollNumber || "-",
+          name: result.studentId?.studentName || "-",
+        };
 
-      for (let i = 0; i < viewResults.length; i++) {
-        const result = viewResults[i];
+        // Add subject marks
+        result.subjects.forEach((subject) => {
+          const key =
+            subject.subjectId?.subjectCode ||
+            subject.subjectId?.subjectName ||
+            "SUB";
+          row[key] = subject.obtainedMarks?.toFixed(1) || "0";
+        });
 
-        // Show progress
-        toast.info(`Processing ${i + 1} of ${viewResults.length}...`);
+        // Add totals
+        row.total = result.totalObtainedMarks?.toFixed(1) || "0";
+        row.percentage = result.percentage?.toFixed(1) || "0";
+        row.grade = result.grade || "-";
+        row.result = result.result || "Pending";
 
-        // Create iframe for isolated rendering
-        const iframe = document.createElement("iframe");
-        iframe.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 297mm;
-        height: 210mm;
-        border: none;
-        z-index: -9999;
-        opacity: 0;
-      `;
-        document.body.appendChild(iframe);
+        return row;
+      });
 
-        // Write HTML to iframe
-        const htmlContent = generateResultCardHTML(result, i + 1);
-        const iframeDoc =
-          iframe.contentDocument || iframe.contentWindow?.document;
+      // Calculate statistics
+      const totalStudents = sortedResults.length;
+      const passedStudents = sortedResults.filter(
+        (r) => r.result === "Pass"
+      ).length;
+      const failedStudents = sortedResults.filter(
+        (r) => r.result === "Fail"
+      ).length;
+      const avgPercentage = (
+        sortedResults.reduce((sum, r) => sum + (r.percentage || 0), 0) /
+        totalStudents
+      ).toFixed(2);
 
-        if (!iframeDoc) {
-          console.error("Could not access iframe document");
-          document.body.removeChild(iframe);
-          continue;
-        }
+      // Subject averages
+      const subjectAverages: Record<string, number> = {};
+      allSubjects.forEach((subject) => {
+        const key = subject.code || subject.name;
+        const total = sortedResults.reduce((sum, result) => {
+          const subj = result.subjects.find(
+            (s) =>
+              (s.subjectId?.subjectCode || s.subjectId?.subjectName) === key
+          );
+          return sum + (subj?.obtainedMarks || 0);
+        }, 0);
+        subjectAverages[key] = total / totalStudents;
+      });
 
-        iframeDoc.open();
-        iframeDoc.write(htmlContent);
-        iframeDoc.close();
+      // Header
+      pdf.setFontSize(16);
+      pdf.setFont(undefined, "bold");
+      pdf.text(SCHOOL_CONFIG.name, 148.5, 15, { align: "center" });
 
-        // Wait for content to render
-        await new Promise((resolve) => setTimeout(resolve, 500));
+      pdf.setFontSize(10);
+      pdf.setFont(undefined, "normal");
+      pdf.text(SCHOOL_CONFIG.address, 148.5, 21, { align: "center" });
 
-        // Wait for images to load
-        const images = iframeDoc.querySelectorAll("img");
-        await Promise.all(
-          Array.from(images).map(
-            (img) =>
-              new Promise((resolve) => {
-                if (img.complete) {
-                  resolve(true);
-                } else {
-                  img.onload = () => resolve(true);
-                  img.onerror = () => resolve(true);
-                }
-              })
-          )
-        );
+      pdf.setFontSize(14);
+      pdf.setFont(undefined, "bold");
+      pdf.text("Examination Marks Sheet (All Subjects)", 148.5, 28, {
+        align: "center",
+      });
 
-        // Additional delay for fonts and styles
-        await new Promise((resolve) => setTimeout(resolve, 300));
+      pdf.setFontSize(10);
+      pdf.setFont(undefined, "normal");
+      const examInfo = `${currentExam?.examName || "Exam"} - ${
+        currentExam?.academicYear || new Date().getFullYear()
+      }`;
+      pdf.text(examInfo, 148.5, 34, { align: "center" });
 
-        // Get the page container element
-        const cardElement = iframeDoc.querySelector(
-          ".page-container"
-        ) as HTMLElement;
+      // Class and Section info
+      pdf.setFontSize(9);
+      const classInfo = `Class: ${getClassLabel(
+        selectedClass === "all" ? viewResults[0]?.class : selectedClass
+      )} | Section: ${
+        selectedSection === "all" ? "All" : getSectionLabel(selectedSection)
+      }`;
+      pdf.text(classInfo, 148.5, 40, { align: "center" });
 
-        if (cardElement) {
-          try {
-            const canvas = await html2canvas(cardElement, {
-              scale: 1,
-              useCORS: true,
-              allowTaint: true,
-              logging: false,
-              backgroundColor: "#f8fafc",
-              width: 1122, // 297mm at 96dpi
-              height: 793, // 210mm at 96dpi
-              windowWidth: 1122,
-              windowHeight: 793,
-            });
+      // Prepare columns
+      const columns: any[] = [
+        { header: "Sr#", dataKey: "sr" },
+        { header: "Roll No", dataKey: "rollNo" },
+        { header: "Student Name", dataKey: "name" },
+      ];
 
-            const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      // Add subject columns
+      allSubjects.forEach((subject) => {
+        const key = subject.code || subject.name;
+        columns.push({
+          header: `${subject.code}\n(${subject.totalMarks})`,
+          dataKey: key,
+        });
+      });
 
-            if (i > 0) {
-              pdf.addPage();
+      // Add total columns
+      columns.push(
+        { header: "Total", dataKey: "total" },
+        { header: "%", dataKey: "percentage" },
+        { header: "Grade", dataKey: "grade" },
+        { header: "Result", dataKey: "result" }
+      );
+
+      // Generate table
+      autoTable(pdf, {
+        startY: 45,
+        head: [columns.map((col) => col.header)],
+        body: tableData.map((row) => columns.map((col) => row[col.dataKey])),
+        theme: "grid",
+        styles: {
+          fontSize: 7,
+          cellPadding: 2,
+          overflow: "linebreak",
+        },
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          halign: "center",
+        },
+        columnStyles: {
+          0: { halign: "center", cellWidth: 10 },
+          1: { halign: "center", cellWidth: 18 },
+          2: { halign: "left", cellWidth: 40 },
+        },
+        didParseCell: function (data: any) {
+          // Color code results
+          if (data.column.dataKey === "result") {
+            if (data.cell.raw === "Pass") {
+              data.cell.styles.textColor = [22, 163, 74];
+              data.cell.styles.fontStyle = "bold";
+            } else if (data.cell.raw === "Fail") {
+              data.cell.styles.textColor = [220, 38, 38];
+              data.cell.styles.fontStyle = "bold";
             }
-
-            pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, pageHeight);
-          } catch (canvasError) {
-            console.error(
-              `Error capturing canvas for result ${i + 1}:`,
-              canvasError
-            );
           }
-        } else {
-          console.error(`Could not find .page-container for result ${i + 1}`);
+          // Color code grades
+          if (data.column.dataKey === "grade") {
+            data.cell.styles.fontStyle = "bold";
+          }
+        },
+      });
+
+      // Statistics footer
+      const finalY = (pdf as any).lastAutoTable.finalY + 10;
+
+      pdf.setFontSize(9);
+      pdf.setFont(undefined, "bold");
+      pdf.text("Summary Statistics:", 15, finalY);
+
+      pdf.setFont(undefined, "normal");
+      let yPos = finalY + 6;
+
+      pdf.text(`Total Students: ${totalStudents}`, 15, yPos);
+      pdf.text(`Passed: ${passedStudents}`, 70, yPos);
+      pdf.text(`Failed: ${failedStudents}`, 125, yPos);
+      pdf.text(`Average %: ${avgPercentage}%`, 180, yPos);
+
+      yPos += 6;
+      pdf.setFont(undefined, "bold");
+      pdf.text("Subject-wise Averages:", 15, yPos);
+
+      yPos += 5;
+      pdf.setFont(undefined, "normal");
+      let xPos = 15;
+      allSubjects.forEach((subject, index) => {
+        const key = subject.code || subject.name;
+        const avg = subjectAverages[key]?.toFixed(1) || "0";
+        pdf.text(`${subject.code}: ${avg}`, xPos, yPos);
+        xPos += 45;
+        if ((index + 1) % 6 === 0) {
+          xPos = 15;
+          yPos += 5;
         }
+      });
 
-        // Clean up iframe
-        document.body.removeChild(iframe);
-      }
-
-      // Clean up container
-      document.body.removeChild(container);
+      // Footer
+      pdf.setFontSize(7);
+      pdf.setFont(undefined, "italic");
+      pdf.text(
+        `Generated on: ${new Date().toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })} | ${SCHOOL_CONFIG.motto}`,
+        148.5,
+        200,
+        { align: "center" }
+      );
 
       // Save the PDF
-      const fileName = `Results_${
+      const fileName = `Marks_Sheet_${
         currentExam?.examName?.replace(/\s+/g, "_") || "Exam"
-      }_${new Date().toISOString().split("T")[0]}.pdf`;
+      }_${getClassLabel(
+        selectedClass === "all" ? viewResults[0]?.class : selectedClass
+      )}_${new Date().toISOString().split("T")[0]}.pdf`;
 
       pdf.save(fileName);
       toast.success("PDF exported successfully!");
     } catch (error) {
       console.error("Error generating PDF:", error);
-      toast.error("Failed to generate PDF. Try the Print option instead.");
+      toast.error("Failed to generate PDF");
     }
   };
 
