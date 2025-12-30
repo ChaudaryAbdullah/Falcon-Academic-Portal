@@ -20,7 +20,7 @@ import AdminSidebar from "../components/AdminSidebar";
 import axios from "axios";
 import { Toaster } from "sonner";
 
-// Lazy load components - they will only be loaded when needed
+// Lazy load components
 const StudentManagement = lazy(() =>
   import("../components/StudentManagment").then((module) => ({
     default: module.StudentManagement,
@@ -48,7 +48,6 @@ const ResultsManagement = lazy(() => import("../components/ResultManagement"));
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
-// Loading Spinner Component
 const LoadingSpinner = () => (
   <div className="flex flex-col items-center justify-center min-h-[400px]">
     <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
@@ -56,7 +55,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
-// Interfaces remain the same...
+// All interfaces...
 interface Student {
   _id: string;
   rollNumber: string;
@@ -213,7 +212,6 @@ interface Result {
   isPublished: boolean;
 }
 
-// Define which tabs need which data
 const TAB_DATA_REQUIREMENTS: Record<string, string[]> = {
   dashboard: ["counts"],
   students: ["students"],
@@ -229,7 +227,7 @@ const TAB_DATA_REQUIREMENTS: Record<string, string[]> = {
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
 
-  // Data states - null means not loaded yet
+  // Data states
   const [students, setStudents] = useState<Student[] | null>(null);
   const [teachers, setTeachers] = useState<Teacher[] | null>(null);
   const [feeStructure, setFeeStructure] = useState<FeeStructureType[] | null>(
@@ -244,28 +242,100 @@ export default function AdminDashboard() {
   const [exams, setExams] = useState<Exam[] | null>(null);
   const [results, setResults] = useState<Result[] | null>(null);
 
-  // Dashboard counts (lightweight alternative)
   const [counts, setCounts] = useState<{
     students: number;
     teachers: number;
   } | null>(null);
-
-  // Loading states
   const [isLoading, setIsLoading] = useState(false);
-
-  // Track loaded data to prevent refetching
   const [loadedData, setLoadedData] = useState<Set<string>>(new Set());
+
+  isLoading;
+  // ✅ WRAPPER SETTERS - These convert null types to non-null types
+  const handleSetStudents = useCallback(
+    (value: React.SetStateAction<Student[]>) => {
+      setStudents((prev) => {
+        const currentValue = prev || [];
+        return typeof value === "function" ? value(currentValue) : value;
+      });
+    },
+    []
+  );
+
+  const handleSetTeachers = useCallback(
+    (value: React.SetStateAction<Teacher[]>) => {
+      setTeachers((prev) => {
+        const currentValue = prev || [];
+        return typeof value === "function" ? value(currentValue) : value;
+      });
+    },
+    []
+  );
+
+  const handleSetFeeStructure = useCallback(
+    (value: React.SetStateAction<FeeStructureType[]>) => {
+      setFeeStructure((prev) => {
+        const currentValue = prev || [];
+        return typeof value === "function" ? value(currentValue) : value;
+      });
+    },
+    []
+  );
+
+  const handleSetChallans = useCallback(
+    (value: React.SetStateAction<FeeChallan[]>) => {
+      setChallans((prev) => {
+        const currentValue = prev || [];
+        return typeof value === "function" ? value(currentValue) : value;
+      });
+    },
+    []
+  );
+
+  const handleSetPaperFundChallans = useCallback(
+    (value: React.SetStateAction<PaperFundChallan[]>) => {
+      setPaperFundChallans((prev) => {
+        const currentValue = prev || [];
+        return typeof value === "function" ? value(currentValue) : value;
+      });
+    },
+    []
+  );
+
+  const handleSetSubjects = useCallback(
+    (value: React.SetStateAction<Subject[]>) => {
+      setSubjects((prev) => {
+        const currentValue = prev || [];
+        return typeof value === "function" ? value(currentValue) : value;
+      });
+    },
+    []
+  );
+
+  const handleSetExams = useCallback((value: React.SetStateAction<Exam[]>) => {
+    setExams((prev) => {
+      const currentValue = prev || [];
+      return typeof value === "function" ? value(currentValue) : value;
+    });
+  }, []);
+
+  const handleSetResults = useCallback(
+    (value: React.SetStateAction<Result[]>) => {
+      setResults((prev) => {
+        const currentValue = prev || [];
+        return typeof value === "function" ? value(currentValue) : value;
+      });
+    },
+    []
+  );
 
   // Fetch functions
   const fetchCounts = useCallback(async () => {
     if (loadedData.has("counts")) return;
     try {
-      // Try to get counts from a lightweight endpoint first
-      // If your backend doesn't have a count endpoint, use the regular endpoints
       const [studentsRes, teachersRes] = await Promise.all([
         axios.get(`${BACKEND}/api/students`, {
           withCredentials: true,
-          params: { limit: 1, countOnly: true }, // Add support for this in backend
+          params: { limit: 1, countOnly: true },
         }),
         axios.get(`${BACKEND}/api/teachers`, {
           withCredentials: true,
@@ -473,7 +543,6 @@ export default function AdminDashboard() {
     fetchResults,
   ]);
 
-  // Check if required data is loaded for current tab
   const isDataReady = (tab: string): boolean => {
     const requirements = TAB_DATA_REQUIREMENTS[tab] || [];
     return requirements.every((req) => {
@@ -505,7 +574,6 @@ export default function AdminDashboard() {
   };
 
   const renderContent = () => {
-    // Show loading if data for current tab isn't ready
     if (!isDataReady(activeTab)) {
       return <LoadingSpinner />;
     }
@@ -516,7 +584,7 @@ export default function AdminDashboard() {
           <Suspense fallback={<LoadingSpinner />}>
             <StudentManagement
               students={students || []}
-              setStudents={setStudents}
+              setStudents={handleSetStudents}
             />
           </Suspense>
         );
@@ -525,7 +593,7 @@ export default function AdminDashboard() {
           <Suspense fallback={<LoadingSpinner />}>
             <TeacherManagement
               teachers={teachers || []}
-              setTeachers={setTeachers}
+              setTeachers={handleSetTeachers}
             />
           </Suspense>
         );
@@ -535,10 +603,10 @@ export default function AdminDashboard() {
             <FeeManagement
               students={students || []}
               feeStructure={feeStructure || []}
-              setFeeStructure={setFeeStructure}
+              setFeeStructure={handleSetFeeStructure}
               studentDiscounts={studentDiscounts || []}
               challans={challans || []}
-              setChallans={setChallans}
+              setChallans={handleSetChallans}
             />
           </Suspense>
         );
@@ -549,7 +617,7 @@ export default function AdminDashboard() {
               students={students || []}
               feeStructure={feeStructure || []}
               challans={paperFundChallans || []}
-              setChallans={setPaperFundChallans}
+              setChallans={handleSetPaperFundChallans}
             />
           </Suspense>
         );
@@ -558,7 +626,7 @@ export default function AdminDashboard() {
           <Suspense fallback={<LoadingSpinner />}>
             <FeeStructure
               feeStructures={feeStructure || []}
-              setFeeStructures={setFeeStructure}
+              setFeeStructures={handleSetFeeStructure}
             />
           </Suspense>
         );
@@ -580,11 +648,11 @@ export default function AdminDashboard() {
             <ResultsManagement
               students={students || []}
               subjects={subjects || []}
-              setSubjects={setSubjects}
+              setSubjects={handleSetSubjects}
               exams={exams || []}
-              setExams={setExams}
+              setExams={handleSetExams}
               results={results || []}
-              setResults={setResults}
+              setResults={handleSetResults}
             />
           </Suspense>
         );
