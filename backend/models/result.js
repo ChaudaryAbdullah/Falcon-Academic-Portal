@@ -142,13 +142,16 @@ const resultSchema = new mongoose.Schema(
 // ============ HELPER FUNCTIONS ============
 
 function calculateGrade(percentage) {
-  if (percentage >= 90) return "A+";
-  if (percentage >= 80) return "A";
-  if (percentage >= 70) return "B";
-  if (percentage >= 60) return "C";
-  if (percentage >= 50) return "D";
-  if (percentage >= 40) return "E";
-  return "F";
+  if (percentage >= 95) return "A++";
+  else if (percentage >= 90) return "A+";
+  else if (percentage >= 85) return "A";
+  else if (percentage >= 80) return "B++";
+  else if (percentage >= 75) return "B+";
+  else if (percentage >= 70) return "B";
+  else if (percentage >= 60) return "C";
+  else if (percentage >= 50) return "D";
+  else if (percentage >= 40) return "E";
+  return "U";
 }
 
 function roundToTwo(num) {
