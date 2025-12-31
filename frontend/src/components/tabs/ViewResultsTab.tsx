@@ -190,24 +190,30 @@ const getNextClass = (currentClass: string): string => {
 
 // Calculate grade based on percentage
 const calculateGrade = (percentage: number): string => {
-  if (percentage >= 90) return "A+";
-  if (percentage >= 80) return "A";
-  if (percentage >= 70) return "B";
-  if (percentage >= 60) return "C";
-  if (percentage >= 50) return "D";
-  if (percentage >= 40) return "E";
-  return "F";
+  if (percentage >= 95) return "A++";
+  else if (percentage >= 90) return "A+";
+  else if (percentage >= 85) return "A";
+  else if (percentage >= 80) return "B++";
+  else if (percentage >= 75) return "B+";
+  else if (percentage >= 70) return "B";
+  else if (percentage >= 60) return "C";
+  else if (percentage >= 50) return "D";
+  else if (percentage >= 40) return "E";
+  return "U";
 };
 
 const getGradeColor = (grade: string): string => {
   const colors: Record<string, string> = {
+    "A++": "#098e6dff", // Emerald
     "A+": "#059669", // Emerald
     A: "#10b981", // Green
+    "B++": "#054fc5ff", // Blue
+    "B+": "#2563eb", // Blue
     B: "#3b82f6", // Blue
     C: "#8b5cf6", // Purple
     D: "#f59e0b", // Amber
     E: "#f97316", // Orange
-    F: "#ef4444", // Red
+    U: "#ef4444", // Red
   };
   return colors[grade] || "#6b7280";
 };
@@ -399,7 +405,7 @@ const generateResultCardHTML = (
           ? ((s.obtainedMarks / s.totalMarks) * 100).toFixed(1)
           : "0";
       const displayGrade = s.grade || calculateGrade(parseFloat(pct));
-      const isPassed = s.obtainedMarks >= s.passingMarks;
+
       const bgColor = rowIndex % 2 === 0 ? "#ffffff" : "#f8fafc";
       rowIndex++;
 
@@ -428,17 +434,7 @@ const generateResultCardHTML = (
               ${displayGrade}
             </span>
           </td>
-          <td style="padding: ${cellPadding}; border-bottom: 1px solid #e2e8f0; text-align: center;">
-            <span style="background-color: ${
-              isPassed ? "#dcfce7" : "#fee2e2"
-            }; color: ${
-        isPassed ? "#166534" : "#991b1b"
-      }; padding: 2px 6px; border-radius: 10px; font-weight: 600; font-size: ${
-        isVeryCompact ? "6pt" : "7pt"
-      }; text-transform: uppercase;">
-              ${isPassed ? "✓ Pass" : "✗ Fail"}
-            </span>
-          </td>
+         
         </tr>
       `;
     } else {
@@ -499,13 +495,7 @@ const generateResultCardHTML = (
                 ${individualGrade}
               </span>
             </td>
-            <td style="padding: ${
-              isVeryCompact ? "3px 6px" : "4px 8px"
-            }; border-bottom: 1px solid #e0f2fe; text-align: center; color: #94a3b8; font-size: ${
-          isVeryCompact ? "6pt" : "7pt"
-        };">
-              —
-            </td>
+           
           </tr>
         `;
       });
@@ -534,18 +524,7 @@ const generateResultCardHTML = (
             };">
               ${group.grade}
             </span>
-          </td>
-          <td style="padding: ${cellPadding}; border-bottom: 2px solid #0284c7; text-align: center;">
-            <span style="background-color: ${
-              group.isPassed ? "rgba(255,255,255,0.9)" : "rgba(254,202,202,0.9)"
-            }; color: ${
-        group.isPassed ? "#166534" : "#991b1b"
-      }; padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: ${
-        isVeryCompact ? "6pt" : "7pt"
-      };">
-              ${group.isPassed ? "✓ PASS" : "✗ FAIL"}
-            </span>
-          </td>
+         
         </tr>
       `;
     }
@@ -804,9 +783,7 @@ const generateResultCardHTML = (
                       <th style="padding: ${headerPadding}; text-align: center; color: white; font-weight: 600; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; width: 12%;">
                         Grade
                       </th>
-                      <th style="padding: ${headerPadding}; text-align: center; color: white; font-weight: 600; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; width: 15%;">
-                        Status
-                      </th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -833,16 +810,7 @@ const generateResultCardHTML = (
                           ${result.grade}
                         </span>
                       </td>
-                      <td style="padding: ${headerPadding}; text-align: center;">
-                        <span style="background: ${
-                          result.result === "Pass"
-                            ? "#10b981"
-                            : result.result === "Fail"
-                            ? "#ef4444"
-                            : "#f59e0b"
-                        }; color: white; padding: 3px 10px; border-radius: 15px; font-weight: 700; font-size: 8pt; text-transform: uppercase;">
-                          ${result.result}
-                        </span>
+                      
                       </td>
                     </tr>
                   </tfoot>
@@ -1930,7 +1898,7 @@ export default function ViewResultsTab({
                     <TableHead>Grade</TableHead>
                     <TableHead>Position</TableHead>
                     <TableHead>Result</TableHead>
-                    <TableHead>Status</TableHead>
+
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
