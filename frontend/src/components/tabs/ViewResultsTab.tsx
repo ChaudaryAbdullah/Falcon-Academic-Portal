@@ -405,7 +405,7 @@ const generateResultCardHTML = (
           ? ((s.obtainedMarks / s.totalMarks) * 100).toFixed(1)
           : "0";
       const displayGrade = s.grade || calculateGrade(parseFloat(pct));
-      const isPassed = s.obtainedMarks >= s.passingMarks;
+
       const bgColor = rowIndex % 2 === 0 ? "#ffffff" : "#f8fafc";
       rowIndex++;
 
