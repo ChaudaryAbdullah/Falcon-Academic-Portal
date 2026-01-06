@@ -78,7 +78,7 @@ interface Student {
   email: string;
   password: string;
   address: string;
-  discountCode?: string;
+  discountCode: string;
   img?: {
     data: string;
     contentType: string;
@@ -230,6 +230,7 @@ export function StudentManagement({
       address: "",
       email: "",
       password: "",
+      discountCode: "",
     });
     clearImage();
     setEditingStudentId(null);
