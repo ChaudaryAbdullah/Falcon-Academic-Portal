@@ -82,6 +82,10 @@ const studentSchema = mongoose.Schema(
       maxlength: 11,
       trim: true,
     },
+    discountCode: {
+      type: String,
+      trim: true,
+    },
     email: {
       type: String,
       sparse: true,

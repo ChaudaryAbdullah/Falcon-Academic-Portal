@@ -13,12 +13,22 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
+import {
   Receipt,
   Search,
   User,
   FileText,
   AlertTriangle,
   Calculator,
+  Printer,
+  X,
 } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { toast } from "sonner";
@@ -45,6 +55,7 @@ interface Student {
   email: string;
   password: string;
   address: string;
+  discountCode: string;
   img?: {
     data: string;
     contentType: string;
@@ -80,6 +91,7 @@ interface FeeChallan {
     mPhoneNumber: string;
     class: string;
     section: string;
+    discountCode: string;
   };
   month: string;
   year: string;
@@ -118,6 +130,11 @@ export function SubmitPaymentTab({
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(
     null
   );
+
+  // Modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isPartialSubmit, setIsPartialSubmit] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filteredStudents = students.filter(
     (student) =>
@@ -937,7 +954,7 @@ Falcon House School Administration
     }
 
     const receiptContent =
-      option == "termal"
+      option == "thermal"
         ? generateThermalFeeChallanHTML(
             selectedFees,
             lateFees,
@@ -1097,12 +1114,6 @@ Falcon House School Administration
         });
         setChallans(fetchResponse.data.data);
 
-        // Send WhatsApp confirmation for partial payment
-        const selectedFees: FeeChallan[] = pendingFees.filter(
-          (fee: FeeChallan) => selectedPendingFees.includes(fee.id)
-        );
-        await sendPartialPaymentConfirmation(selectedFees, amount, lateFees);
-
         toast.success(
           `Partial payment of Rs. ${amount.toLocaleString()} submitted successfully!`
         );
@@ -1121,110 +1132,110 @@ Falcon House School Administration
   };
 
   // ADD this function for partial payment WhatsApp confirmation:
-  const sendPartialPaymentConfirmation = async (
-    selectedFees: FeeChallan[],
-    paidAmount: number,
-    lateFees: { [key: string]: number }
-  ): Promise<void> => {
-    try {
-      const student = selectedFees[0].studentId;
+  //   const sendPartialPaymentConfirmation = async (
+  //     selectedFees: FeeChallan[],
+  //     paidAmount: number,
+  //     lateFees: { [key: string]: number }
+  //   ): Promise<void> => {
+  //     try {
+  //       const student = selectedFees[0].studentId;
 
-      if (!student.mPhoneNumber) {
-        toast.error(
-          `Phone number not available for ${student.studentName}. Please update the student's phone number first.`
-        );
-        return;
-      }
+  //       if (!student.mPhoneNumber) {
+  //         toast.error(
+  //           `Phone number not available for ${student.studentName}. Please update the student's phone number first.`
+  //         );
+  //         return;
+  //       }
 
-      // Format phone number (same logic as existing function)
-      let phoneNumber: string = student.mPhoneNumber
-        .toString()
-        .replace(/[\s-]/g, "");
-      phoneNumber = phoneNumber.replace(/[^\d+]/g, "");
+  //       // Format phone number (same logic as existing function)
+  //       let phoneNumber: string = student.mPhoneNumber
+  //         .toString()
+  //         .replace(/[\s-]/g, "");
+  //       phoneNumber = phoneNumber.replace(/[^\d+]/g, "");
 
-      if (phoneNumber.startsWith("+92")) {
-        phoneNumber = phoneNumber.substring(1);
-      } else if (phoneNumber.startsWith("0")) {
-        phoneNumber = "92" + phoneNumber.substring(1);
-      } else if (!phoneNumber.startsWith("92")) {
-        if (phoneNumber.startsWith("3")) {
-          phoneNumber = "92" + phoneNumber;
-        } else {
-          toast.error(
-            `Invalid phone number format for ${student.studentName}: ${student.mPhoneNumber}`
-          );
-          return;
-        }
-      }
+  //       if (phoneNumber.startsWith("+92")) {
+  //         phoneNumber = phoneNumber.substring(1);
+  //       } else if (phoneNumber.startsWith("0")) {
+  //         phoneNumber = "92" + phoneNumber.substring(1);
+  //       } else if (!phoneNumber.startsWith("92")) {
+  //         if (phoneNumber.startsWith("3")) {
+  //           phoneNumber = "92" + phoneNumber;
+  //         } else {
+  //           toast.error(
+  //             `Invalid phone number format for ${student.studentName}: ${student.mPhoneNumber}`
+  //           );
+  //           return;
+  //         }
+  //       }
 
-      if (phoneNumber.length < 12 || phoneNumber.length > 13) {
-        toast.error(
-          `Invalid phone number length for ${student.studentName}: ${student.mPhoneNumber}`
-        );
-        return;
-      }
+  //       if (phoneNumber.length < 12 || phoneNumber.length > 13) {
+  //         toast.error(
+  //           `Invalid phone number length for ${student.studentName}: ${student.mPhoneNumber}`
+  //         );
+  //         return;
+  //       }
 
-      const monthsString: string = selectedFees
-        .map((fee: FeeChallan) => `${fee.month} ${fee.year}`)
-        .join(", ");
+  //       const monthsString: string = selectedFees
+  //         .map((fee: FeeChallan) => `${fee.month} ${fee.year}`)
+  //         .join(", ");
 
-      // Calculate outstanding balance
-      const totalOutstanding: number = selectedFees.reduce(
-        (sum: number, fee: FeeChallan) => {
-          const currentBalance: number =
-            fee.remainingBalance || fee.totalAmount;
-          const lateFee: number = lateFees[fee.id] || 0;
-          return sum + currentBalance + lateFee;
-        },
-        0
-      );
+  //       // Calculate outstanding balance
+  //       const totalOutstanding: number = selectedFees.reduce(
+  //         (sum: number, fee: FeeChallan) => {
+  //           const currentBalance: number =
+  //             fee.remainingBalance || fee.totalAmount;
+  //           const lateFee: number = lateFees[fee.id] || 0;
+  //           return sum + currentBalance + lateFee;
+  //         },
+  //         0
+  //       );
 
-      const remainingBalance: number = totalOutstanding - paidAmount;
+  //       const remainingBalance: number = totalOutstanding - paidAmount;
 
-      // Create partial payment confirmation message
-      const message: string = `
-*Partial Payment Confirmation - Falcon House School*
+  //       // Create partial payment confirmation message
+  //       const message: string = `
+  // *Partial Payment Confirmation - Falcon House School*
 
-Dear ${student.fatherName || "Parent"},
+  // Dear ${student.fatherName || "Parent"},
 
-Thank you for your partial payment!
+  // Thank you for your partial payment!
 
-*Student Information:*
-• Name: ${student.studentName}
-• Registration Number: ${student.rollNumber}
-• Class: ${student.class}-${student.section}
+  // *Student Information:*
+  // • Name: ${student.studentName}
+  // • Registration Number: ${student.rollNumber}
+  // • Class: ${student.class}-${student.section}
 
-*Payment Details:*
-• Date: ${new Date().toLocaleDateString()}
-• Months: ${monthsString}
-• Amount Paid: Rs. ${paidAmount.toLocaleString()}
+  // *Payment Details:*
+  // • Date: ${new Date().toLocaleDateString()}
+  // • Months: ${monthsString}
+  // • Amount Paid: Rs. ${paidAmount.toLocaleString()}
 
-*Balance Information:*
-• Total Outstanding: Rs. ${totalOutstanding.toLocaleString()}
-• Amount Paid: Rs. ${paidAmount.toLocaleString()}
-• Remaining Balance: Rs. ${remainingBalance.toLocaleString()}
+  // *Balance Information:*
+  // • Total Outstanding: Rs. ${totalOutstanding.toLocaleString()}
+  // • Amount Paid: Rs. ${paidAmount.toLocaleString()}
+  // • Remaining Balance: Rs. ${remainingBalance.toLocaleString()}
 
-Your partial payment has been successfully recorded. The remaining balance will be allocated to pending fees.
+  // Your partial payment has been successfully recorded. The remaining balance will be allocated to pending fees.
 
-Thank you for choosing Falcon House School!
+  // Thank you for choosing Falcon House School!
 
-Best regards,
-Falcon House School Administration
-    `.trim();
+  // Best regards,
+  // Falcon House School Administration
+  //     `.trim();
 
-      const whatsappUrl: string = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
-        message
-      )}`;
-      window.open(whatsappUrl, "_blank");
+  //       const whatsappUrl: string = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
+  //         message
+  //       )}`;
+  //       window.open(whatsappUrl, "_blank");
 
-      toast.success(
-        "WhatsApp partial payment confirmation opened successfully!"
-      );
-    } catch (error) {
-      console.error("Error sending partial payment confirmation:", error);
-      toast.error("Error opening WhatsApp message. Please try again.");
-    }
-  };
+  //       toast.success(
+  //         "WhatsApp partial payment confirmation opened successfully!"
+  //       );
+  //     } catch (error) {
+  //       console.error("Error sending partial payment confirmation:", error);
+  //       toast.error("Error opening WhatsApp message. Please try again.");
+  //     }
+  //   };
 
   useEffect(() => {
     if (selectedStudent) {
@@ -1278,7 +1289,8 @@ Falcon House School Administration
     }
   };
 
-  const submitFeePayment = async () => {
+  // Handler to open modal when clicking submit
+  const handleSubmitClick = (isPartial: boolean) => {
     if (!selectedStudent || selectedPendingFees.length === 0) {
       toast.error(
         "Please select a student and at least one fee challan to process payment."
@@ -1286,12 +1298,41 @@ Falcon House School Administration
       return;
     }
 
-    try {
-      // Get selected fees for WhatsApp message
-      const selectedFees = pendingFees.filter((fee) =>
-        selectedPendingFees.includes(fee.id)
-      );
+    if (isPartial && (!partialAmount || parseFloat(partialAmount) <= 0)) {
+      toast.error("Please enter a valid partial payment amount.");
+      return;
+    }
 
+    setIsPartialSubmit(isPartial);
+    setShowPaymentModal(true);
+  };
+
+  // Handler for print and submit
+  const handlePrintAndSubmit = async (printType: "thermal" | "regular") => {
+    setIsSubmitting(true);
+    try {
+      // First print the receipt
+      printPaymentReceipt(printType);
+
+      // Then submit the payment
+      if (isPartialSubmit) {
+        await submitPartialPayment();
+      } else {
+        await submitFeePaymentInternal();
+      }
+
+      setShowPaymentModal(false);
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      toast.error("Failed to process payment. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Internal submit function without modal
+  const submitFeePaymentInternal = async () => {
+    try {
       // Check if any fees have late fees that need to be updated first
       const feesWithLateFees = selectedPendingFees.filter(
         (feeId) => lateFees[feeId] && lateFees[feeId] > 0
@@ -1344,9 +1385,6 @@ Falcon House School Administration
           return sum + (fee ? fee.totalAmount + lateFee : 0);
         }, 0);
 
-        // Send WhatsApp confirmation message
-        await sendPaymentConfirmation(selectedFees, lateFees);
-
         // Reset form
         setSelectedPendingFees([]);
         setSelectedStudent("");
@@ -1368,396 +1406,505 @@ Falcon House School Administration
     }
   };
 
+  // Keep original function for backwards compatibility but now opens modal
+  // const submitFeePayment = async () => {
+  //   handleSubmitClick(false);
+  // };
+
   return (
-    <Card className="w-full max-w-none">
-      <CardHeader className="px-4 sm:px-6">
-        <CardTitle className="text-lg sm:text-xl">Submit Fee Payment</CardTitle>
-        <CardDescription className="text-sm">
-          Submit payment for generated fee challans
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
-        <div className="space-y-4 sm:space-y-6">
-          {/* Student Search Section */}
-          <div className="space-y-2 relative">
-            <Label htmlFor="student" className="text-sm font-medium">
-              Search Student
-            </Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="student"
-                placeholder="Type student name or ID..."
-                value={studentSearch}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                onFocus={() => setShowStudentDropdown(studentSearch.length > 0)}
-                className="pl-10 h-10 sm:h-11"
-              />
-            </div>
-            {showStudentDropdown && filteredStudents.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                {filteredStudents.slice(0, 10).map((student) => (
-                  <div
-                    key={student._id}
-                    className="px-4 py-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                    onClick={() => handleStudentSelect(student)}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <User className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">
-                          {student.studentName}
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">
-                          Father: {student.fatherName} | ID:{" "}
-                          {student.rollNumber}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+    <>
+      {/* Payment Confirmation Modal */}
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-green-600" />
+              Confirm Payment
+            </DialogTitle>
+            <DialogDescription>
+              {isPartialSubmit
+                ? `Partial payment of Rs. ${
+                    partialAmount
+                      ? parseFloat(partialAmount).toLocaleString()
+                      : "0"
+                  }`
+                : `Full payment of Rs. ${pendingFees
+                    .filter((fee) => selectedPendingFees.includes(fee.id))
+                    .reduce(
+                      (sum, fee) =>
+                        sum + fee.remainingBalance + (lateFees[fee.id] || 0),
+                      0
+                    )
+                    .toLocaleString()}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-4">
+            <p className="text-sm text-gray-600">
+              Choose how you want to print the receipt:
+            </p>
+
+            <Button
+              onClick={() => handlePrintAndSubmit("thermal")}
+              className="w-full h-12 bg-blue-600 hover:bg-blue-700"
+              disabled={isSubmitting}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Print Thermal Receipt & Submit
+            </Button>
+
+            <Button
+              onClick={() => handlePrintAndSubmit("regular")}
+              className="w-full h-12 bg-green-600 hover:bg-green-700"
+              disabled={isSubmitting}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Print Receipt & Submit
+            </Button>
           </div>
 
-          {/* Selected Student Fee Challans */}
-          {selectedStudent && (
-            <div className="space-y-4">
-              <div className="border rounded-lg p-3 sm:p-4 bg-blue-50">
-                <h3 className="font-semibold text-blue-800 mb-3 flex flex-wrap items-center gap-2 text-sm sm:text-base">
-                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                  <span className="break-words">
-                    Generated Fee Challans for This Student
-                  </span>
-                </h3>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowPaymentModal(false)}
+              className="w-full"
+              disabled={isSubmitting}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-                {pendingFees.length === 0 ? (
-                  <div className="text-center py-6 sm:py-8">
-                    <AlertTriangle className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-600 font-medium text-sm sm:text-base">
-                      No Generated Fee Challans Found
-                    </p>
-                    <p className="text-xs sm:text-sm text-gray-500 mt-1 px-2">
-                      Please generate fee challans first in the "Generate Fee
-                      Challans" tab
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {pendingFees.map((fee) => (
-                      <div
-                        key={fee.id}
-                        className="bg-white border rounded-lg p-3 sm:p-4 shadow-sm"
-                      >
-                        {/* Fee Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                          <div className="flex items-start space-x-3">
-                            <Checkbox
-                              id={`pending-${fee.id}`}
-                              checked={selectedPendingFees.includes(fee.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedPendingFees([
-                                    ...selectedPendingFees,
-                                    fee.id,
-                                  ]);
-                                } else {
-                                  setSelectedPendingFees(
-                                    selectedPendingFees.filter(
-                                      (id) => id !== fee.id
-                                    )
-                                  );
-                                }
-                              }}
-                              className="mt-1 flex-shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <h4 className="font-medium text-base sm:text-lg flex flex-wrap items-center gap-2">
-                                <span className="break-words">
-                                  {fee.month} {fee.year}
-                                </span>
-                                {fee.status === "overdue" && (
-                                  <Badge className="bg-red-100 text-red-800 text-xs flex-shrink-0">
-                                    Overdue
-                                  </Badge>
-                                )}
-                              </h4>
-                              <p className="text-xs sm:text-sm text-gray-500">
-                                Due Date: {fee.dueDate}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end space-y-1">
-                            {getStatusBadge(fee.status)}
-                            <div className="text-base sm:text-lg font-bold text-green-600">
-                              Rs.{" "}
-                              {fee.remainingBalance + (lateFees[fee.id] || 0)}
-                            </div>
-                            {lateFees[fee.id] > 0 && (
-                              <span className="text-xs text-red-600">
-                                (+ Rs. {lateFees[fee.id]} late fee)
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Enhanced Fee Breakdown */}
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 text-xs sm:text-sm">
-                          <div className="bg-gray-50 p-2 rounded">
-                            <div className="font-medium text-gray-600 truncate">
-                              Tuition Fee
-                            </div>
-                            <div className="font-semibold">
-                              Rs. {fee.tutionFee}
-                            </div>
-                          </div>
-
-                          <div className="bg-gray-50 p-2 rounded">
-                            <div className="font-medium text-gray-600 truncate">
-                              Exam Fee
-                            </div>
-                            <div className="font-semibold">
-                              Rs. {fee.examFee}
-                            </div>
-                          </div>
-                          <div className="bg-gray-50 p-2 rounded">
-                            <div className="font-medium text-gray-600 truncate">
-                              Misc Fee
-                            </div>
-                            <div className="font-semibold">
-                              Rs. {fee.miscFee}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Additional Fee Information */}
-                        {(fee.arrears > 0 || fee.discount > 0) && (
-                          <div className="mt-3 pt-3 border-t">
-                            <div className="space-y-2 sm:space-y-0 sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-3 text-xs sm:text-sm">
-                              {fee.arrears > 0 && (
-                                <div className="space-y-2">
-                                  <div className="bg-red-50 p-2 sm:p-3 rounded border border-red-200">
-                                    <div className="font-medium text-red-700">
-                                      Previous Arrears
-                                    </div>
-                                    <div className="font-semibold text-red-800">
-                                      Rs. {fee.arrears}
-                                    </div>
-                                  </div>
-                                  <div className="bg-blue-50 p-2 sm:p-3 rounded border border-blue-200">
-                                    <div className="text-xs text-blue-700 leading-relaxed">
-                                      <strong>Note:</strong> This shows
-                                      individual month fees. Previous unpaid
-                                      amounts are shown as separate entries
-                                      below.
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                              {fee.discount > 0 && (
-                                <div className="bg-green-50 p-2 sm:p-3 rounded border border-green-200">
-                                  <div className="font-medium text-green-700">
-                                    Discount Applied
-                                  </div>
-                                  <div className="font-semibold text-green-800">
-                                    Rs. {fee.discount}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Late Fee Input for Overdue Fees */}
-                        {fee.status === "overdue" && (
-                          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                              <div className="flex items-center gap-2">
-                                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0" />
-                                <span className="font-medium text-red-800 text-sm">
-                                  Overdue Fee - Add Late Fee
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                              <Label
-                                htmlFor={`lateFee-${fee.id}`}
-                                className="text-sm flex-shrink-0"
-                              >
-                                Late Fee Amount (Rs.)
-                              </Label>
-                              <Input
-                                id={`lateFee-${fee.id}`}
-                                type="number"
-                                min="0"
-                                step="10"
-                                value={lateFees[fee.id] || 0}
-                                onChange={(e) => {
-                                  const value = Math.max(
-                                    0,
-                                    Number(e.target.value)
-                                  );
-                                  setLateFees((prev) => ({
-                                    ...prev,
-                                    [fee.id]: value,
-                                  }));
-                                }}
-                                className="w-full sm:w-24 h-8"
-                                placeholder="0"
-                              />
-                              <span className="text-xs text-red-600">
-                                Will be added to misc fee
-                              </span>
-                            </div>
-                            <p className="text-xs text-red-600 mt-2 leading-relaxed">
-                              Due date was {fee.dueDate}. This fee is{" "}
-                              {Math.ceil(
-                                (new Date().getTime() -
-                                  new Date(fee.dueDate).getTime()) /
-                                  (1000 * 3600 * 24)
-                              )}{" "}
-                              days overdue.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <p className="text-xs sm:text-sm text-yellow-800 leading-relaxed">
-                        <strong>Note:</strong> Select the challans above that
-                        you want to mark as paid. You can select multiple months
-                        at once.
-                      </p>
-                    </div>
-                  </div>
-                )}
+      <Card className="w-full max-w-none">
+        <CardHeader className="px-4 sm:px-6">
+          <CardTitle className="text-lg sm:text-xl">
+            Submit Fee Payment
+          </CardTitle>
+          <CardDescription className="text-sm">
+            Submit payment for generated fee challans
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+          <div className="space-y-4 sm:space-y-6">
+            {/* Student Search Section */}
+            <div className="space-y-2 relative">
+              <Label htmlFor="student" className="text-sm font-medium">
+                Search Student
+              </Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="student"
+                  placeholder="Type student name or ID..."
+                  value={studentSearch}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  onFocus={() =>
+                    setShowStudentDropdown(studentSearch.length > 0)
+                  }
+                  className="pl-10 h-10 sm:h-11"
+                />
               </div>
+              {showStudentDropdown && filteredStudents.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  {filteredStudents.slice(0, 10).map((student) => (
+                    <div
+                      key={student._id}
+                      className="px-4 py-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      onClick={() => handleStudentSelect(student)}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <User className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">
+                            {student.studentName}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate">
+                            Father: {student.fatherName} | ID:{" "}
+                            {student.rollNumber}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-              {/* Payment Summary */}
-              {selectedPendingFees.length > 0 && (
-                <div className="border rounded-lg p-3 sm:p-4 bg-green-50">
-                  <h3 className="font-semibold text-green-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
-                    <Receipt className="h-4 w-4 sm:h-5 sm:w-5" />
-                    Payment Summary
+            {/* Selected Student Fee Challans */}
+            {selectedStudent && (
+              <div className="space-y-4">
+                <div className="border rounded-lg p-3 sm:p-4 bg-blue-50">
+                  <h3 className="font-semibold text-blue-800 mb-3 flex flex-wrap items-center gap-2 text-sm sm:text-base">
+                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                    <span className="break-words">
+                      Generated Fee Challans for This Student
+                    </span>
                   </h3>
 
-                  <div className="space-y-2">
-                    {pendingFees
-                      .filter((fee) => selectedPendingFees.includes(fee.id))
-                      .map((fee) => (
+                  {pendingFees.length === 0 ? (
+                    <div className="text-center py-6 sm:py-8">
+                      <AlertTriangle className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3" />
+                      <p className="text-gray-600 font-medium text-sm sm:text-base">
+                        No Generated Fee Challans Found
+                      </p>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1 px-2">
+                        Please generate fee challans first in the "Generate Fee
+                        Challans" tab
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {pendingFees.map((fee) => (
                         <div
                           key={fee.id}
-                          className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white p-3 rounded gap-2"
+                          className="bg-white border rounded-lg p-3 sm:p-4 shadow-sm"
                         >
-                          <div className="text-xs sm:text-sm">
-                            <span className="font-medium">
-                              {fee.month} {fee.year}
-                            </span>
-                            {fee.discount > 0 && (
-                              <span className="text-green-600 ml-1 block sm:inline">
-                                (- Rs. {fee.discount} discount)
-                              </span>
-                            )}
-                            {lateFees[fee.id] > 0 && (
-                              <span className="text-red-600 ml-1 block sm:inline">
-                                (+ Rs. {lateFees[fee.id]} late fee)
-                              </span>
-                            )}
+                          {/* Fee Header */}
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                            <div className="flex items-start space-x-3">
+                              <Checkbox
+                                id={`pending-${fee.id}`}
+                                checked={selectedPendingFees.includes(fee.id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedPendingFees([
+                                      ...selectedPendingFees,
+                                      fee.id,
+                                    ]);
+                                  } else {
+                                    setSelectedPendingFees(
+                                      selectedPendingFees.filter(
+                                        (id) => id !== fee.id
+                                      )
+                                    );
+                                  }
+                                }}
+                                className="mt-1 flex-shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <h4 className="font-medium text-base sm:text-lg flex flex-wrap items-center gap-2">
+                                  <span className="break-words">
+                                    {fee.month} {fee.year}
+                                  </span>
+                                  {fee.status === "overdue" && (
+                                    <Badge className="bg-red-100 text-red-800 text-xs flex-shrink-0">
+                                      Overdue
+                                    </Badge>
+                                  )}
+                                </h4>
+                                <p className="text-xs sm:text-sm text-gray-500">
+                                  Due Date: {fee.dueDate}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end space-y-1">
+                              {getStatusBadge(fee.status)}
+                              <div className="text-base sm:text-lg font-bold text-green-600">
+                                Rs.{" "}
+                                {fee.remainingBalance + (lateFees[fee.id] || 0)}
+                              </div>
+                              {lateFees[fee.id] > 0 && (
+                                <span className="text-xs text-red-600">
+                                  (+ Rs. {lateFees[fee.id]} late fee)
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <span className="font-semibold text-sm sm:text-base">
-                            Rs. {fee.remainingBalance + (lateFees[fee.id] || 0)}
-                          </span>
+
+                          {/* Enhanced Fee Breakdown */}
+                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 text-xs sm:text-sm">
+                            <div className="bg-gray-50 p-2 rounded">
+                              <div className="font-medium text-gray-600 truncate">
+                                Tuition Fee
+                              </div>
+                              <div className="font-semibold">
+                                Rs. {fee.tutionFee}
+                              </div>
+                            </div>
+
+                            <div className="bg-gray-50 p-2 rounded">
+                              <div className="font-medium text-gray-600 truncate">
+                                Exam Fee
+                              </div>
+                              <div className="font-semibold">
+                                Rs. {fee.examFee}
+                              </div>
+                            </div>
+                            <div className="bg-gray-50 p-2 rounded">
+                              <div className="font-medium text-gray-600 truncate">
+                                Misc Fee
+                              </div>
+                              <div className="font-semibold">
+                                Rs. {fee.miscFee}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Additional Fee Information */}
+                          {(fee.arrears > 0 || fee.discount > 0) && (
+                            <div className="mt-3 pt-3 border-t">
+                              <div className="space-y-2 sm:space-y-0 sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-3 text-xs sm:text-sm">
+                                {fee.arrears > 0 && (
+                                  <div className="space-y-2">
+                                    <div className="bg-red-50 p-2 sm:p-3 rounded border border-red-200">
+                                      <div className="font-medium text-red-700">
+                                        Previous Arrears
+                                      </div>
+                                      <div className="font-semibold text-red-800">
+                                        Rs. {fee.arrears}
+                                      </div>
+                                    </div>
+                                    <div className="bg-blue-50 p-2 sm:p-3 rounded border border-blue-200">
+                                      <div className="text-xs text-blue-700 leading-relaxed">
+                                        <strong>Note:</strong> This shows
+                                        individual month fees. Previous unpaid
+                                        amounts are shown as separate entries
+                                        below.
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                {fee.discount > 0 && (
+                                  <div className="bg-green-50 p-2 sm:p-3 rounded border border-green-200">
+                                    <div className="font-medium text-green-700">
+                                      Discount Applied
+                                    </div>
+                                    <div className="font-semibold text-green-800">
+                                      Rs. {fee.discount}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Late Fee Input for Overdue Fees */}
+                          {fee.status === "overdue" && (
+                            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                                <div className="flex items-center gap-2">
+                                  <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                                  <span className="font-medium text-red-800 text-sm">
+                                    Overdue Fee - Add Late Fee
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                <Label
+                                  htmlFor={`lateFee-${fee.id}`}
+                                  className="text-sm flex-shrink-0"
+                                >
+                                  Late Fee Amount (Rs.)
+                                </Label>
+                                <Input
+                                  id={`lateFee-${fee.id}`}
+                                  type="number"
+                                  min="0"
+                                  step="10"
+                                  value={lateFees[fee.id] || 0}
+                                  onChange={(e) => {
+                                    const value = Math.max(
+                                      0,
+                                      Number(e.target.value)
+                                    );
+                                    setLateFees((prev) => ({
+                                      ...prev,
+                                      [fee.id]: value,
+                                    }));
+                                  }}
+                                  className="w-full sm:w-24 h-8"
+                                  placeholder="0"
+                                />
+                                <span className="text-xs text-red-600">
+                                  Will be added to misc fee
+                                </span>
+                              </div>
+                              <p className="text-xs text-red-600 mt-2 leading-relaxed">
+                                Due date was {fee.dueDate}. This fee is{" "}
+                                {Math.ceil(
+                                  (new Date().getTime() -
+                                    new Date(fee.dueDate).getTime()) /
+                                    (1000 * 3600 * 24)
+                                )}{" "}
+                                days overdue.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ))}
 
-                    <div className="border-t pt-3 mt-3">
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                        <span className="font-bold text-base sm:text-lg">
-                          Total Amount:
-                        </span>
-                        <span className="font-bold text-base sm:text-lg text-green-600">
-                          Rs.{" "}
-                          {pendingFees
-                            .filter((fee) =>
-                              selectedPendingFees.includes(fee.id)
-                            )
-                            .reduce(
-                              (sum, fee) =>
-                                sum +
-                                fee.remainingBalance +
-                                (lateFees[fee.id] || 0),
-                              0
-                            )}
-                        </span>
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <p className="text-xs sm:text-sm text-yellow-800 leading-relaxed">
+                          <strong>Note:</strong> Select the challans above that
+                          you want to mark as paid. You can select multiple
+                          months at once.
+                        </p>
                       </div>
-                      {Object.values(lateFees).some((fee) => fee > 0) && (
-                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs sm:text-sm text-red-600 mt-1 gap-1">
-                          <span>Late Fees:</span>
-                          <span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Payment Summary */}
+                {selectedPendingFees.length > 0 && (
+                  <div className="border rounded-lg p-3 sm:p-4 bg-green-50">
+                    <h3 className="font-semibold text-green-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                      <Receipt className="h-4 w-4 sm:h-5 sm:w-5" />
+                      Payment Summary
+                    </h3>
+
+                    <div className="space-y-2">
+                      {pendingFees
+                        .filter((fee) => selectedPendingFees.includes(fee.id))
+                        .map((fee) => (
+                          <div
+                            key={fee.id}
+                            className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white p-3 rounded gap-2"
+                          >
+                            <div className="text-xs sm:text-sm">
+                              <span className="font-medium">
+                                {fee.month} {fee.year}
+                              </span>
+                              {fee.discount > 0 && (
+                                <span className="text-green-600 ml-1 block sm:inline">
+                                  (- Rs. {fee.discount} discount)
+                                </span>
+                              )}
+                              {lateFees[fee.id] > 0 && (
+                                <span className="text-red-600 ml-1 block sm:inline">
+                                  (+ Rs. {lateFees[fee.id]} late fee)
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-semibold text-sm sm:text-base">
+                              Rs.{" "}
+                              {fee.remainingBalance + (lateFees[fee.id] || 0)}
+                            </span>
+                          </div>
+                        ))}
+
+                      <div className="border-t pt-3 mt-3">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                          <span className="font-bold text-base sm:text-lg">
+                            Total Amount:
+                          </span>
+                          <span className="font-bold text-base sm:text-lg text-green-600">
                             Rs.{" "}
-                            {Object.values(lateFees).reduce(
-                              (sum, fee) => sum + fee,
-                              0
-                            )}
+                            {pendingFees
+                              .filter((fee) =>
+                                selectedPendingFees.includes(fee.id)
+                              )
+                              .reduce(
+                                (sum, fee) =>
+                                  sum +
+                                  fee.remainingBalance +
+                                  (lateFees[fee.id] || 0),
+                                0
+                              )}
                           </span>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Partial Payment Section */}
-              {selectedPendingFees.length > 0 && (
-                <div className="border rounded-lg p-3 sm:p-4 bg-orange-50">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-orange-800 flex items-center gap-2 text-sm sm:text-base">
-                      <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />
-                      Payment Options
-                    </h3>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant={partialPaymentMode ? "outline" : "default"}
-                        onClick={() => {
-                          setPartialPaymentMode(false);
-                          setPartialAmount("");
-                          setPaymentSummary(null);
-                        }}
-                      >
-                        Full Payment
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={partialPaymentMode ? "default" : "outline"}
-                        onClick={() => setPartialPaymentMode(true)}
-                      >
-                        Partial Payment
-                      </Button>
-                    </div>
-                  </div>
-
-                  {partialPaymentMode && (
-                    <div className="space-y-4">
-                      <div className="bg-white p-3 rounded border">
-                        <Label
-                          htmlFor="partialAmount"
-                          className="text-sm font-medium"
-                        >
-                          Enter Partial Payment Amount
-                        </Label>
-                        <div className="flex items-center gap-3 mt-2">
-                          <div className="relative flex-1">
-                            <span className="absolute left-3 top-2 text-sm text-gray-500">
-                              Rs.
+                        {Object.values(lateFees).some((fee) => fee > 0) && (
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs sm:text-sm text-red-600 mt-1 gap-1">
+                            <span>Late Fees:</span>
+                            <span>
+                              Rs.{" "}
+                              {Object.values(lateFees).reduce(
+                                (sum, fee) => sum + fee,
+                                0
+                              )}
                             </span>
-                            <Input
-                              id="partialAmount"
-                              type="number"
-                              min="1"
-                              max={selectedPendingFees.reduce(
-                                (total: number, feeId: string) => {
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Partial Payment Section */}
+                {selectedPendingFees.length > 0 && (
+                  <div className="border rounded-lg p-3 sm:p-4 bg-orange-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-orange-800 flex items-center gap-2 text-sm sm:text-base">
+                        <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />
+                        Payment Options
+                      </h3>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant={partialPaymentMode ? "outline" : "default"}
+                          onClick={() => {
+                            setPartialPaymentMode(false);
+                            setPartialAmount("");
+                            setPaymentSummary(null);
+                          }}
+                        >
+                          Full Payment
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={partialPaymentMode ? "default" : "outline"}
+                          onClick={() => setPartialPaymentMode(true)}
+                        >
+                          Partial Payment
+                        </Button>
+                      </div>
+                    </div>
+
+                    {partialPaymentMode && (
+                      <div className="space-y-4">
+                        <div className="bg-white p-3 rounded border">
+                          <Label
+                            htmlFor="partialAmount"
+                            className="text-sm font-medium"
+                          >
+                            Enter Partial Payment Amount
+                          </Label>
+                          <div className="flex items-center gap-3 mt-2">
+                            <div className="relative flex-1">
+                              <span className="absolute left-3 top-2 text-sm text-gray-500">
+                                Rs.
+                              </span>
+                              <Input
+                                id="partialAmount"
+                                type="number"
+                                min="1"
+                                max={selectedPendingFees.reduce(
+                                  (total: number, feeId: string) => {
+                                    const fee = pendingFees.find(
+                                      (f: FeeChallan) => f.id === feeId
+                                    );
+                                    if (!fee) return total;
+                                    const currentBalance: number =
+                                      fee.remainingBalance || fee.totalAmount;
+                                    const lateFee: number =
+                                      lateFees[feeId] || 0;
+                                    return total + currentBalance + lateFee;
+                                  },
+                                  0
+                                )}
+                                value={partialAmount}
+                                onChange={(
+                                  e: React.ChangeEvent<HTMLInputElement>
+                                ) => {
+                                  const value: string = e.target.value;
+                                  setPartialAmount(value);
+                                  if (value && parseFloat(value) > 0) {
+                                    const summary: PaymentSummary | null =
+                                      simulatePartialPayment(value);
+                                    setPaymentSummary(summary);
+                                  } else {
+                                    setPaymentSummary(null);
+                                  }
+                                }}
+                                placeholder="Enter amount"
+                                className="pl-8"
+                              />
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Max: Rs.{" "}
+                              {selectedPendingFees
+                                .reduce((total: number, feeId: string) => {
                                   const fee = pendingFees.find(
                                     (f: FeeChallan) => f.id === feeId
                                   );
@@ -1766,216 +1913,108 @@ Falcon House School Administration
                                     fee.remainingBalance || fee.totalAmount;
                                   const lateFee: number = lateFees[feeId] || 0;
                                   return total + currentBalance + lateFee;
-                                },
-                                0
-                              )}
-                              value={partialAmount}
-                              onChange={(
-                                e: React.ChangeEvent<HTMLInputElement>
-                              ) => {
-                                const value: string = e.target.value;
-                                setPartialAmount(value);
-                                if (value && parseFloat(value) > 0) {
-                                  const summary: PaymentSummary | null =
-                                    simulatePartialPayment(value);
-                                  setPaymentSummary(summary);
-                                } else {
-                                  setPaymentSummary(null);
-                                }
-                              }}
-                              placeholder="Enter amount"
-                              className="pl-8"
-                            />
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            Max: Rs.{" "}
-                            {selectedPendingFees
-                              .reduce((total: number, feeId: string) => {
-                                const fee = pendingFees.find(
-                                  (f: FeeChallan) => f.id === feeId
-                                );
-                                if (!fee) return total;
-                                const currentBalance: number =
-                                  fee.remainingBalance || fee.totalAmount;
-                                const lateFee: number = lateFees[feeId] || 0;
-                                return total + currentBalance + lateFee;
-                              }, 0)
-                              .toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Partial Payment Preview */}
-                      {paymentSummary && (
-                        <div className="bg-white p-3 rounded border">
-                          <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            Payment Allocation Preview
-                          </h4>
-                          <div className="space-y-2">
-                            {paymentSummary.breakdown.map(
-                              (item: PaymentBreakdown, index: number) => (
-                                <div
-                                  key={index}
-                                  className="text-xs bg-gray-50 p-2 rounded"
-                                >
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-medium">
-                                      {item.month} {item.year}
-                                    </span>
-                                    <Badge
-                                      className={
-                                        item.status === "paid"
-                                          ? "bg-green-100 text-green-800"
-                                          : "bg-blue-100 text-blue-800"
-                                      }
-                                    >
-                                      {item.status}
-                                    </Badge>
-                                  </div>
-                                  <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
-                                    <div>
-                                      Balance: Rs.{" "}
-                                      {item.currentBalance.toLocaleString()}
-                                    </div>
-                                    <div>
-                                      Payment: Rs.{" "}
-                                      {item.paymentAmount.toLocaleString()}
-                                    </div>
-                                    <div>
-                                      Late Fee: Rs.{" "}
-                                      {item.lateFee.toLocaleString()}
-                                    </div>
-                                    <div className="font-medium">
-                                      Remaining: Rs.{" "}
-                                      {item.newBalance.toLocaleString()}
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            )}
-                          </div>
-                          <div className="mt-3 p-2 bg-green-50 rounded border-l-4 border-green-400">
-                            <div className="text-sm font-medium text-green-800">
-                              Total Payment: Rs.{" "}
-                              {paymentSummary.totalPaid.toLocaleString()}
+                                }, 0)
+                                .toLocaleString()}
                             </div>
                           </div>
                         </div>
-                      )}
 
-                      {/* Partial Payment Submit Button */}
-                      <Button
-                        onClick={submitPartialPayment}
-                        className="w-full h-12"
-                        disabled={
-                          !partialAmount || parseFloat(partialAmount) <= 0
-                        }
-                      >
-                        <Calculator className="h-4 w-4 mr-2" />
-                        Submit Partial Payment - Rs.{" "}
-                        {partialAmount
-                          ? parseFloat(partialAmount).toLocaleString()
-                          : "0"}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
+                        {/* Partial Payment Preview */}
+                        {paymentSummary && (
+                          <div className="bg-white p-3 rounded border">
+                            <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              Payment Allocation Preview
+                            </h4>
+                            <div className="space-y-2">
+                              {paymentSummary.breakdown.map(
+                                (item: PaymentBreakdown, index: number) => (
+                                  <div
+                                    key={index}
+                                    className="text-xs bg-gray-50 p-2 rounded"
+                                  >
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-medium">
+                                        {item.month} {item.year}
+                                      </span>
+                                      <Badge
+                                        className={
+                                          item.status === "paid"
+                                            ? "bg-green-100 text-green-800"
+                                            : "bg-blue-100 text-blue-800"
+                                        }
+                                      >
+                                        {item.status}
+                                      </Badge>
+                                    </div>
+                                    <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
+                                      <div>
+                                        Balance: Rs.{" "}
+                                        {item.currentBalance.toLocaleString()}
+                                      </div>
+                                      <div>
+                                        Payment: Rs.{" "}
+                                        {item.paymentAmount.toLocaleString()}
+                                      </div>
+                                      <div>
+                                        Late Fee: Rs.{" "}
+                                        {item.lateFee.toLocaleString()}
+                                      </div>
+                                      <div className="font-medium">
+                                        Remaining: Rs.{" "}
+                                        {item.newBalance.toLocaleString()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                            <div className="mt-3 p-2 bg-green-50 rounded border-l-4 border-green-400">
+                              <div className="text-sm font-medium text-green-800">
+                                Total Payment: Rs.{" "}
+                                {paymentSummary.totalPaid.toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
-              {/* Submit and Print Buttons */}
-              <div className="space-y-3">
-                {/* Mobile View - Stacked buttons */}
-                <div className="flex flex-col gap-3 md:hidden">
-                  <Button
-                    onClick={submitFeePayment}
-                    className="w-full h-12 text-sm"
-                    size="lg"
-                    disabled={selectedPendingFees.length === 0}
-                  >
-                    <Receipt className="h-4 w-4 mr-2 flex-shrink-0" />
-                    <span className="flex-1 truncate">
-                      Submit Payment ({selectedPendingFees.length})
-                    </span>
-                    {selectedPendingFees.length > 0 && (
-                      <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-xs font-bold flex-shrink-0">
-                        Rs.{" "}
-                        {pendingFees
-                          .filter((fee) => selectedPendingFees.includes(fee.id))
-                          .reduce(
-                            (sum, fee) =>
-                              sum +
-                              fee.remainingBalance +
-                              (lateFees[fee.id] || 0),
-                            0
-                          )
-                          .toLocaleString()}
-                      </span>
+                        {/* Partial Payment Submit Button */}
+                        <Button
+                          onClick={() => handleSubmitClick(true)}
+                          className="w-full h-12"
+                          disabled={
+                            !partialAmount || parseFloat(partialAmount) <= 0
+                          }
+                        >
+                          <Calculator className="h-4 w-4 mr-2" />
+                          Submit Partial Payment - Rs.{" "}
+                          {partialAmount
+                            ? parseFloat(partialAmount).toLocaleString()
+                            : "0"}
+                        </Button>
+                      </div>
                     )}
-                  </Button>
-                  <Button
-                    onClick={() => printPaymentReceipt("termal")}
-                    variant="outline"
-                    className="w-full h-12 text-sm"
-                    size="lg"
-                    disabled={selectedPendingFees.length === 0}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Print Thermal
-                  </Button>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      onClick={() => printPaymentReceipt("regular")}
-                      variant="outline"
-                      className="h-12 text-sm"
-                      size="lg"
-                      disabled={selectedPendingFees.length === 0}
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Print
-                    </Button>
-
-                    <Button
-                      onClick={() => {
-                        const selectedFees = pendingFees.filter((fee) =>
-                          selectedPendingFees.includes(fee.id)
-                        );
-                        sendPaymentConfirmation(selectedFees, lateFees);
-                      }}
-                      variant="outline"
-                      className="h-12 text-sm bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
-                      size="lg"
-                      disabled={selectedPendingFees.length === 0}
-                    >
-                      <svg
-                        className="h-4 w-4 mr-2"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
-                      </svg>
-                      WhatsApp
-                    </Button>
                   </div>
-                </div>
+                )}
 
-                {/* Tablet View - 2 rows */}
-                <div className="hidden md:flex lg:flex flex-col gap-3">
-                  <div className="lg:flex gap-3">
+                {/* Submit and Print Buttons */}
+                <div className="space-y-3">
+                  {/* Mobile View - Stacked buttons */}
+                  <div className="flex flex-col gap-3 md:hidden">
                     <Button
-                      onClick={submitFeePayment}
-                      className=" flex-1 h-11 text-sm md:mb-2 md:w-full"
+                      onClick={() => handleSubmitClick(false)}
+                      className="w-full h-12 text-sm"
                       size="lg"
-                      disabled={selectedPendingFees.length === 0}
+                      disabled={
+                        selectedPendingFees.length === 0 || partialPaymentMode
+                      }
                     >
                       <Receipt className="h-4 w-4 mr-2 flex-shrink-0" />
                       <span className="flex-1 truncate">
-                        Submit Payment for {selectedPendingFees.length}{" "}
-                        Challan(s)
+                        Submit Payment ({selectedPendingFees.length})
                       </span>
                       {selectedPendingFees.length > 0 && (
-                        <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-sm font-bold flex-shrink-0">
+                        <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-xs font-bold flex-shrink-0">
                           Rs.{" "}
                           {pendingFees
                             .filter((fee) =>
@@ -1992,29 +2031,6 @@ Falcon House School Administration
                         </span>
                       )}
                     </Button>
-                    <Button
-                      onClick={() => printPaymentReceipt("termal")}
-                      variant="outline"
-                      className="flex-1 h-11 md:w-full text-sm"
-                      size="lg"
-                      disabled={selectedPendingFees.length === 0}
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Print Thermal Receipt
-                    </Button>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={() => printPaymentReceipt("regular")}
-                      variant="outline"
-                      className="flex-1 h-11 text-sm"
-                      size="lg"
-                      disabled={selectedPendingFees.length === 0}
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Print Receipt
-                    </Button>
 
                     <Button
                       onClick={() => {
@@ -2024,7 +2040,7 @@ Falcon House School Administration
                         sendPaymentConfirmation(selectedFees, lateFees);
                       }}
                       variant="outline"
-                      className="flex-1 h-11 text-sm bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                      className="w-full h-12 text-sm bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
                       size="lg"
                       disabled={selectedPendingFees.length === 0}
                     >
@@ -2035,29 +2051,90 @@ Falcon House School Administration
                       >
                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
                       </svg>
-                      Send WhatsApp
+                      WhatsApp
                     </Button>
+                  </div>
+
+                  {/* Tablet/Desktop View */}
+                  <div className="hidden md:flex lg:flex flex-col gap-3">
+                    <div className="lg:flex gap-3">
+                      <Button
+                        onClick={() => handleSubmitClick(false)}
+                        className="flex-1 h-11 text-sm md:mb-2 md:w-full"
+                        size="lg"
+                        disabled={
+                          selectedPendingFees.length === 0 || partialPaymentMode
+                        }
+                      >
+                        <Receipt className="h-4 w-4 mr-2 flex-shrink-0" />
+                        <span className="flex-1 truncate">
+                          Submit Payment for {selectedPendingFees.length}{" "}
+                          Challan(s)
+                        </span>
+                        {selectedPendingFees.length > 0 && (
+                          <span className="ml-2 bg-white text-green-600 px-2 py-1 rounded text-sm font-bold flex-shrink-0">
+                            Rs.{" "}
+                            {pendingFees
+                              .filter((fee) =>
+                                selectedPendingFees.includes(fee.id)
+                              )
+                              .reduce(
+                                (sum, fee) =>
+                                  sum +
+                                  fee.remainingBalance +
+                                  (lateFees[fee.id] || 0),
+                                0
+                              )
+                              .toLocaleString()}
+                          </span>
+                        )}
+                      </Button>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => {
+                          const selectedFees = pendingFees.filter((fee) =>
+                            selectedPendingFees.includes(fee.id)
+                          );
+                          sendPaymentConfirmation(selectedFees, lateFees);
+                        }}
+                        variant="outline"
+                        className="flex-1 h-11 text-sm bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                        size="lg"
+                        disabled={selectedPendingFees.length === 0}
+                      >
+                        <svg
+                          className="h-4 w-4 mr-2"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
+                        </svg>
+                        Send WhatsApp
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* No Student Selected State */}
-          {!selectedStudent && (
-            <div className="text-center py-8 sm:py-12">
-              <User className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-medium text-gray-600 mb-2">
-                Select a Student
-              </h3>
-              <p className="text-sm text-gray-500 px-4">
-                Search and select a student above to view their generated fee
-                challans
-              </p>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            {/* No Student Selected State */}
+            {!selectedStudent && (
+              <div className="text-center py-8 sm:py-12">
+                <User className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-base sm:text-lg font-medium text-gray-600 mb-2">
+                  Select a Student
+                </h3>
+                <p className="text-sm text-gray-500 px-4">
+                  Search and select a student above to view their generated fee
+                  challans
+                </p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }

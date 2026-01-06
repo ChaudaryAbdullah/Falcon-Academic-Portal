@@ -27,7 +27,14 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Badge } from "../ui/badge";
-import { Search, Download, MessageCircle, Filter, X } from "lucide-react";
+import {
+  Search,
+  Download,
+  MessageCircle,
+  Filter,
+  X,
+  Printer,
+} from "lucide-react";
 import { toast } from "sonner";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
@@ -179,8 +186,8 @@ Falcon House School Administration
     }
   };
 
-  const downloadPaperFundChallanPDF = (challan: PaperFundChallan) => {
-    const pdfContent = `
+  const getChallanHTML = (challan: PaperFundChallan) => {
+    return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -320,6 +327,31 @@ Falcon House School Administration
 </body>
 </html>
     `;
+  };
+
+  const printPaperFundChallan = (challan: PaperFundChallan) => {
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(getChallanHTML(challan));
+      printWindow.document.close();
+      printWindow.focus();
+
+      // Wait for content to load before printing
+      printWindow.onload = () => {
+        printWindow.print();
+        // Optionally close the window after printing
+        // printWindow.close();
+      };
+
+      // Fallback for browsers that don't trigger onload properly
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    }
+  };
+
+  const downloadPaperFundChallanPDF = (challan: PaperFundChallan) => {
+    const pdfContent = getChallanHTML(challan);
 
     const blob = new Blob([pdfContent], { type: "text/html" });
     const url = window.URL.createObjectURL(blob);
@@ -671,8 +703,16 @@ Falcon House School Administration
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => printPaperFundChallan(challan)}
+                          title="Print Challan"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => downloadPaperFundChallanPDF(challan)}
-                          title="Download PDF"
+                          title="Download Challan"
                         >
                           <Download className="h-4 w-4" />
                         </Button>

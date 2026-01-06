@@ -27,7 +27,14 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Badge } from "../ui/badge";
-import { Search, Download, MessageCircle, Filter, X } from "lucide-react";
+import {
+  Search,
+  Download,
+  MessageCircle,
+  Filter,
+  X,
+  Printer,
+} from "lucide-react";
 import { toast } from "sonner";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
@@ -42,6 +49,7 @@ interface FeeChallan {
     mPhoneNumber: string;
     class: string;
     section: string;
+    discountCode: string;
   };
   month: string;
   year: string;
@@ -219,8 +227,8 @@ Falcon House School Administration
     }
   };
 
-  const downloadFeeChallanPDF = (challan: FeeChallan) => {
-    const pdfContent = `
+  const getChallanHTML = (challan: FeeChallan) => {
+    return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -369,14 +377,19 @@ Falcon House School Administration
           challan.discount > 0
             ? `
         <tr class="discount">
-            <td><strong>Discount</strong></td>
-            <td><strong>${challan.discount}</strong></td>
+            <td><strong>Fee Code</strong></td>
+            <td><strong>${challan.studentId.discountCode}</strong></td>
         </tr>`
             : ""
         }
         <tr class="total">
             <td>Total Amount</td>
-            <td>Rs. ${challan.totalAmount + challan.arrears}</td>
+            <td>Rs. ${
+              challan.examFee +
+              challan.miscFee +
+              challan.tutionFee +
+              challan.arrears
+            }</td>
         </tr>
     </table>
 
@@ -387,6 +400,29 @@ Falcon House School Administration
 </body>
 </html>
     `;
+  };
+
+  const printFeeChallan = (challan: FeeChallan) => {
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(getChallanHTML(challan));
+      printWindow.document.close();
+      printWindow.focus();
+
+      // Wait for content to load before printing
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+
+      // Fallback for browsers that don't trigger onload properly
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    }
+  };
+
+  const downloadFeeChallanPDF = (challan: FeeChallan) => {
+    const pdfContent = getChallanHTML(challan);
 
     const blob = new Blob([pdfContent], { type: "text/html" });
     const url = window.URL.createObjectURL(blob);
@@ -712,8 +748,16 @@ Falcon House School Administration
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => printFeeChallan(challan)}
+                          title="Print Challan"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => downloadFeeChallanPDF(challan)}
-                          title="Download PDF"
+                          title="Download Challan"
                         >
                           <Download className="h-4 w-4" />
                         </Button>

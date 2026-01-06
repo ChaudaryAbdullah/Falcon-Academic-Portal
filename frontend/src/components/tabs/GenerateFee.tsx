@@ -51,6 +51,7 @@ interface Student {
   email: string;
   password: string;
   address: string;
+  discountCode: string;
   img?: {
     data: string;
     contentType: string;
@@ -84,6 +85,7 @@ interface FeeChallan {
     mPhoneNumber: string;
     class: string;
     section: string;
+    discountCode: string;
   };
   month: string;
   year: string;
@@ -281,7 +283,7 @@ export function GenerateFeeTab({
             ? `
         <tr class="discount">
             <td><strong>Discount</strong></td>
-            <td><strong>-${challan.discount}</strong></td>
+            <td><strong>-${challan.studentId.discountCode}</strong></td>
         </tr>`
             : ""
         }
@@ -622,6 +624,7 @@ export function GenerateFeeTab({
           mPhoneNumber: student.mPhoneNumber,
           class: student.class,
           section: student.section,
+          discountCode: student.discountCode,
         },
         month,
         year,
