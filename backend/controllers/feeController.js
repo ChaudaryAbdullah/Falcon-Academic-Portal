@@ -7,7 +7,7 @@ export const createFee = async (req, res) => {
     const fee = await Fee.create(req.body);
     const populatedFee = await Fee.findById(fee._id).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section"
+      "studentName fatherName mPhoneNumber rollNumber class section discountCode"
     );
     res.status(201).json({ success: true, data: populatedFee });
   } catch (error) {
@@ -21,7 +21,7 @@ export const getFees = async (req, res) => {
     const fees = await Fee.find({})
       .populate(
         "studentId",
-        "studentName fatherName mPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section discountCode"
       )
       .sort({ createdAt: -1 });
 
@@ -36,6 +36,7 @@ export const getFees = async (req, res) => {
         rollNumber: fee.studentId.rollNumber,
         class: fee.studentId.class,
         section: fee.studentId.section,
+        discountCode: fee.studentId.discountCode,
       },
       month: fee.month,
       year: fee.year,
@@ -110,7 +111,7 @@ export const generateBulkFees = async (req, res) => {
         const newFee = await Fee.create(feeData);
         const populatedFee = await Fee.findById(newFee._id).populate(
           "studentId",
-          "studentName fatherName mPhoneNumber rollNumber class section"
+          "studentName fatherName mPhoneNumber rollNumber class section discountCode"
         );
 
         createdChallans.push(populatedFee);
@@ -138,7 +139,7 @@ export const getFeeById = async (req, res) => {
   try {
     const fee = await Fee.findById(req.params.id).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section"
+      "studentName fatherName mPhoneNumber rollNumber class section discountCode"
     );
     if (!fee)
       return res
@@ -158,7 +159,7 @@ export const updateFee = async (req, res) => {
       runValidators: true,
     }).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section"
+      "studentName fatherName mPhoneNumber rollNumber class section discountCode"
     );
 
     if (!fee)
@@ -281,7 +282,7 @@ export const bulkUpdateFeeStatus = async (req, res) => {
       _id: { $in: validObjectIds },
     }).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section"
+      "studentName fatherName mPhoneNumber rollNumber class section discountCode"
     );
 
     res.status(200).json({
@@ -314,7 +315,7 @@ export const updateWhatsAppStatus = async (req, res) => {
       { new: true }
     ).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section"
+      "studentName fatherName mPhoneNumber rollNumber class section discountCode"
     );
 
     if (!fee) {

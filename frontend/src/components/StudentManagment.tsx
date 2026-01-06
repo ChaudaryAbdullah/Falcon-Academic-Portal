@@ -78,6 +78,7 @@ interface Student {
   email: string;
   password: string;
   address: string;
+  discountCode?: string;
   img?: {
     data: string;
     contentType: string;
@@ -115,6 +116,7 @@ interface ColumnVisibility {
   mPhoneNumber: boolean;
   address: boolean;
   actions: boolean;
+  discountCode: boolean;
 }
 
 export function StudentManagement({
@@ -140,6 +142,7 @@ export function StudentManagement({
     address: "",
     email: "",
     password: "",
+    discountCode: "",
   });
 
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -176,6 +179,7 @@ export function StudentManagement({
     mPhoneNumber: false,
     address: false,
     actions: true,
+    discountCode: false,
   });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -254,6 +258,7 @@ export function StudentManagement({
       class: student.class,
       address: student.address,
       email: student.email || "",
+      discountCode: student.discountCode || "",
       password: "",
     });
 
@@ -384,6 +389,7 @@ export function StudentManagement({
     mPhoneNumber: "Whatsapp Number",
     address: "Address",
     actions: "Actions",
+    discountCode: "Discount Code",
   };
 
   const getImageUrl = (student: Student) => {
@@ -777,6 +783,16 @@ export function StudentManagement({
                       }
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="discountCode">Discount Code</Label>
+                    <Input
+                      id="discountCode"
+                      value={formData.discountCode || ""}
+                      onChange={(e: { target: { value: string } }) =>
+                        handleInputChange("discountCode", e.target.value)
+                      }
+                    />
+                  </div>
                 </div>
                 <Button type="submit" className="w-full bg-blue-600">
                   {editingStudentId ? (
@@ -1167,6 +1183,11 @@ export function StudentManagement({
                       {columnVisibility.address && (
                         <TableHead className="min-w-[200px]">Address</TableHead>
                       )}
+                      {columnVisibility.discountCode && (
+                        <TableHead className="min-w-[100px]">
+                          Discount Code
+                        </TableHead>
+                      )}
                       {columnVisibility.actions && (
                         <TableHead className="min-w-[100px]">Actions</TableHead>
                       )}
@@ -1292,6 +1313,11 @@ export function StudentManagement({
                           {columnVisibility.address && (
                             <TableCell>
                               {safeToString(student.address)}
+                            </TableCell>
+                          )}
+                          {columnVisibility.discountCode && (
+                            <TableCell>
+                              {safeToString(student.discountCode)}
                             </TableCell>
                           )}
                           {columnVisibility.actions && (
