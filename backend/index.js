@@ -24,13 +24,24 @@ const server = http.createServer(app);
 
 // Add these to your .env or define them here
 const allowedOrigins = [
-  FRONTEND, // Your Vercel URL
-  "http://falcon-academic-portal.com.pk", // New Domain (HTTP)
-  "https://falcon-academic-portal.com.pk", // New Domain (HTTPS)
-  "http://185.170.58.165", // Your VPS IP
-  "http://185.170.58.165:5000", // Your API directly
+  FRONTEND,
+  "http://falcon-academic-portal.com.pk",
+  "https://falcon-academic-portal.com.pk",
+  "http://185.170.58.165",
+  "http://185.170.58.165:5000",
 ];
 
+app.use(
+  cors({
+    origin: allowedOrigins, // Express-cors handles the array check automatically
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// MUST handle preflight requests explicitly
+app.options("*", cors());
 app.use(
   cors({
     origin: (origin, callback) => {
