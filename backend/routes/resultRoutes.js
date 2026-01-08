@@ -27,11 +27,7 @@ router.post("/bulk-update", bulkUpdateResults);
 router.post("/bulk-delete", bulkDeleteResults);
 
 // Calculation and publishing routes
-router.post(
-  "/calculate-positions",
-
-  calculatePositions
-);
+router.post("/calculate-positions", calculatePositions);
 router.post("/publish", publishResults);
 router.post("/unpublish", unpublishResults);
 
