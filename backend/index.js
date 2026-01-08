@@ -17,12 +17,12 @@ import examRoutes from "./routes/examRoutes.js";
 
 dotenv.config();
 const FRONTEND = process.env.FRONTEND;
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 const DB_URL = process.env.DB_URL;
+
 const app = express();
 const server = http.createServer(app);
 
-// Add these to your .env or define them here
 const allowedOrigins = [
   FRONTEND,
   "http://falcon-academic-portal.com.pk",
@@ -31,40 +31,27 @@ const allowedOrigins = [
   "http://185.170.58.165:5000",
 ];
 
-app.use(
-  cors({
-    origin: allowedOrigins, // Express-cors handles the array check automatically
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+// ✅ SINGLE CORS configuration
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
 
-// MUST handle preflight requests explicitly
-app.options("*", cors());
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
+    if (
+      allowedOrigins.includes(origin) ||
+      /\.vercel\.app$/.test(new URL(origin).hostname)
+    ) {
+      return callback(null, true);
+    }
 
-      // Check if origin is in our list or a Vercel preview
-      if (
-        allowedOrigins.includes(origin) ||
-        /\.vercel\.app$/.test(new URL(origin).hostname)
-      ) {
-        return callback(null, true);
-      }
+    callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
-
-// ✅ Handle preflight requests
-// app.options("*", cors());
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // Middleware
 app.use(express.json({ limit: "50mb" }));
@@ -72,12 +59,10 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 app.use(
   session({
-    secret: "12345",
+    secret: process.env.SESSION_SECRET || "12345",
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-      mongoUrl: DB_URL,
-    }),
+    store: MongoStore.create({ mongoUrl: DB_URL }),
     cookie: {
       secure: false,
       httpOnly: true,
