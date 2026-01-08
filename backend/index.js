@@ -22,16 +22,21 @@ const DB_URL = process.env.DB_URL;
 const app = express();
 const server = http.createServer(app);
 
+// Add these to your .env or define them here
+const allowedOrigins = [
+  FRONTEND, // Your Vercel URL
+  "http://falcon-academic-portal.com.pk", // New Domain (HTTP)
+  "https://falcon-academic-portal.com.pk", // New Domain (HTTPS)
+  "http://185.170.58.165", // Your VPS IP
+  "http://185.170.58.165:5000", // Your API directly
+];
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, Postman)
       if (!origin) return callback(null, true);
 
-      // Allowed domains
-      const allowedOrigins = [FRONTEND];
-
-      // Allow all Vercel preview deployments (*.vercel.app)
+      // Check if origin is in our list or a Vercel preview
       if (
         allowedOrigins.includes(origin) ||
         /\.vercel\.app$/.test(new URL(origin).hostname)
@@ -39,7 +44,6 @@ app.use(
         return callback(null, true);
       }
 
-      // Otherwise block
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
