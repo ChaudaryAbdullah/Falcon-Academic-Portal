@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -20,6 +20,7 @@ import AdminSidebar from "../components/AdminSidebar";
 import axios from "axios";
 import { Toaster } from "sonner";
 
+// Direct imports instead of lazy loading
 import { StudentManagement } from "../components/StudentManagment";
 import { TeacherManagement } from "../components/TeacherManagment";
 import { FeeManagement } from "../components/FeeManagment";
@@ -566,80 +567,60 @@ export default function AdminDashboard() {
     switch (activeTab) {
       case "students":
         return (
-          <Suspense fallback={<LoadingSpinner />}>
-            <StudentManagement
-              students={students || []}
-              setStudents={handleSetStudents}
-            />
-          </Suspense>
+          <StudentManagement
+            students={students || []}
+            setStudents={handleSetStudents}
+          />
         );
       case "teachers":
         return (
-          <Suspense fallback={<LoadingSpinner />}>
-            <TeacherManagement
-              teachers={teachers || []}
-              setTeachers={handleSetTeachers}
-            />
-          </Suspense>
+          <TeacherManagement
+            teachers={teachers || []}
+            setTeachers={handleSetTeachers}
+          />
         );
       case "fees":
         return (
-          <Suspense fallback={<LoadingSpinner />}>
-            <FeeManagement
-              students={students || []}
-              feeStructure={feeStructure || []}
-              setFeeStructure={handleSetFeeStructure}
-              studentDiscounts={studentDiscounts || []}
-              challans={challans || []}
-              setChallans={handleSetChallans}
-            />
-          </Suspense>
+          <FeeManagement
+            students={students || []}
+            feeStructure={feeStructure || []}
+            setFeeStructure={handleSetFeeStructure}
+            studentDiscounts={studentDiscounts || []}
+            challans={challans || []}
+            setChallans={handleSetChallans}
+          />
         );
       case "paperFund":
         return (
-          <Suspense fallback={<LoadingSpinner />}>
-            <PaperFundManagement
-              students={students || []}
-              feeStructure={feeStructure || []}
-              challans={paperFundChallans || []}
-              setChallans={handleSetPaperFundChallans}
-            />
-          </Suspense>
+          <PaperFundManagement
+            students={students || []}
+            feeStructure={feeStructure || []}
+            challans={paperFundChallans || []}
+            setChallans={handleSetPaperFundChallans}
+          />
         );
       case "feeStructure":
         return (
-          <Suspense fallback={<LoadingSpinner />}>
-            <FeeStructure
-              feeStructures={feeStructure || []}
-              setFeeStructures={handleSetFeeStructure}
-            />
-          </Suspense>
+          <FeeStructure
+            feeStructures={feeStructure || []}
+            setFeeStructures={handleSetFeeStructure}
+          />
         );
       case "studentDiscount":
-        return (
-          <Suspense fallback={<LoadingSpinner />}>
-            <StudentDiscount students={students || []} />
-          </Suspense>
-        );
+        return <StudentDiscount students={students || []} />;
       case "fee-reports":
-        return (
-          <Suspense fallback={<LoadingSpinner />}>
-            <FeeReports students={students || []} />
-          </Suspense>
-        );
+        return <FeeReports students={students || []} />;
       case "results":
         return (
-          <Suspense fallback={<LoadingSpinner />}>
-            <ResultsManagement
-              students={students || []}
-              subjects={subjects || []}
-              setSubjects={handleSetSubjects}
-              exams={exams || []}
-              setExams={handleSetExams}
-              results={results || []}
-              setResults={handleSetResults}
-            />
-          </Suspense>
+          <ResultsManagement
+            students={students || []}
+            subjects={subjects || []}
+            setSubjects={handleSetSubjects}
+            exams={exams || []}
+            setExams={handleSetExams}
+            results={results || []}
+            setResults={handleSetResults}
+          />
         );
       default:
         return (
