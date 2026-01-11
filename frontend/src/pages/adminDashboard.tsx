@@ -467,56 +467,51 @@ export default function AdminDashboard() {
     }
   }, [loadedData]);
 
-  // Load data based on active tab
+  // Load data based on active tab with parallel + progressive loading
   useEffect(() => {
     const loadDataForTab = async () => {
       const requirements = TAB_DATA_REQUIREMENTS[activeTab] || [];
-      const fetchPromises: Promise<void>[] = [];
+
+      // Don't fetch if already loaded
+      const needsLoading = requirements.filter((req) => !loadedData.has(req));
+      if (needsLoading.length === 0) return;
 
       setIsLoading(true);
 
-      for (const req of requirements) {
-        switch (req) {
-          case "counts":
-            fetchPromises.push(fetchCounts());
-            break;
-          case "students":
-            fetchPromises.push(fetchStudents());
-            break;
-          case "teachers":
-            fetchPromises.push(fetchTeachers());
-            break;
-          case "feeStructure":
-            fetchPromises.push(fetchFeeStructure());
-            break;
-          case "studentDiscounts":
-            fetchPromises.push(fetchStudentDiscounts());
-            break;
-          case "challans":
-            fetchPromises.push(fetchChallans());
-            break;
-          case "paperFundChallans":
-            fetchPromises.push(fetchPaperFundChallans());
-            break;
-          case "subjects":
-            fetchPromises.push(fetchSubjects());
-            break;
-          case "exams":
-            fetchPromises.push(fetchExams());
-            break;
-          case "results":
-            fetchPromises.push(fetchResults());
-            break;
-        }
-      }
+      // Map requirements to fetch functions for parallel execution
+      const fetchMap: Record<string, () => Promise<void>> = {
+        counts: fetchCounts,
+        students: fetchStudents,
+        teachers: fetchTeachers,
+        feeStructure: fetchFeeStructure,
+        studentDiscounts: fetchStudentDiscounts,
+        challans: fetchChallans,
+        paperFundChallans: fetchPaperFundChallans,
+        subjects: fetchSubjects,
+        exams: fetchExams,
+        results: fetchResults,
+      };
 
-      await Promise.all(fetchPromises);
+      // Execute all fetches in parallel without waiting for completion
+      needsLoading.forEach((req) => {
+        const fetchFn = fetchMap[req];
+        if (fetchFn) {
+          fetchFn(); // Fire and forget - each updates state independently
+        }
+      });
+
+      // Wait for all to complete before removing loading state
+      await Promise.all(
+        needsLoading.map((req) => fetchMap[req]?.()).filter(Boolean)
+      );
+
       setIsLoading(false);
     };
 
     loadDataForTab();
   }, [
     activeTab,
+    loadedData,
     fetchCounts,
     fetchStudents,
     fetchTeachers,
