@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -20,7 +20,6 @@ import AdminSidebar from "../components/AdminSidebar";
 import axios from "axios";
 import { Toaster } from "sonner";
 
-// Direct imports instead of lazy loading
 import { StudentManagement } from "../components/StudentManagment";
 import { TeacherManagement } from "../components/TeacherManagment";
 import { FeeManagement } from "../components/FeeManagment";
@@ -32,14 +31,7 @@ import ResultsManagement from "../components/ResultManagement";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
-const LoadingSpinner = () => (
-  <div className="flex flex-col items-center justify-center min-h-[400px]">
-    <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
-    <span className="mt-4 text-gray-600 text-lg">Loading...</span>
-  </div>
-);
-
-// All interfaces...
+// Interfaces (keep all your existing interfaces here)
 interface Student {
   _id: string;
   rollNumber: string;
@@ -61,10 +53,7 @@ interface Student {
   password: string;
   address: string;
   discountCode: string;
-  img?: {
-    data: string;
-    contentType: string;
-  };
+  img?: { data: string; contentType: string };
 }
 
 interface Teacher {
@@ -178,11 +167,7 @@ interface Result {
   class: string;
   section: string;
   subjects: {
-    subjectId: {
-      _id: string;
-      subjectName: string;
-      subjectCode: string;
-    };
+    subjectId: { _id: string; subjectName: string; subjectCode: string };
     totalMarks: number;
     obtainedMarks: number;
     passingMarks: number;
@@ -198,8 +183,20 @@ interface Result {
   isPublished: boolean;
 }
 
-const TAB_DATA_REQUIREMENTS: Record<string, string[]> = {
-  dashboard: ["counts"],
+interface LoadingState {
+  students: boolean;
+  teachers: boolean;
+  feeStructure: boolean;
+  studentDiscounts: boolean;
+  challans: boolean;
+  paperFundChallans: boolean;
+  subjects: boolean;
+  exams: boolean;
+  results: boolean;
+}
+
+const TAB_REQUIREMENTS: Record<string, (keyof LoadingState)[]> = {
+  dashboard: [],
   students: ["students"],
   teachers: ["teachers"],
   fees: ["students", "feeStructure", "studentDiscounts", "challans"],
@@ -213,413 +210,272 @@ const TAB_DATA_REQUIREMENTS: Record<string, string[]> = {
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
 
-  // Data states
-  const [students, setStudents] = useState<Student[] | null>(null);
-  const [teachers, setTeachers] = useState<Teacher[] | null>(null);
-  const [feeStructure, setFeeStructure] = useState<FeeStructureType[] | null>(
-    null
-  );
-  const [studentDiscounts, setStudentDiscounts] = useState<any[] | null>(null);
-  const [challans, setChallans] = useState<FeeChallan[] | null>(null);
+  // Initialize with empty arrays - render immediately, no null checks needed
+  const [students, setStudents] = useState<Student[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [feeStructure, setFeeStructure] = useState<FeeStructureType[]>([]);
+  const [studentDiscounts, setStudentDiscounts] = useState<any[]>([]);
+  const [challans, setChallans] = useState<FeeChallan[]>([]);
   const [paperFundChallans, setPaperFundChallans] = useState<
-    PaperFundChallan[] | null
-  >(null);
-  const [subjects, setSubjects] = useState<Subject[] | null>(null);
-  const [exams, setExams] = useState<Exam[] | null>(null);
-  const [results, setResults] = useState<Result[] | null>(null);
+    PaperFundChallan[]
+  >([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [results, setResults] = useState<Result[]>([]);
+  const [counts, setCounts] = useState({ students: 0, teachers: 0 });
 
-  const [counts, setCounts] = useState<{
-    students: number;
-    teachers: number;
-  } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadedData, setLoadedData] = useState<Set<string>>(new Set());
+  // Track loading state for each data type
+  const [loading, setLoading] = useState<LoadingState>({
+    students: true,
+    teachers: true,
+    feeStructure: true,
+    studentDiscounts: true,
+    challans: true,
+    paperFundChallans: true,
+    subjects: true,
+    exams: true,
+    results: true,
+  });
 
-  isLoading;
-  // ✅ WRAPPER SETTERS - These convert null types to non-null types
+  // Prevent double fetch in StrictMode
+  const hasFetched = useRef(false);
+
+  // 🚀 PREFETCH ALL DATA ON MOUNT - This is the key optimization
+  useEffect(() => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+
+    const api = axios.create({
+      baseURL: BACKEND,
+      withCredentials: true,
+    });
+
+    // Helper to update loading state
+    const setLoaded = (key: keyof LoadingState) => {
+      setLoading((prev) => ({ ...prev, [key]: false }));
+    };
+
+    // Fire ALL requests simultaneously - don't wait for any to complete
+    // Students
+    api
+      .get("/api/students")
+      .then((res) => {
+        const data = res.data.data || [];
+        setStudents(data);
+        setCounts((prev) => ({ ...prev, students: data.length }));
+      })
+      .catch(console.error)
+      .finally(() => setLoaded("students"));
+
+    // Teachers
+    api
+      .get("/api/teachers")
+      .then((res) => {
+        const data = res.data.data || [];
+        setTeachers(data);
+        setCounts((prev) => ({ ...prev, teachers: data.length }));
+      })
+      .catch(console.error)
+      .finally(() => setLoaded("teachers"));
+
+    // Fee Structure
+    api
+      .get("/api/fee-structures")
+      .then((res) => setFeeStructure(res.data || []))
+      .catch(console.error)
+      .finally(() => setLoaded("feeStructure"));
+
+    // Student Discounts
+    api
+      .get("/api/student-discounts")
+      .then((res) => setStudentDiscounts(res.data || []))
+      .catch(console.error)
+      .finally(() => setLoaded("studentDiscounts"));
+
+    // Fee Challans
+    api
+      .get("/api/fees")
+      .then((res) => setChallans(res.data.data || []))
+      .catch(console.error)
+      .finally(() => setLoaded("challans"));
+
+    // Paper Fund Challans
+    api
+      .get("/api/paperFund")
+      .then((res) => setPaperFundChallans(res.data.data || []))
+      .catch(console.error)
+      .finally(() => setLoaded("paperFundChallans"));
+
+    // Subjects
+    api
+      .get("/api/subjects", { params: { isActive: true } })
+      .then((res) => setSubjects(res.data.data || []))
+      .catch(console.error)
+      .finally(() => setLoaded("subjects"));
+
+    // Exams
+    api
+      .get("/api/exams", { params: { isActive: true } })
+      .then((res) => setExams(res.data.data || []))
+      .catch(console.error)
+      .finally(() => setLoaded("exams"));
+
+    // Results
+    api
+      .get("/api/results")
+      .then((res) => setResults(res.data.data || []))
+      .catch(console.error)
+      .finally(() => setLoaded("results"));
+  }, []);
+
+  // Check if tab data is ready
+  const isTabReady = useCallback(
+    (tab: string): boolean => {
+      const requirements = TAB_REQUIREMENTS[tab] || [];
+      if (requirements.length === 0) return true;
+      return requirements.every((req) => !loading[req]);
+    },
+    [loading]
+  );
+
+  // Wrapper setters for child components
   const handleSetStudents = useCallback(
     (value: React.SetStateAction<Student[]>) => {
-      setStudents((prev) => {
-        const currentValue = prev || [];
-        return typeof value === "function" ? value(currentValue) : value;
-      });
+      setStudents((prev) =>
+        typeof value === "function" ? value(prev) : value
+      );
     },
     []
   );
 
   const handleSetTeachers = useCallback(
     (value: React.SetStateAction<Teacher[]>) => {
-      setTeachers((prev) => {
-        const currentValue = prev || [];
-        return typeof value === "function" ? value(currentValue) : value;
-      });
+      setTeachers((prev) =>
+        typeof value === "function" ? value(prev) : value
+      );
     },
     []
   );
 
   const handleSetFeeStructure = useCallback(
     (value: React.SetStateAction<FeeStructureType[]>) => {
-      setFeeStructure((prev) => {
-        const currentValue = prev || [];
-        return typeof value === "function" ? value(currentValue) : value;
-      });
+      setFeeStructure((prev) =>
+        typeof value === "function" ? value(prev) : value
+      );
     },
     []
   );
 
   const handleSetChallans = useCallback(
     (value: React.SetStateAction<FeeChallan[]>) => {
-      setChallans((prev) => {
-        const currentValue = prev || [];
-        return typeof value === "function" ? value(currentValue) : value;
-      });
+      setChallans((prev) =>
+        typeof value === "function" ? value(prev) : value
+      );
     },
     []
   );
 
   const handleSetPaperFundChallans = useCallback(
     (value: React.SetStateAction<PaperFundChallan[]>) => {
-      setPaperFundChallans((prev) => {
-        const currentValue = prev || [];
-        return typeof value === "function" ? value(currentValue) : value;
-      });
+      setPaperFundChallans((prev) =>
+        typeof value === "function" ? value(prev) : value
+      );
     },
     []
   );
 
   const handleSetSubjects = useCallback(
     (value: React.SetStateAction<Subject[]>) => {
-      setSubjects((prev) => {
-        const currentValue = prev || [];
-        return typeof value === "function" ? value(currentValue) : value;
-      });
+      setSubjects((prev) =>
+        typeof value === "function" ? value(prev) : value
+      );
     },
     []
   );
 
   const handleSetExams = useCallback((value: React.SetStateAction<Exam[]>) => {
-    setExams((prev) => {
-      const currentValue = prev || [];
-      return typeof value === "function" ? value(currentValue) : value;
-    });
+    setExams((prev) => (typeof value === "function" ? value(prev) : value));
   }, []);
 
   const handleSetResults = useCallback(
     (value: React.SetStateAction<Result[]>) => {
-      setResults((prev) => {
-        const currentValue = prev || [];
-        return typeof value === "function" ? value(currentValue) : value;
-      });
+      setResults((prev) => (typeof value === "function" ? value(prev) : value));
     },
     []
   );
 
-  // Fetch functions
-  const fetchCounts = useCallback(async () => {
-    if (loadedData.has("counts")) return;
-    try {
-      const [studentsRes, teachersRes] = await Promise.all([
-        axios.get(`${BACKEND}/api/students`, {
-          withCredentials: true,
-          params: { limit: 1, countOnly: true },
-        }),
-        axios.get(`${BACKEND}/api/teachers`, {
-          withCredentials: true,
-          params: { limit: 1, countOnly: true },
-        }),
-      ]);
-      setCounts({
-        students: studentsRes.data.total || studentsRes.data.data?.length || 0,
-        teachers: teachersRes.data.total || teachersRes.data.data?.length || 0,
-      });
-      setLoadedData((prev) => new Set(prev).add("counts"));
-    } catch (error) {
-      console.error("Error fetching counts:", error);
-      setCounts({ students: 0, teachers: 0 });
-    }
-  }, [loadedData]);
-
-  const fetchStudents = useCallback(async () => {
-    if (loadedData.has("students")) return;
-    try {
-      const res = await axios.get(`${BACKEND}/api/students`, {
-        withCredentials: true,
-      });
-      setStudents(res.data.data);
-      setLoadedData((prev) => new Set(prev).add("students"));
-    } catch (error) {
-      console.error("Error fetching students:", error);
-      setStudents([]);
-    }
-  }, [loadedData]);
-
-  const fetchTeachers = useCallback(async () => {
-    if (loadedData.has("teachers")) return;
-    try {
-      const res = await axios.get(`${BACKEND}/api/teachers`, {
-        withCredentials: true,
-      });
-      setTeachers(res.data.data);
-      setLoadedData((prev) => new Set(prev).add("teachers"));
-    } catch (error) {
-      console.error("Error fetching teachers:", error);
-      setTeachers([]);
-    }
-  }, [loadedData]);
-
-  const fetchFeeStructure = useCallback(async () => {
-    if (loadedData.has("feeStructure")) return;
-    try {
-      const res = await axios.get(`${BACKEND}/api/fee-structures`, {
-        withCredentials: true,
-      });
-      setFeeStructure(res.data);
-      setLoadedData((prev) => new Set(prev).add("feeStructure"));
-    } catch (error) {
-      console.error("Error fetching fee structure:", error);
-      setFeeStructure([]);
-    }
-  }, [loadedData]);
-
-  const fetchStudentDiscounts = useCallback(async () => {
-    if (loadedData.has("studentDiscounts")) return;
-    try {
-      const res = await axios.get(`${BACKEND}/api/student-discounts`, {
-        withCredentials: true,
-      });
-      setStudentDiscounts(res.data);
-      setLoadedData((prev) => new Set(prev).add("studentDiscounts"));
-    } catch (error) {
-      console.error("Error fetching student discounts:", error);
-      setStudentDiscounts([]);
-    }
-  }, [loadedData]);
-
-  const fetchChallans = useCallback(async () => {
-    if (loadedData.has("challans")) return;
-    try {
-      const res = await axios.get(`${BACKEND}/api/fees`, {
-        withCredentials: true,
-      });
-      setChallans(res.data.data);
-      setLoadedData((prev) => new Set(prev).add("challans"));
-    } catch (error) {
-      console.error("Error fetching challans:", error);
-      setChallans([]);
-    }
-  }, [loadedData]);
-
-  const fetchPaperFundChallans = useCallback(async () => {
-    if (loadedData.has("paperFundChallans")) return;
-    try {
-      const res = await axios.get(`${BACKEND}/api/paperFund`, {
-        withCredentials: true,
-      });
-      setPaperFundChallans(res.data.data);
-      setLoadedData((prev) => new Set(prev).add("paperFundChallans"));
-    } catch (error) {
-      console.error("Error fetching paper fund challans:", error);
-      setPaperFundChallans([]);
-    }
-  }, [loadedData]);
-
-  const fetchSubjects = useCallback(async () => {
-    if (loadedData.has("subjects")) return;
-    try {
-      const res = await axios.get(`${BACKEND}/api/subjects`, {
-        params: { isActive: true },
-        withCredentials: true,
-      });
-      setSubjects(res.data.data);
-      setLoadedData((prev) => new Set(prev).add("subjects"));
-    } catch (error) {
-      console.error("Error fetching subjects:", error);
-      setSubjects([]);
-    }
-  }, [loadedData]);
-
-  const fetchExams = useCallback(async () => {
-    if (loadedData.has("exams")) return;
-    try {
-      const res = await axios.get(`${BACKEND}/api/exams`, {
-        params: { isActive: true },
-        withCredentials: true,
-      });
-      setExams(res.data.data);
-      setLoadedData((prev) => new Set(prev).add("exams"));
-    } catch (error) {
-      console.error("Error fetching exams:", error);
-      setExams([]);
-    }
-  }, [loadedData]);
-
-  const fetchResults = useCallback(async () => {
-    if (loadedData.has("results")) return;
-    try {
-      const res = await axios.get(`${BACKEND}/api/results`, {
-        withCredentials: true,
-      });
-      setResults(res.data.data);
-      setLoadedData((prev) => new Set(prev).add("results"));
-    } catch (error) {
-      console.error("Error fetching results:", error);
-      setResults([]);
-    }
-  }, [loadedData]);
-
-  // Load data based on active tab with parallel + progressive loading
-  useEffect(() => {
-    const loadDataForTab = async () => {
-      const requirements = TAB_DATA_REQUIREMENTS[activeTab] || [];
-
-      // Don't fetch if already loaded
-      const needsLoading = requirements.filter((req) => !loadedData.has(req));
-      if (needsLoading.length === 0) return;
-
-      setIsLoading(true);
-
-      // Map requirements to fetch functions for parallel execution
-      const fetchMap: Record<string, () => Promise<void>> = {
-        counts: fetchCounts,
-        students: fetchStudents,
-        teachers: fetchTeachers,
-        feeStructure: fetchFeeStructure,
-        studentDiscounts: fetchStudentDiscounts,
-        challans: fetchChallans,
-        paperFundChallans: fetchPaperFundChallans,
-        subjects: fetchSubjects,
-        exams: fetchExams,
-        results: fetchResults,
-      };
-
-      // Execute all fetches in parallel without waiting for completion
-      needsLoading.forEach((req) => {
-        const fetchFn = fetchMap[req];
-        if (fetchFn) {
-          fetchFn(); // Fire and forget - each updates state independently
-        }
-      });
-
-      // Wait for all to complete before removing loading state
-      await Promise.all(
-        needsLoading.map((req) => fetchMap[req]?.()).filter(Boolean)
-      );
-
-      setIsLoading(false);
-    };
-
-    loadDataForTab();
-  }, [
-    activeTab,
-    loadedData,
-    fetchCounts,
-    fetchStudents,
-    fetchTeachers,
-    fetchFeeStructure,
-    fetchStudentDiscounts,
-    fetchChallans,
-    fetchPaperFundChallans,
-    fetchSubjects,
-    fetchExams,
-    fetchResults,
-  ]);
-
-  const isDataReady = (tab: string): boolean => {
-    const requirements = TAB_DATA_REQUIREMENTS[tab] || [];
-    return requirements.every((req) => {
-      switch (req) {
-        case "counts":
-          return counts !== null;
-        case "students":
-          return students !== null;
-        case "teachers":
-          return teachers !== null;
-        case "feeStructure":
-          return feeStructure !== null;
-        case "studentDiscounts":
-          return studentDiscounts !== null;
-        case "challans":
-          return challans !== null;
-        case "paperFundChallans":
-          return paperFundChallans !== null;
-        case "subjects":
-          return subjects !== null;
-        case "exams":
-          return exams !== null;
-        case "results":
-          return results !== null;
-        default:
-          return true;
-      }
-    });
-  };
-
+  // Render content based on active tab
   const renderContent = () => {
-    if (!isDataReady(activeTab)) {
-      return <LoadingSpinner />;
+    // Show minimal loading spinner only if required data isn't ready
+    if (!isTabReady(activeTab)) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      );
     }
 
     switch (activeTab) {
       case "students":
         return (
           <StudentManagement
-            students={students || []}
+            students={students}
             setStudents={handleSetStudents}
           />
         );
       case "teachers":
         return (
           <TeacherManagement
-            teachers={teachers || []}
+            teachers={teachers}
             setTeachers={handleSetTeachers}
           />
         );
       case "fees":
         return (
           <FeeManagement
-            students={students || []}
-            feeStructure={feeStructure || []}
+            students={students}
+            feeStructure={feeStructure}
             setFeeStructure={handleSetFeeStructure}
-            studentDiscounts={studentDiscounts || []}
-            challans={challans || []}
+            studentDiscounts={studentDiscounts}
+            challans={challans}
             setChallans={handleSetChallans}
           />
         );
       case "paperFund":
         return (
           <PaperFundManagement
-            students={students || []}
-            feeStructure={feeStructure || []}
-            challans={paperFundChallans || []}
+            students={students}
+            feeStructure={feeStructure}
+            challans={paperFundChallans}
             setChallans={handleSetPaperFundChallans}
           />
         );
       case "feeStructure":
         return (
           <FeeStructure
-            feeStructures={feeStructure || []}
+            feeStructures={feeStructure}
             setFeeStructures={handleSetFeeStructure}
           />
         );
       case "studentDiscount":
-        return <StudentDiscount students={students || []} />;
+        return <StudentDiscount students={students} />;
       case "fee-reports":
-        return <FeeReports students={students || []} />;
+        return <FeeReports students={students} />;
       case "results":
         return (
           <ResultsManagement
-            students={students || []}
-            subjects={subjects || []}
+            students={students}
+            subjects={subjects}
             setSubjects={handleSetSubjects}
-            exams={exams || []}
+            exams={exams}
             setExams={handleSetExams}
-            results={results || []}
+            results={results}
             setResults={handleSetResults}
           />
         );
       default:
         return (
-          <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
+          <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">
                 Admin Dashboard
@@ -639,8 +495,10 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {counts?.students ?? (
+                    {loading.students ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      counts.students
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -658,8 +516,10 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {counts?.teachers ?? (
+                    {loading.teachers ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      counts.teachers
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -687,7 +547,7 @@ export default function AdminDashboard() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="w-full bg-transparent"
+                    className="w-full"
                     onClick={() => setActiveTab("teachers")}
                   >
                     <Users className="h-4 w-4 mr-2" />
@@ -696,7 +556,7 @@ export default function AdminDashboard() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="w-full bg-transparent"
+                    className="w-full"
                     onClick={() => setActiveTab("fees")}
                   >
                     <Receipt className="h-4 w-4 mr-2" />
@@ -729,7 +589,6 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-
       <main className="md:ml-72 py-6 pr-6">
         <div className="space-y-6">{renderContent()}</div>
       </main>
