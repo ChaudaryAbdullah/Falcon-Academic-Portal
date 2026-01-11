@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense, lazy, useCallback } from "react";
+import { useEffect, useState, Suspense, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -20,31 +20,14 @@ import AdminSidebar from "../components/AdminSidebar";
 import axios from "axios";
 import { Toaster } from "sonner";
 
-// Lazy load components
-const StudentManagement = lazy(() =>
-  import("../components/StudentManagment").then((module) => ({
-    default: module.StudentManagement,
-  }))
-);
-const TeacherManagement = lazy(() =>
-  import("../components/TeacherManagment").then((module) => ({
-    default: module.TeacherManagement,
-  }))
-);
-const FeeManagement = lazy(() =>
-  import("../components/FeeManagment").then((module) => ({
-    default: module.FeeManagement,
-  }))
-);
-const FeeStructure = lazy(() => import("../components/FeeStructure"));
-const StudentDiscount = lazy(() => import("../components/StudentDiscount"));
-const FeeReports = lazy(() => import("../components/FeeReports"));
-const PaperFundManagement = lazy(() =>
-  import("../components/PaperFundManagement").then((module) => ({
-    default: module.PaperFundManagement,
-  }))
-);
-const ResultsManagement = lazy(() => import("../components/ResultManagement"));
+import { StudentManagement } from "../components/StudentManagment";
+import { TeacherManagement } from "../components/TeacherManagment";
+import { FeeManagement } from "../components/FeeManagment";
+import FeeStructure from "../components/FeeStructure";
+import StudentDiscount from "../components/StudentDiscount";
+import FeeReports from "../components/FeeReports";
+import { PaperFundManagement } from "../components/PaperFundManagement";
+import ResultsManagement from "../components/ResultManagement";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
