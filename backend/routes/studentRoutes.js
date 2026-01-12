@@ -7,26 +7,36 @@ import {
   deleteStudent,
   getStudentImage,
   upload,
+  passOutStudent,
+  strikeOffStudent,
+  reactivateStudent,
+  getStudentsByStatus,
 } from "../controllers/studentController.js";
 
 const router = express.Router();
 
-// POST /api/students - Create a new student with image upload
+//Create a new student with image upload
 router.post("/", upload.single("image"), createStudent);
 
-// GET /api/students - Get all students
+// Get all students
 router.get("/", getStudents);
 
-// GET /api/students/:id - Get a single student by ID
+// Get a single student by ID
 router.get("/:id", getStudentById);
 
-// GET /api/students/:id/image - Get student image by ID (optional direct image serving)
+//  Get student image by ID (optional direct image serving)
 router.get("/:id/image", getStudentImage);
 
-// PUT /api/students/:id - Update a student with optional image upload
+//  Update a student with optional image upload
 router.put("/:id", upload.single("image"), updateStudent);
 
-// DELETE /api/students/:id - Delete a student
+//  Delete a student
 router.delete("/:id", deleteStudent);
+
+// Pass Out and Strike Off
+router.put("/:id/pass-out", passOutStudent);
+router.put("/:id/strike-off", strikeOffStudent);
+router.put("/:id/reactivate", reactivateStudent);
+router.get("/status/:status", getStudentsByStatus);
 
 export default router;

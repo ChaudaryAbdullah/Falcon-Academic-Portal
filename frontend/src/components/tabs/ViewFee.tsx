@@ -339,12 +339,17 @@ Falcon House School Administration
     <div class="challan-info">
         <p><strong>Student Name:</strong> ${challan.studentId.studentName}</p>
         <p><strong>Father Name:</strong> ${challan.studentId.fatherName}</p>
-        <p><strong>Roll Number:</strong> ${challan.studentId.rollNumber}</p>
+        <p><strong>Reg Number:</strong> ${challan.studentId.rollNumber}</p>
         <p><strong>Class:</strong> ${challan.studentId.class} ${
       challan.studentId.section
     }</p>
         <p><strong>Month/Year:</strong> ${challan.month} ${challan.year}</p>
         <p><strong>Due Date:</strong> ${challan.dueDate}</p>
+        <p><strong>Challan code:</strong> ${
+          challan.studentId.discountCode
+            ? challan.studentId.discountCode
+            : "*ADF*"
+        }</p>
     </div>
 
     <table class="fee-details">
@@ -373,15 +378,7 @@ Falcon House School Administration
         </tr>`
             : ""
         }
-        ${
-          challan.discount > 0
-            ? `
-        <tr class="discount">
-            <td><strong>Fee Code</strong></td>
-            <td><strong>${challan.studentId.discountCode}</strong></td>
-        </tr>`
-            : ""
-        }
+        
         <tr class="total">
             <td>Total Amount</td>
             <td>Rs. ${
