@@ -270,3 +270,173 @@ export const getStudentImage = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Pass Out Student
+export const passOutStudent = async (req, res) => {
+  try {
+    const { passOutYear, passOutClass, reason } = req.body;
+
+    const student = await Student.findById(req.params.id);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    if (student.status !== "active") {
+      return res.status(400).json({
+        success: false,
+        message: `Student is already ${
+          student.status === "passedOut" ? "passed out" : "struck off"
+        }`,
+      });
+    }
+
+    student.status = "passedOut";
+    student.statusDate = new Date();
+    student.statusReason = reason || "Completed education";
+    student.passOutYear = passOutYear || new Date().getFullYear().toString();
+    student.passOutClass = passOutClass || student.class;
+
+    await student.save();
+
+    const responseStudent = student.toObject();
+    if (responseStudent.img && responseStudent.img.data) {
+      responseStudent.img.data = responseStudent.img.data.toString("base64");
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Student marked as passed out successfully",
+      data: responseStudent,
+    });
+  } catch (error) {
+    console.error("Error passing out student:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Strike Off Student
+export const strikeOffStudent = async (req, res) => {
+  try {
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: "Reason is required for striking off a student",
+      });
+    }
+
+    const student = await Student.findById(req.params.id);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    if (student.status !== "active") {
+      return res.status(400).json({
+        success: false,
+        message: `Student is already ${
+          student.status === "passedOut" ? "passed out" : "struck off"
+        }`,
+      });
+    }
+
+    student.status = "struckOff";
+    student.statusDate = new Date();
+    student.statusReason = reason;
+
+    await student.save();
+
+    const responseStudent = student.toObject();
+    if (responseStudent.img && responseStudent.img.data) {
+      responseStudent.img.data = responseStudent.img.data.toString("base64");
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Student struck off successfully",
+      data: responseStudent,
+    });
+  } catch (error) {
+    console.error("Error striking off student:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Reactivate Student (optional - to undo pass out or struck off)
+export const reactivateStudent = async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    if (student.status === "active") {
+      return res.status(400).json({
+        success: false,
+        message: "Student is already active",
+      });
+    }
+
+    student.status = "active";
+    student.statusDate = undefined;
+    student.statusReason = undefined;
+    student.passOutYear = undefined;
+    student.passOutClass = undefined;
+
+    await student.save();
+
+    const responseStudent = student.toObject();
+    if (responseStudent.img && responseStudent.img.data) {
+      responseStudent.img.data = responseStudent.img.data.toString("base64");
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Student reactivated successfully",
+      data: responseStudent,
+    });
+  } catch (error) {
+    console.error("Error reactivating student:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get Students by Status
+export const getStudentsByStatus = async (req, res) => {
+  try {
+    const { status } = req.params;
+
+    if (!["active", "passedOut", "struckOff"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status. Use: active, passedOut, or struckOff",
+      });
+    }
+
+    const students = await Student.find({ status });
+
+    const studentsWithImages = students.map((student) => {
+      const studentObj = student.toObject();
+      if (studentObj.img && studentObj.img.data) {
+        studentObj.img.data = studentObj.img.data.toString("base64");
+      }
+      return studentObj;
+    });
+
+    res.status(200).json({ success: true, data: studentsWithImages });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

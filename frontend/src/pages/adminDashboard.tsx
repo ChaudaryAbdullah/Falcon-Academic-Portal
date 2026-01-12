@@ -53,7 +53,15 @@ interface Student {
   password: string;
   address: string;
   discountCode: string;
-  img?: { data: string; contentType: string };
+  status: "active" | "passedOut" | "struckOff";
+  statusDate?: string;
+  statusReason?: string;
+  passOutYear?: string;
+  passOutClass?: string;
+  img?: {
+    data: string;
+    contentType: string;
+  };
 }
 
 interface Teacher {

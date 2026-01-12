@@ -1,3 +1,5 @@
+// models/student.js - Add these new fields to your schema
+
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import { Counter } from "./counter.js";
@@ -98,6 +100,26 @@ const studentSchema = mongoose.Schema(
       ],
     },
     password: { type: String, minlength: 8, maxlength: 16 },
+
+    // NEW FIELDS FOR PASS OUT AND STRUCK OFF
+    status: {
+      type: String,
+      enum: ["active", "passedOut", "struckOff"],
+      default: "active",
+    },
+    statusDate: {
+      type: Date,
+    },
+    statusReason: {
+      type: String,
+      trim: true,
+    },
+    passOutYear: {
+      type: String,
+    },
+    passOutClass: {
+      type: String,
+    },
   },
   { timestamps: true }
 );
@@ -106,10 +128,9 @@ const studentSchema = mongoose.Schema(
 studentSchema.pre("save", async function (next) {
   try {
     if (this.isNew && !this.rollNumber) {
-      const year = new Date().getFullYear().toString().slice(-2); // e.g. "25"
+      const year = new Date().getFullYear().toString().slice(-2);
       const prefix = `${year}-F`;
 
-      // Atomic increment in Counter collection
       const counter = await Counter.findOneAndUpdate(
         { _id: prefix },
         { $inc: { seq: 1 } },
@@ -120,7 +141,6 @@ studentSchema.pre("save", async function (next) {
       this.rollNumber = `${prefix}-${nextNumber}`;
     }
 
-    // Hash password if modified or new
     if (this.isModified("password")) {
       const salt = await bcrypt.genSalt(10);
       this.password = await bcrypt.hash(this.password, salt);
@@ -132,14 +152,8 @@ studentSchema.pre("save", async function (next) {
   }
 });
 
-// Compare password method
 studentSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
-
-// Create indexes manually (run this once)
-// studentSchema.index({ rollNumber: 1 }, { unique: true, sparse: false });
-// studentSchema.index({ bform: 1 }, { unique: true });
-// studentSchema.index({ email: 1 }, { unique: true });
 
 export const Student = mongoose.model("Student", studentSchema);
