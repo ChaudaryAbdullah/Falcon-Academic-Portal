@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -230,7 +230,11 @@ export default function AdminDashboard() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
   const [results, setResults] = useState<Result[]>([]);
-  const [counts, setCounts] = useState({ students: 0, teachers: 0 });
+  const [counts, setCounts] = useState({
+    students: 0,
+    teachers: 0,
+    activeStudents: 0,
+  });
 
   // Track loading state for each data type
   const [loading, setLoading] = useState<LoadingState>({
@@ -247,6 +251,19 @@ export default function AdminDashboard() {
 
   // Prevent double fetch in StrictMode
   const hasFetched = useRef(false);
+
+  // 🔥 MEMOIZED: Filter active students only - used for fees, reports, results, etc.
+  const activeStudents = useMemo(() => {
+    return students.filter((s) => s.status === "active" || !s.status);
+  }, [students]);
+
+  // Update active students count whenever students change
+  useEffect(() => {
+    setCounts((prev) => ({
+      ...prev,
+      activeStudents: activeStudents.length,
+    }));
+  }, [activeStudents]);
 
   // 🚀 PREFETCH ALL DATA ON MOUNT - This is the key optimization
   useEffect(() => {
@@ -270,7 +287,14 @@ export default function AdminDashboard() {
       .then((res) => {
         const data = res.data.data || [];
         setStudents(data);
-        setCounts((prev) => ({ ...prev, students: data.length }));
+        const activeCount = data.filter(
+          (s: Student) => s.status === "active" || !s.status
+        ).length;
+        setCounts((prev) => ({
+          ...prev,
+          students: data.length,
+          activeStudents: activeCount,
+        }));
       })
       .catch(console.error)
       .finally(() => setLoaded("students"));
@@ -425,6 +449,7 @@ export default function AdminDashboard() {
 
     switch (activeTab) {
       case "students":
+        // StudentManagement gets ALL students (including passedOut and struckOff)
         return (
           <StudentManagement
             students={students}
@@ -439,9 +464,10 @@ export default function AdminDashboard() {
           />
         );
       case "fees":
+        // FeeManagement only gets ACTIVE students
         return (
           <FeeManagement
-            students={students}
+            students={activeStudents}
             feeStructure={feeStructure}
             setFeeStructure={handleSetFeeStructure}
             studentDiscounts={studentDiscounts}
@@ -450,9 +476,10 @@ export default function AdminDashboard() {
           />
         );
       case "paperFund":
+        // PaperFundManagement only gets ACTIVE students
         return (
           <PaperFundManagement
-            students={students}
+            students={activeStudents}
             feeStructure={feeStructure}
             challans={paperFundChallans}
             setChallans={handleSetPaperFundChallans}
@@ -466,13 +493,16 @@ export default function AdminDashboard() {
           />
         );
       case "studentDiscount":
-        return <StudentDiscount students={students} />;
+        // StudentDiscount only gets ACTIVE students
+        return <StudentDiscount students={activeStudents} />;
       case "fee-reports":
-        return <FeeReports students={students} />;
+        // FeeReports only gets ACTIVE students
+        return <FeeReports students={activeStudents} />;
       case "results":
+        // ResultsManagement only gets ACTIVE students
         return (
           <ResultsManagement
-            students={students}
+            students={activeStudents}
             subjects={subjects}
             setSubjects={handleSetSubjects}
             exams={exams}
@@ -510,7 +540,28 @@ export default function AdminDashboard() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Enrolled students
+                    All registered students
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Active Students
+                  </CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">
+                    {loading.students ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      counts.activeStudents
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Currently enrolled
                   </p>
                 </CardContent>
               </Card>
@@ -572,23 +623,80 @@ export default function AdminDashboard() {
                   </Button>
                 </CardContent>
               </Card>
+            </div>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    System Status
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-sm text-green-600 font-medium">
-                    All Systems Online
+            {/* Additional stats cards showing student breakdown */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="bg-green-50 border-green-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-green-600">Active Students</p>
+                      <p className="text-2xl font-bold text-green-700">
+                        {loading.students ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          counts.activeStudents
+                        )}
+                      </p>
+                    </div>
+                    <Users className="h-8 w-8 text-green-500" />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Last updated: {new Date().toLocaleDateString()}
-                  </p>
+                </CardContent>
+              </Card>
+              <Card className="bg-blue-50 border-blue-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-blue-600">Passed Out</p>
+                      <p className="text-2xl font-bold text-blue-700">
+                        {loading.students ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          students.filter((s) => s.status === "passedOut")
+                            .length
+                        )}
+                      </p>
+                    </div>
+                    <GraduationCap className="h-8 w-8 text-blue-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-red-50 border-red-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-red-600">Struck Off</p>
+                      <p className="text-2xl font-bold text-red-700">
+                        {loading.students ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          students.filter((s) => s.status === "struckOff")
+                            .length
+                        )}
+                      </p>
+                    </div>
+                    <Users className="h-8 w-8 text-red-500" />
+                  </div>
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">
+                  System Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-green-600 font-medium">
+                  All Systems Online
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Last updated: {new Date().toLocaleDateString()}
+                </p>
+              </CardContent>
+            </Card>
           </div>
         );
     }
