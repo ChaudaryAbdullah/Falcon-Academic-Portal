@@ -7,7 +7,7 @@ export const createFee = async (req, res) => {
     const fee = await Fee.create(req.body);
     const populatedFee = await Fee.findById(fee._id).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section discountCode"
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
     );
     res.status(201).json({ success: true, data: populatedFee });
   } catch (error) {
@@ -21,7 +21,7 @@ export const getFees = async (req, res) => {
     const fees = await Fee.find({})
       .populate(
         "studentId",
-        "studentName fatherName mPhoneNumber rollNumber class section discountCode"
+        "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
       )
       .sort({ createdAt: -1 });
 
@@ -37,6 +37,7 @@ export const getFees = async (req, res) => {
         class: fee.studentId.class,
         section: fee.studentId.section,
         discountCode: fee.studentId.discountCode,
+        img: fee.studentId.img || null,
       },
       month: fee.month,
       year: fee.year,
@@ -111,7 +112,7 @@ export const generateBulkFees = async (req, res) => {
         const newFee = await Fee.create(feeData);
         const populatedFee = await Fee.findById(newFee._id).populate(
           "studentId",
-          "studentName fatherName mPhoneNumber rollNumber class section discountCode"
+          "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
         );
 
         createdChallans.push(populatedFee);
@@ -139,7 +140,7 @@ export const getFeeById = async (req, res) => {
   try {
     const fee = await Fee.findById(req.params.id).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section discountCode"
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
     );
     if (!fee)
       return res
@@ -159,7 +160,7 @@ export const updateFee = async (req, res) => {
       runValidators: true,
     }).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section discountCode"
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
     );
 
     if (!fee)
@@ -195,7 +196,7 @@ export const getFeeByStudentId = async (req, res) => {
 
     const fees = await Fee.find({ studentId }).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section"
+      "img studentName fatherName mPhoneNumber rollNumber class section"
     );
 
     if (!fees || fees.length === 0) {
@@ -282,7 +283,7 @@ export const bulkUpdateFeeStatus = async (req, res) => {
       _id: { $in: validObjectIds },
     }).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section discountCode"
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
     );
 
     res.status(200).json({
@@ -315,7 +316,7 @@ export const updateWhatsAppStatus = async (req, res) => {
       { new: true }
     ).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section discountCode"
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
     );
 
     if (!fee) {
@@ -492,7 +493,7 @@ export const getStudentReport = async (req, res) => {
     const fees = await Fee.find({ studentId })
       .populate(
         "studentId",
-        "studentName fatherName mPhoneNumber rollNumber class section"
+        "img studentName fatherName mPhoneNumber rollNumber class section"
       )
       .sort({ year: -1, month: -1 });
 
@@ -1217,7 +1218,7 @@ export const submitPartialPayment = async (req, res) => {
         runValidators: true,
       }).populate(
         "studentId",
-        "studentName fatherName mPhoneNumber rollNumber class section"
+        "img studentName fatherName mPhoneNumber rollNumber class section"
       );
 
       if (!updatedFee) {
@@ -1294,7 +1295,7 @@ export const getPartialPaymentSummary = async (req, res) => {
       status: { $in: ["pending", "overdue"] },
     }).populate(
       "studentId",
-      "studentName fatherName mPhoneNumber rollNumber class section"
+      "img studentName fatherName mPhoneNumber rollNumber class section"
     );
 
     const summary = fees.map((fee) => ({
