@@ -79,6 +79,10 @@ interface FeeChallan {
   id: string;
   studentId: {
     _id: string;
+    img?: {
+      data: string;
+      contentType: string;
+    };
     rollNumber: string;
     studentName: string;
     fatherName: string;
@@ -225,6 +229,65 @@ export function GenerateFeeTab({
       challanPairs.push(challansArray.slice(i, i + 2));
     }
 
+    // Helper function to get student image
+    const getStudentImage = (studentId: any): string | null => {
+      if (!studentId?.img?.data || !studentId?.img?.contentType) {
+        return null;
+      }
+
+      const { data, contentType } = studentId.img;
+
+      try {
+        // Case 1: Already a base64 string
+        if (typeof data === "string") {
+          // Check if it already has the data URI prefix
+          if (data.startsWith("data:")) {
+            return data;
+          }
+          return `data:${contentType};base64,${data}`;
+        }
+
+        // Case 2: Buffer object with data array (common when sent from Node.js)
+        if (data.type === "Buffer" && Array.isArray(data.data)) {
+          const base64String = btoa(
+            data.data.reduce(
+              (acc: string, byte: number) => acc + String.fromCharCode(byte),
+              ""
+            )
+          );
+          return `data:${contentType};base64,${base64String}`;
+        }
+
+        // Case 3: Uint8Array or regular array of bytes
+        if (Array.isArray(data) || data instanceof Uint8Array) {
+          const base64String = btoa(
+            Array.from(data).reduce(
+              (acc: string, byte: number) => acc + String.fromCharCode(byte),
+              ""
+            )
+          );
+          return `data:${contentType};base64,${base64String}`;
+        }
+
+        // Case 4: ArrayBuffer
+        if (data instanceof ArrayBuffer) {
+          const base64String = btoa(
+            new Uint8Array(data).reduce(
+              (acc: string, byte: number) => acc + String.fromCharCode(byte),
+              ""
+            )
+          );
+          return `data:${contentType};base64,${base64String}`;
+        }
+
+        console.warn("Unknown image data format:", typeof data, data);
+        return null;
+      } catch (error) {
+        console.error("Error processing student image:", error);
+        return null;
+      }
+    };
+
     const pages = challanPairs
       .map((pair, pageIndex) => {
         const pageBreak =
@@ -234,27 +297,51 @@ export function GenerateFeeTab({
 
         const challansOnPage = pair
           .map((challan) => {
+            const studentImage = getStudentImage(challan.studentId);
+
             return `
 <div class="challan-container">
     <div class="header">
-        <h1>FALCON House School</h1>
-        <h2>Fee Challan</h2>
+        <div class="header-content">
+            <img src="${"/results.jpeg"}" alt="Logo" style="width: auto; height: 70px; object-fit: contain;" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size: 28pt; color: #3b82f6;\\'>🏫</span>';" />
+            <div class="header-text">
+                <h1>FALCON House School</h1>
+                <h2>Fee Challan</h2>
+            </div>
+            <div class="logo-spacer"></div>
+        </div>
     </div>
     
-    <div class="challan-info">
-        <p><strong>Student Name:</strong> ${challan.studentId.studentName}</p>
-        <p><strong>Father Name:</strong> ${challan.studentId.fatherName}</p>
-        <p><strong>Reg Number:</strong> ${challan.studentId.rollNumber}</p>
-        <p><strong>Class:</strong> ${challan.studentId.class} ${
+    <div class="info-section">
+        <div class="student-photo">
+            ${
+              studentImage
+                ? `<img src="${studentImage}" alt="Student Photo" class="student-img" />`
+                : `<div class="photo-placeholder">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                 </div>`
+            }
+        </div>
+        <div class="challan-info">
+            <p><strong>Student Name:</strong> ${
+              challan.studentId.studentName
+            }</p>
+            <p><strong>Father Name:</strong> ${challan.studentId.fatherName}</p>
+            <p><strong>Reg Number:</strong> ${challan.studentId.rollNumber}</p>
+            <p><strong>Class:</strong> ${challan.studentId.class} ${
               challan.studentId.section
             }</p>
-        <p><strong>Month/Year:</strong> ${challan.month} ${challan.year}</p>
-        <p><strong>Due Date:</strong> ${challan.dueDate}</p>
-         <p><strong>Challan code:</strong> ${
-           challan.studentId.discountCode
-             ? challan.studentId.discountCode
-             : "*ADF*"
-         }</p>
+            <p><strong>Month/Year:</strong> ${challan.month} ${challan.year}</p>
+            <p><strong>Due Date:</strong> ${challan.dueDate}</p>
+            <p><strong>Challan code:</strong> ${
+              challan.studentId.discountCode
+                ? challan.studentId.discountCode
+                : "*ADF*"
+            }</p>
+        </div>
     </div>
 
     <table class="fee-details">
@@ -352,6 +439,40 @@ export function GenerateFeeTab({
             margin-bottom: 6px; 
         }
         
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .school-logo {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+        }
+        
+        .logo-placeholder {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            color: #999;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        
+        .logo-spacer {
+            width: 40px;
+        }
+        
+        .header-text {
+            flex: 1;
+        }
+        
         .header h1 {
             font-size: 14px;
             margin: 0 0 2px 0;
@@ -364,8 +485,44 @@ export function GenerateFeeTab({
             font-weight: normal;
         }
         
+        .info-section {
+            display: flex;
+            gap: 10px;
+            margin: 6px 0;
+            align-items: flex-start;
+        }
+        
+        .student-photo {
+            flex-shrink: 0;
+        }
+        
+        .student-img {
+            width: 50px;
+            height: 60px;
+            object-fit: cover;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .photo-placeholder {
+            width: 50px;
+            height: 60px;
+            border: 1px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        
+        .photo-placeholder svg {
+            width: 24px;
+            height: 24px;
+            color: #ccc;
+        }
+        
         .challan-info { 
-            margin: 6px 0; 
+            flex: 1;
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-gap: 4px 15px;

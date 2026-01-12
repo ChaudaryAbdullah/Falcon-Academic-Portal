@@ -43,6 +43,10 @@ interface FeeChallan {
   id: string;
   studentId: {
     _id: string;
+    img?: {
+      data: string;
+      contentType: string;
+    };
     rollNumber: string;
     studentName: string;
     fatherName: string;
@@ -228,6 +232,67 @@ Falcon House School Administration
   };
 
   const getChallanHTML = (challan: FeeChallan) => {
+    // Helper function to get student image
+    const getStudentImage = (studentId: any): string | null => {
+      if (!studentId?.img?.data || !studentId?.img?.contentType) {
+        return null;
+      }
+
+      const { data, contentType } = studentId.img;
+
+      try {
+        // Case 1: Already a base64 string
+        if (typeof data === "string") {
+          // Check if it already has the data URI prefix
+          if (data.startsWith("data:")) {
+            return data;
+          }
+          return `data:${contentType};base64,${data}`;
+        }
+
+        // Case 2: Buffer object with data array (common when sent from Node.js)
+        if (data.type === "Buffer" && Array.isArray(data.data)) {
+          const base64String = btoa(
+            data.data.reduce(
+              (acc: string, byte: number) => acc + String.fromCharCode(byte),
+              ""
+            )
+          );
+          return `data:${contentType};base64,${base64String}`;
+        }
+
+        // Case 3: Uint8Array or regular array of bytes
+        if (Array.isArray(data) || data instanceof Uint8Array) {
+          const base64String = btoa(
+            Array.from(data).reduce(
+              (acc: string, byte: number) => acc + String.fromCharCode(byte),
+              ""
+            )
+          );
+          return `data:${contentType};base64,${base64String}`;
+        }
+
+        // Case 4: ArrayBuffer
+        if (data instanceof ArrayBuffer) {
+          const base64String = btoa(
+            new Uint8Array(data).reduce(
+              (acc: string, byte: number) => acc + String.fromCharCode(byte),
+              ""
+            )
+          );
+          return `data:${contentType};base64,${base64String}`;
+        }
+
+        console.warn("Unknown image data format:", typeof data, data);
+        return null;
+      } catch (error) {
+        console.error("Error processing student image:", error);
+        return null;
+      }
+    };
+
+    const studentImage = getStudentImage(challan.studentId);
+
     return `
 <!DOCTYPE html>
 <html>
@@ -252,6 +317,28 @@ Falcon House School Administration
             margin-bottom: 15px; 
         }
         
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        .school-logo {
+            width: auto;
+            height: 70px;
+            object-fit: contain;
+        }
+        
+        .logo-spacer {
+            width: 70px;
+        }
+        
+        .header-text {
+            flex: 1;
+            text-align: center;
+        }
+        
         .header h1 {
             font-size: 20px;
             margin: 0 0 3px 0;
@@ -262,11 +349,47 @@ Falcon House School Administration
             margin: 0;
         }
         
+        .info-section {
+            display: flex;
+            gap: 15px;
+            margin: 15px 0;
+            align-items: flex-start;
+        }
+        
+        .student-photo {
+            flex-shrink: 0;
+        }
+        
+        .student-img {
+            width: 70px;
+            height: 85px;
+            object-fit: cover;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .photo-placeholder {
+            width: 70px;
+            height: 85px;
+            border: 2px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        
+        .photo-placeholder svg {
+            width: 35px;
+            height: 35px;
+            color: #ccc;
+        }
+        
         .challan-info { 
-            margin: 15px 0; 
+            flex: 1;
             display: grid;
-            grid-template-columns: 1fr 1fr; /* Two columns */
-            grid-gap: 15px 30px; /* vertical and horizontal gap */
+            grid-template-columns: 1fr 1fr;
+            grid-gap: 8px 30px;
             font-size: 13px;
         }
         
@@ -294,14 +417,15 @@ Falcon House School Administration
         
         .total { 
             font-weight: bold; 
-            font-size: 12px; 
+            font-size: 14px; 
+            background-color: #f8f9fa;
         }
         
         .footer { 
             margin-top: 15px; 
             text-align: center; 
             font-size: 10px; 
-            line-height: 1;
+            line-height: 1.3;
         }
         
         .footer p {
@@ -310,10 +434,12 @@ Falcon House School Administration
         
         .arrears { 
             color: #e74c3c; 
+            font-weight: bold;
         }
         
         .discount { 
             color: #27ae60; 
+            font-weight: bold;
         }
         
         /* Force left alignment for print */
@@ -332,24 +458,46 @@ Falcon House School Administration
 </head>
 <body>
     <div class="header">
-        <h1>FALCON House School</h1>
-        <h2>Fee Challan</h2>
+        <div class="header-content">
+            <img src="/results.jpeg" alt="Logo" class="school-logo" onerror="this.style.display='none'; this.nextElementSibling.style.flex='none';" />
+            <div class="header-text">
+                <h1>FALCON House School</h1>
+                <h2>Fee Challan</h2>
+            </div>
+            <div class="logo-spacer"></div>
+        </div>
     </div>
     
-    <div class="challan-info">
-        <p><strong>Student Name:</strong> ${challan.studentId.studentName}</p>
-        <p><strong>Father Name:</strong> ${challan.studentId.fatherName}</p>
-        <p><strong>Reg Number:</strong> ${challan.studentId.rollNumber}</p>
-        <p><strong>Class:</strong> ${challan.studentId.class} ${
+    <div class="info-section">
+        <div class="student-photo">
+            ${
+              studentImage
+                ? `<img src="${studentImage}" alt="Student Photo" class="student-img" />`
+                : `<div class="photo-placeholder">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                 </div>`
+            }
+        </div>
+        <div class="challan-info">
+            <p><strong>Student Name:</strong> ${
+              challan.studentId.studentName
+            }</p>
+            <p><strong>Father Name:</strong> ${challan.studentId.fatherName}</p>
+            <p><strong>Reg Number:</strong> ${challan.studentId.rollNumber}</p>
+            <p><strong>Class:</strong> ${challan.studentId.class} ${
       challan.studentId.section
     }</p>
-        <p><strong>Month/Year:</strong> ${challan.month} ${challan.year}</p>
-        <p><strong>Due Date:</strong> ${challan.dueDate}</p>
-        <p><strong>Challan code:</strong> ${
-          challan.studentId.discountCode
-            ? challan.studentId.discountCode
-            : "*ADF*"
-        }</p>
+            <p><strong>Month/Year:</strong> ${challan.month} ${challan.year}</p>
+            <p><strong>Due Date:</strong> ${challan.dueDate}</p>
+            <p><strong>Challan code:</strong> ${
+              challan.studentId.discountCode
+                ? challan.studentId.discountCode
+                : "*ADF*"
+            }</p>
+        </div>
     </div>
 
     <table class="fee-details">
@@ -382,9 +530,9 @@ Falcon House School Administration
         <tr class="total">
             <td>Total Amount</td>
             <td>Rs. ${
+              challan.tutionFee +
               challan.examFee +
               challan.miscFee +
-              challan.tutionFee +
               challan.arrears
             }</td>
         </tr>

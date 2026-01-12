@@ -61,6 +61,10 @@ interface FeeChallan {
   id: string;
   studentId: {
     _id: string;
+    img?: {
+      data: string;
+      contentType: string;
+    };
     rollNumber: string;
     studentName: string;
     fatherName: string;
