@@ -82,6 +82,9 @@ import {
   ArrowDown,
   Users,
   CheckCircle,
+  FileText,
+  Download,
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -314,6 +317,25 @@ export function StudentManagement({
 
     return isActive && matchesClass && matchesSection && matchesSearch;
   });
+
+  // Reports Tab State
+  const [reportType, setReportType] = useState<
+    "student" | "contact" | "custom"
+  >("student");
+  const [reportClassFilter, setReportClassFilter] = useState("");
+  const [reportSectionFilter, setReportSectionFilter] = useState("");
+  const [reportStatusFilter, setReportStatusFilter] = useState("active");
+  const [customFields, setCustomFields] = useState<Set<keyof Student>>(
+    new Set([
+      "studentName",
+      "rollNumber",
+      "class",
+      "section",
+      "fatherName",
+      "fPhoneNumber",
+    ])
+  );
+  const [reportSearchTerm, setReportSearchTerm] = useState("");
 
   // Pagination for promotion tab
   const promotionIndexOfLastStudent =
@@ -929,7 +951,7 @@ export function StudentManagement({
 
   const columnLabels: Record<keyof ColumnVisibility, string> = {
     image: "Photo",
-    rollNumber: "Roll Number",
+    rollNumber: "Reg Number",
     studentName: "Student Name",
     class: "Class",
     section: "Section",
@@ -1079,6 +1101,287 @@ export function StudentManagement({
     struckOff: students.filter((s) => s.status === "struckOff").length,
   };
 
+  // Available fields for custom reports
+  const availableFields: { key: keyof Student; label: string }[] = [
+    { key: "rollNumber", label: "Reg Number" },
+    { key: "studentName", label: "Student Name" },
+    { key: "fatherName", label: "Father Name" },
+    { key: "fatherCnic", label: "Father CNIC" },
+    { key: "motherName", label: "Mother Name" },
+    { key: "motherCnic", label: "Mother CNIC" },
+    { key: "bform", label: "B-Form" },
+    { key: "dob", label: "Date of Birth" },
+    { key: "class", label: "Class" },
+    { key: "section", label: "Section" },
+    { key: "gender", label: "Gender" },
+    { key: "fPhoneNumber", label: "Father Phone" },
+    { key: "mPhoneNumber", label: "Whatsapp Number" },
+    { key: "fatherOccupation", label: "Father Occupation" },
+    { key: "motherOccupation", label: "Mother Occupation" },
+    { key: "address", label: "Address" },
+    { key: "email", label: "Email" },
+    { key: "discountCode", label: "Discount Code" },
+    { key: "status", label: "Status" },
+  ];
+
+  // Filter students for reports
+  const getReportStudents = () => {
+    return students.filter((s) => {
+      const matchesClass = !reportClassFilter || s.class === reportClassFilter;
+      const matchesSection =
+        !reportSectionFilter || s.section === reportSectionFilter;
+      const matchesStatus =
+        !reportStatusFilter ||
+        s.status === reportStatusFilter ||
+        (!s.status && reportStatusFilter === "active");
+      const matchesSearch =
+        !reportSearchTerm ||
+        s.studentName.toLowerCase().includes(reportSearchTerm.toLowerCase()) ||
+        s.rollNumber?.toLowerCase().includes(reportSearchTerm.toLowerCase()) ||
+        s.fatherName?.toLowerCase().includes(reportSearchTerm.toLowerCase());
+
+      return matchesClass && matchesSection && matchesStatus && matchesSearch;
+    });
+  };
+
+  // Generate and print report
+  const generateReport = () => {
+    const reportStudents = getReportStudents();
+
+    if (reportStudents.length === 0) {
+      toast.error("No students found matching the criteria");
+      return;
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Please allow popups to generate reports");
+      return;
+    }
+
+    let tableHeaders = "";
+    let tableRows = "";
+
+    if (reportType === "student") {
+      // Full student list
+      tableHeaders = `
+        <th>Photo</th>
+        <th>Reg No.</th>
+        <th>Student Name</th>
+        <th>Father Name</th>
+        <th>Class</th>
+        <th>Section</th>
+      `;
+
+      tableRows = reportStudents
+        .map(
+          (s) => `
+        <tr>
+          <td>${
+            getImageUrl(s)
+              ? `<img src="${getImageUrl(
+                  s
+                )}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;" />`
+              : "-"
+          }</td>
+          <td>${s.rollNumber || "-"}</td>
+          <td>${s.studentName}</td>
+          <td>${s.fatherName}</td>
+          <td>${s.class}</td>
+          <td>${s.section}</td>
+        </tr>
+      `
+        )
+        .join("");
+    } else if (reportType === "contact") {
+      // Contact list
+      tableHeaders = `
+        <th>Reg No.</th>
+        <th>Student Name</th>
+        <th>Father Name</th>
+        <th>Father Phone</th>
+        <th>Whatsapp</th>
+        <th>Class</th>
+        <th>Section</th>
+      `;
+
+      tableRows = reportStudents
+        .map(
+          (s) => `
+        <tr>
+          <td>${s.rollNumber || "-"}</td>
+          <td>${s.studentName}</td>
+          <td>${s.fatherName}</td>
+          <td>${s.fPhoneNumber || "-"}</td>
+          <td>${s.mPhoneNumber || "-"}</td>
+          <td>${s.class}</td>
+          <td>${s.section}</td>
+        </tr>
+      `
+        )
+        .join("");
+    } else {
+      // Custom list
+      const selectedFieldsArray = Array.from(customFields);
+
+      tableHeaders = selectedFieldsArray
+        .map((field) => {
+          const fieldInfo = availableFields.find((f) => f.key === field);
+          return `<th>${fieldInfo?.label || field}</th>`;
+        })
+        .join("");
+
+      tableRows = reportStudents
+        .map(
+          (s) => `
+        <tr>
+          ${selectedFieldsArray
+            .map((field) => {
+              let value = s[field];
+              if (field === "dob" && value) {
+                value = new Date(value as string).toLocaleDateString();
+              } else if (field === "status") {
+                value =
+                  value === "passedOut"
+                    ? "Passed Out"
+                    : value === "struckOff"
+                    ? "Struck Off"
+                    : "Active";
+              }
+              return `<td>${value || "-"}</td>`;
+            })
+            .join("")}
+        </tr>
+      `
+        )
+        .join("");
+    }
+
+    const reportTitle =
+      reportType === "student"
+        ? "Student List"
+        : reportType === "contact"
+        ? "Contact List"
+        : "Custom Report";
+    const filterInfo = `
+      ${reportClassFilter ? `Class: ${reportClassFilter} | ` : ""}
+      ${reportSectionFilter ? `Section: ${reportSectionFilter} | ` : ""}
+      ${
+        reportStatusFilter
+          ? `Status: ${
+              reportStatusFilter === "active"
+                ? "Active"
+                : reportStatusFilter === "passedOut"
+                ? "Passed Out"
+                : "Struck Off"
+            } | `
+          : ""
+      }
+      Total: ${reportStudents.length} students
+    `;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${reportTitle}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              padding: 20px;
+              margin: 0;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 2px solid #333;
+              padding-bottom: 10px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 24px;
+              color: #333;
+            }
+            .header p {
+              margin: 5px 0;
+              color: #666;
+              font-size: 14px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+              font-size: 12px;
+            }
+            th {
+              background-color: #4B5563;
+              color: white;
+              font-weight: bold;
+            }
+            tr:nth-child(even) {
+              background-color: #f9fafb;
+            }
+            .footer {
+              margin-top: 30px;
+              text-align: center;
+              font-size: 11px;
+              color: #666;
+            }
+            @media print {
+              body {
+                padding: 10px;
+              }
+              .no-print {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${reportTitle}</h1>
+            <p>${filterInfo}</p>
+            <p>Generated on: ${new Date().toLocaleString()}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>${tableHeaders}</tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+          <div class="footer">
+            <p>This is a computer-generated report</p>
+          </div>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+
+    // Wait for images to load before printing
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  };
+
+  // Toggle custom field selection
+  const toggleCustomField = (field: keyof Student) => {
+    const newFields = new Set(customFields);
+    if (newFields.has(field)) {
+      newFields.delete(field);
+    } else {
+      newFields.add(field);
+    }
+    setCustomFields(newFields);
+  };
+
   return (
     <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
       <div>
@@ -1135,12 +1438,13 @@ export function StudentManagement({
         onValueChange={setActiveTab}
         className="space-y-4"
       >
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="add">
             {editingStudentId ? "Edit Student" : "Add Student"}
           </TabsTrigger>
           <TabsTrigger value="list">View Students</TabsTrigger>
           <TabsTrigger value="promote">Promote/Demote</TabsTrigger>
+          <TabsTrigger value="reports">Reports/Lists</TabsTrigger>
         </TabsList>
 
         <TabsContent value="add">
@@ -1758,7 +2062,7 @@ export function StudentManagement({
                       )}
                       {columnVisibility.rollNumber && (
                         <TableHead className="min-w-[100px]">
-                          Roll Number
+                          Reg Number
                         </TableHead>
                       )}
                       {columnVisibility.studentName && (
@@ -2232,7 +2536,7 @@ export function StudentManagement({
                           />
                         </TableHead>
                         <TableHead className="w-16">Photo</TableHead>
-                        <TableHead>Roll No.</TableHead>
+                        <TableHead>Reg No.</TableHead>
                         <TableHead>Student Name</TableHead>
                         <TableHead>Father Name</TableHead>
                         <TableHead>Class</TableHead>
@@ -2391,6 +2695,276 @@ export function StudentManagement({
                       }
                     </p>
                   </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Reports Tab */}
+        <TabsContent value="reports">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Generate Reports
+              </CardTitle>
+              <CardDescription>
+                Generate and print student lists, contact lists, or custom
+                reports with selected fields
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Report Type Selection */}
+                <div className="space-y-2">
+                  <Label>Report Type</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card
+                      className={`cursor-pointer transition-all ${
+                        reportType === "student"
+                          ? "border-blue-500 bg-blue-50"
+                          : "hover:border-gray-400"
+                      }`}
+                      onClick={() => setReportType("student")}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <Users className="h-8 w-8 text-blue-600" />
+                          <div>
+                            <h3 className="font-semibold">Student List</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Complete student information
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className={`cursor-pointer transition-all ${
+                        reportType === "contact"
+                          ? "border-blue-500 bg-blue-50"
+                          : "hover:border-gray-400"
+                      }`}
+                      onClick={() => setReportType("contact")}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-8 w-8 text-green-600" />
+                          <div>
+                            <h3 className="font-semibold">Contact List</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Names and contact details
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className={`cursor-pointer transition-all ${
+                        reportType === "custom"
+                          ? "border-blue-500 bg-blue-50"
+                          : "hover:border-gray-400"
+                      }`}
+                      onClick={() => setReportType("custom")}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <Settings className="h-8 w-8 text-purple-600" />
+                          <div>
+                            <h3 className="font-semibold">Custom Report</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Choose specific fields
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                {/* Custom Fields Selection */}
+                {reportType === "custom" && (
+                  <div className="space-y-2">
+                    <Label>Select Fields to Include</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 border rounded-lg bg-gray-50">
+                      {availableFields.map((field) => (
+                        <div
+                          key={field.key}
+                          className="flex items-center space-x-2"
+                        >
+                          <Checkbox
+                            id={field.key}
+                            checked={customFields.has(field.key)}
+                            onCheckedChange={() => toggleCustomField(field.key)}
+                          />
+                          <Label
+                            htmlFor={field.key}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {field.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    {customFields.size === 0 && (
+                      <p className="text-sm text-red-600">
+                        Please select at least one field
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Filters */}
+                <div className="space-y-4">
+                  <Label className="text-base font-semibold">Filters</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Class Filter */}
+                    <div className="space-y-2">
+                      <Label>Class</Label>
+                      <Select
+                        value={reportClassFilter || "all"}
+                        onValueChange={(value) =>
+                          setReportClassFilter(value === "all" ? "" : value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="All Classes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Classes</SelectItem>
+                          {CLASS_ORDER.map((cls) => (
+                            <SelectItem key={cls} value={cls}>
+                              Class {cls}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Section Filter */}
+                    <div className="space-y-2">
+                      <Label>Section</Label>
+                      <Select
+                        value={reportSectionFilter || "all"}
+                        onValueChange={(value) =>
+                          setReportSectionFilter(value === "all" ? "" : value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="All Sections" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Sections</SelectItem>
+                          {getUniqueValues("section").map((section) => (
+                            <SelectItem key={section} value={section}>
+                              Section {section}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Status Filter */}
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={reportStatusFilter || "all"}
+                        onValueChange={(value) =>
+                          setReportStatusFilter(value === "all" ? "" : value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="All Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="passedOut">Passed Out</SelectItem>
+                          <SelectItem value="struckOff">Struck Off</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Search */}
+                    <div className="space-y-2">
+                      <Label>Search</Label>
+                      <div className="flex items-center space-x-2">
+                        <Search className="h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search students..."
+                          value={reportSearchTerm}
+                          onChange={(e) => setReportSearchTerm(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preview Count */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      <span className="font-medium text-blue-900">
+                        {getReportStudents().length} student(s) match the
+                        criteria
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setReportClassFilter("");
+                          setReportSectionFilter("");
+                          setReportStatusFilter("active");
+                          setReportSearchTerm("");
+                        }}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Clear Filters
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Generate Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+                  <Button
+                    onClick={generateReport}
+                    disabled={
+                      getReportStudents().length === 0 ||
+                      (reportType === "custom" && customFields.size === 0)
+                    }
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Report
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={generateReport}
+                    disabled={
+                      getReportStudents().length === 0 ||
+                      (reportType === "custom" && customFields.size === 0)
+                    }
+                    className="flex-1"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Generate PDF
+                  </Button>
+                </div>
+
+                {/* Report Info */}
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>• The report will open in a new window</p>
+                  <p>• Use your browser's print function to save as PDF</p>
+                  <p>
+                    • All filters and search criteria will be applied to the
+                    report
+                  </p>
                 </div>
               </div>
             </CardContent>

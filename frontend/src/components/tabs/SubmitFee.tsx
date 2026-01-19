@@ -29,6 +29,7 @@ import {
   Calculator,
   Printer,
   X,
+  Percent,
 } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { toast } from "sonner";
@@ -69,6 +70,7 @@ interface PaymentBreakdown {
   originalAmount: number;
   currentBalance: number;
   lateFee: number;
+  instanceDiscount: number;
   totalRequired: number;
   paymentAmount: number;
   newBalance: number;
@@ -125,6 +127,9 @@ export function SubmitPaymentTab({
   const [pendingFees, setPendingFees] = useState<FeeChallan[]>([]);
   const [selectedPendingFees, setSelectedPendingFees] = useState<string[]>([]);
   const [lateFees, setLateFees] = useState<{ [key: string]: number }>({});
+  const [instanceDiscounts, setInstanceDiscounts] = useState<{
+    [key: string]: number;
+  }>({});
   const [partialPaymentMode, setPartialPaymentMode] = useState(false);
   const [partialAmount, setPartialAmount] = useState("");
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(
@@ -154,6 +159,13 @@ export function SubmitPaymentTab({
         ...challan,
         displayAmount: challan.totalAmount - challan.arrears,
       }));
+  };
+
+  // Helper function to calculate effective amount for a fee
+  const getEffectiveAmount = (fee: FeeChallan) => {
+    const lateFee = lateFees[fee.id] || 0;
+    const discount = instanceDiscounts[fee.id] || 0;
+    return Math.max(0, fee.remainingBalance + lateFee - discount);
   };
 
   // New WhatsApp function
@@ -215,6 +227,10 @@ export function SubmitPaymentTab({
         (sum, fee) => sum + fee.discount,
         0
       );
+      const totalInstanceDiscounts = selectedFees.reduce(
+        (sum, fee) => sum + (instanceDiscounts[fee.id] || 0),
+        0
+      );
       const totalLateFees = Object.values(lateFees).reduce(
         (sum, fee) => sum + fee,
         0
@@ -224,7 +240,8 @@ export function SubmitPaymentTab({
         totalExamFee +
         totalMiscFee +
         totalLateFees -
-        totalDiscount;
+        totalDiscount -
+        totalInstanceDiscounts;
 
       const monthsString = selectedFees
         .map((fee) => `${fee.month} ${fee.year}`)
@@ -252,6 +269,11 @@ Thank you for your payment! Here are the details:
 • Exam Fee: Rs. ${totalExamFee.toLocaleString()}
 • Miscellaneous Fee: Rs. ${totalMiscFee.toLocaleString()}
 ${totalLateFees > 0 ? `• Late Fee: Rs. ${totalLateFees.toLocaleString()}` : ""}
+${
+  totalInstanceDiscounts > 0
+    ? `• Discount: Rs. ${totalInstanceDiscounts.toLocaleString()}`
+    : ""
+}
 
 *Total Paid: Rs. ${grandTotal.toLocaleString()}*
 
@@ -278,6 +300,7 @@ Falcon House School Administration
   const generateFeeChallanHTML = (
     selectedFees: FeeChallan[],
     lateFees: { [key: string]: number },
+    instanceDiscounts: { [key: string]: number },
     isPartialPayment: boolean = false,
     partialPaymentAmount: string = "",
     paymentSummaryData: PaymentSummary | null = null
@@ -298,6 +321,10 @@ Falcon House School Administration
       (sum, fee) => sum + fee.discount,
       0
     );
+    const totalInstanceDiscounts = selectedFees.reduce(
+      (sum, fee) => sum + (instanceDiscounts[fee.id] || 0),
+      0
+    );
     const totalLateFees = Object.values(lateFees).reduce(
       (sum, fee) => sum + fee,
       0
@@ -311,14 +338,16 @@ Falcon House School Administration
           totalExamFee +
           totalMiscFee +
           totalLateFees -
-          totalDiscount;
+          totalDiscount -
+          totalInstanceDiscounts;
 
     const totalOutstanding =
       totalTuitionFee +
       totalExamFee +
       totalMiscFee +
       totalLateFees -
-      totalDiscount;
+      totalDiscount -
+      totalInstanceDiscounts;
     const remainingBalance = isPartialPayment
       ? totalOutstanding - grandTotal
       : 0;
@@ -586,6 +615,16 @@ Falcon House School Administration
             `
                 : ""
             }
+            ${
+              totalInstanceDiscounts > 0
+                ? `
+            <tr>
+                <td>Discount</td>
+                <td class="amount-column">-${totalInstanceDiscounts.toLocaleString()}</td>
+            </tr>
+            `
+                : ""
+            }
             <tr class="grand-total">
                 <td>Total Paid</td>
                 <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
@@ -680,6 +719,16 @@ Falcon House School Administration
             `
                 : ""
             }
+            ${
+              totalInstanceDiscounts > 0
+                ? `
+            <tr>
+                <td>Discount</td>
+                <td class="amount-column">-${totalInstanceDiscounts.toLocaleString()}</td>
+            </tr>
+            `
+                : ""
+            }
             <tr class="grand-total">
                 <td>Total Paid</td>
                 <td class="amount-column">Rs. ${grandTotal.toLocaleString()}</td>
@@ -704,6 +753,7 @@ Falcon House School Administration
   const generateThermalFeeChallanHTML = (
     selectedFees: FeeChallan[],
     lateFees: { [key: string]: number },
+    instanceDiscounts: { [key: string]: number },
     isPartialPayment: boolean = false,
     partialPaymentAmount: string = "",
     paymentSummaryData: PaymentSummary | null = null
@@ -724,6 +774,10 @@ Falcon House School Administration
       (sum, fee) => sum + fee.discount,
       0
     );
+    const totalInstanceDiscounts = selectedFees.reduce(
+      (sum, fee) => sum + (instanceDiscounts[fee.id] || 0),
+      0
+    );
     const totalLateFees = Object.values(lateFees).reduce(
       (sum, fee) => sum + fee,
       0
@@ -736,14 +790,16 @@ Falcon House School Administration
           totalExamFee +
           totalMiscFee +
           totalLateFees -
-          totalDiscount;
+          totalDiscount -
+          totalInstanceDiscounts;
 
     const totalOutstanding =
       totalTuitionFee +
       totalExamFee +
       totalMiscFee +
       totalLateFees -
-      totalDiscount;
+      totalDiscount -
+      totalInstanceDiscounts;
     const remainingBalance = isPartialPayment
       ? totalOutstanding - grandTotal
       : 0;
@@ -905,6 +961,11 @@ Falcon House School Administration
         ? `<tr><td>Late Fee</td><td class="amount">${totalLateFees.toLocaleString()}</td></tr>`
         : ""
     }
+    ${
+      totalInstanceDiscounts > 0
+        ? `<tr><td>Discount</td><td class="amount">-${totalInstanceDiscounts.toLocaleString()}</td></tr>`
+        : ""
+    }
     <tr class="grand-total"><td>Total Paid</td><td class="amount">Rs. ${grandTotal.toLocaleString()}</td></tr>
     `
     }
@@ -958,6 +1019,7 @@ Falcon House School Administration
         ? generateThermalFeeChallanHTML(
             selectedFees,
             lateFees,
+            instanceDiscounts,
             partialPaymentMode,
             partialAmount,
             paymentSummary
@@ -965,6 +1027,7 @@ Falcon House School Administration
         : generateFeeChallanHTML(
             selectedFees,
             lateFees,
+            instanceDiscounts,
             partialPaymentMode,
             partialAmount,
             paymentSummary
@@ -1028,8 +1091,12 @@ Falcon House School Administration
       if (remainingAmount <= 0) break;
 
       const lateFee: number = lateFees[fee.id] || 0;
+      const discount: number = instanceDiscounts[fee.id] || 0;
       const currentBalance: number = fee.remainingBalance || fee.totalAmount;
-      const totalRequired: number = currentBalance + lateFee;
+      const totalRequired: number = Math.max(
+        0,
+        currentBalance + lateFee - discount
+      );
 
       const paymentForThisFee: number = Math.min(
         remainingAmount,
@@ -1044,6 +1111,7 @@ Falcon House School Administration
         originalAmount: fee.totalAmount,
         currentBalance,
         lateFee,
+        instanceDiscount: discount,
         totalRequired,
         paymentAmount: paymentForThisFee,
         newBalance,
@@ -1078,7 +1146,8 @@ Falcon House School Administration
 
         const currentBalance: number = fee.remainingBalance || fee.totalAmount;
         const lateFee: number = lateFees[feeId] || 0;
-        return total + currentBalance + lateFee;
+        const discount: number = instanceDiscounts[feeId] || 0;
+        return total + Math.max(0, currentBalance + lateFee - discount);
       },
       0
     );
@@ -1096,6 +1165,40 @@ Falcon House School Administration
     }
 
     try {
+      // First update any instance discounts and late fees to the database
+      for (const feeId of selectedPendingFees) {
+        const fee = challans.find((c) => c.id === feeId);
+        if (!fee) continue;
+
+        const instanceDiscount = instanceDiscounts[feeId] || 0;
+        const lateFee = lateFees[feeId] || 0;
+
+        if (instanceDiscount > 0 || lateFee > 0) {
+          const newDiscount = fee.discount + instanceDiscount;
+          const newMiscFee = fee.miscFee + lateFee;
+          // Recalculate totalAmount with new discount and late fee
+          const newTotalAmount =
+            fee.tutionFee + fee.examFee + newMiscFee - newDiscount;
+          // Adjust remainingBalance for the discount (late fee will be handled by partial payment API)
+          const adjustedRemainingBalance = Math.max(
+            0,
+            fee.remainingBalance - instanceDiscount
+          );
+
+          await axios.put(
+            `${BACKEND}/api/fees/${feeId}`,
+            {
+              ...fee,
+              discount: newDiscount,
+              miscFee: newMiscFee,
+              totalAmount: newTotalAmount,
+              remainingBalance: adjustedRemainingBalance,
+            },
+            { withCredentials: true }
+          );
+        }
+      }
+
       const response = await axios.post(
         `${BACKEND}/api/fees/partial-payment`,
         {
@@ -1103,6 +1206,7 @@ Falcon House School Administration
           selectedFeeIds: selectedPendingFees,
           partialAmount: amount,
           lateFees: lateFees,
+          instanceDiscounts: instanceDiscounts, // Pass instance discounts to backend
         },
         { withCredentials: true }
       );
@@ -1124,118 +1228,13 @@ Falcon House School Administration
         setPartialAmount("");
         setPaymentSummary(null);
         setLateFees({});
+        setInstanceDiscounts({});
       }
     } catch (error) {
       console.error("Error submitting partial payment:", error);
       toast.error("Failed to submit partial payment. Please try again.");
     }
   };
-
-  // ADD this function for partial payment WhatsApp confirmation:
-  //   const sendPartialPaymentConfirmation = async (
-  //     selectedFees: FeeChallan[],
-  //     paidAmount: number,
-  //     lateFees: { [key: string]: number }
-  //   ): Promise<void> => {
-  //     try {
-  //       const student = selectedFees[0].studentId;
-
-  //       if (!student.mPhoneNumber) {
-  //         toast.error(
-  //           `Phone number not available for ${student.studentName}. Please update the student's phone number first.`
-  //         );
-  //         return;
-  //       }
-
-  //       // Format phone number (same logic as existing function)
-  //       let phoneNumber: string = student.mPhoneNumber
-  //         .toString()
-  //         .replace(/[\s-]/g, "");
-  //       phoneNumber = phoneNumber.replace(/[^\d+]/g, "");
-
-  //       if (phoneNumber.startsWith("+92")) {
-  //         phoneNumber = phoneNumber.substring(1);
-  //       } else if (phoneNumber.startsWith("0")) {
-  //         phoneNumber = "92" + phoneNumber.substring(1);
-  //       } else if (!phoneNumber.startsWith("92")) {
-  //         if (phoneNumber.startsWith("3")) {
-  //           phoneNumber = "92" + phoneNumber;
-  //         } else {
-  //           toast.error(
-  //             `Invalid phone number format for ${student.studentName}: ${student.mPhoneNumber}`
-  //           );
-  //           return;
-  //         }
-  //       }
-
-  //       if (phoneNumber.length < 12 || phoneNumber.length > 13) {
-  //         toast.error(
-  //           `Invalid phone number length for ${student.studentName}: ${student.mPhoneNumber}`
-  //         );
-  //         return;
-  //       }
-
-  //       const monthsString: string = selectedFees
-  //         .map((fee: FeeChallan) => `${fee.month} ${fee.year}`)
-  //         .join(", ");
-
-  //       // Calculate outstanding balance
-  //       const totalOutstanding: number = selectedFees.reduce(
-  //         (sum: number, fee: FeeChallan) => {
-  //           const currentBalance: number =
-  //             fee.remainingBalance || fee.totalAmount;
-  //           const lateFee: number = lateFees[fee.id] || 0;
-  //           return sum + currentBalance + lateFee;
-  //         },
-  //         0
-  //       );
-
-  //       const remainingBalance: number = totalOutstanding - paidAmount;
-
-  //       // Create partial payment confirmation message
-  //       const message: string = `
-  // *Partial Payment Confirmation - Falcon House School*
-
-  // Dear ${student.fatherName || "Parent"},
-
-  // Thank you for your partial payment!
-
-  // *Student Information:*
-  // • Name: ${student.studentName}
-  // • Registration Number: ${student.rollNumber}
-  // • Class: ${student.class}-${student.section}
-
-  // *Payment Details:*
-  // • Date: ${new Date().toLocaleDateString()}
-  // • Months: ${monthsString}
-  // • Amount Paid: Rs. ${paidAmount.toLocaleString()}
-
-  // *Balance Information:*
-  // • Total Outstanding: Rs. ${totalOutstanding.toLocaleString()}
-  // • Amount Paid: Rs. ${paidAmount.toLocaleString()}
-  // • Remaining Balance: Rs. ${remainingBalance.toLocaleString()}
-
-  // Your partial payment has been successfully recorded. The remaining balance will be allocated to pending fees.
-
-  // Thank you for choosing Falcon House School!
-
-  // Best regards,
-  // Falcon House School Administration
-  //     `.trim();
-
-  //       const whatsappUrl: string = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
-  //         message
-  //       )}`;
-  //       window.open(whatsappUrl, "_blank");
-
-  //       toast.success(
-  //         "WhatsApp partial payment confirmation opened successfully!"
-  //       );
-  //     } catch (error) {
-  //       console.error("Error sending partial payment confirmation:", error);
-  //       toast.error("Error opening WhatsApp message. Please try again.");
-  //     }
-  //   };
 
   useEffect(() => {
     if (selectedStudent) {
@@ -1248,9 +1247,11 @@ Falcon House School Administration
         }
       });
       setLateFees(initialLateFees);
+      setInstanceDiscounts({});
     } else {
       setPendingFees([]);
       setLateFees({});
+      setInstanceDiscounts({});
     }
   }, [selectedStudent, challans]);
 
@@ -1262,6 +1263,7 @@ Falcon House School Administration
     setShowStudentDropdown(false);
     setSelectedPendingFees([]);
     setLateFees({});
+    setInstanceDiscounts({});
   };
 
   const handleSearchChange = (value: string) => {
@@ -1333,23 +1335,28 @@ Falcon House School Administration
   // Internal submit function without modal
   const submitFeePaymentInternal = async () => {
     try {
-      // Check if any fees have late fees that need to be updated first
-      const feesWithLateFees = selectedPendingFees.filter(
-        (feeId) => lateFees[feeId] && lateFees[feeId] > 0
+      // Check if any fees have late fees or instance discounts that need to be updated first
+      const feesWithUpdates = selectedPendingFees.filter(
+        (feeId) =>
+          (lateFees[feeId] && lateFees[feeId] > 0) ||
+          (instanceDiscounts[feeId] && instanceDiscounts[feeId] > 0)
       );
 
-      // Update late fees if any exist
-      if (feesWithLateFees.length > 0) {
-        for (const feeId of feesWithLateFees) {
+      // Update late fees and discounts if any exist
+      if (feesWithUpdates.length > 0) {
+        for (const feeId of feesWithUpdates) {
           const fee = challans.find((c) => c.id === feeId);
           if (!fee) continue;
 
-          const lateFee = lateFees[feeId];
+          const lateFee = lateFees[feeId] || 0;
+          const instanceDiscount = instanceDiscounts[feeId] || 0;
+
           await axios.put(
             `${BACKEND}/api/fees/${feeId}`,
             {
               ...fee,
               miscFee: fee.miscFee + lateFee,
+              discount: fee.discount + instanceDiscount,
             },
             { withCredentials: true }
           );
@@ -1373,16 +1380,21 @@ Falcon House School Administration
         });
         setChallans(fetchResponse.data.data);
 
-        // Calculate total amount paid including late fees
+        // Calculate total amount paid including late fees and discounts
         const totalLateFees = Object.values(lateFees).reduce(
           (sum, fee) => sum + fee,
+          0
+        );
+        const totalInstanceDiscounts = selectedPendingFees.reduce(
+          (sum, feeId) => sum + (instanceDiscounts[feeId] || 0),
           0
         );
 
         const totalPaid = selectedPendingFees.reduce((sum, feeId) => {
           const fee = challans.find((c) => c.id === feeId);
           const lateFee = lateFees[feeId] || 0;
-          return sum + (fee ? fee.totalAmount + lateFee : 0);
+          const discount = instanceDiscounts[feeId] || 0;
+          return sum + (fee ? fee.totalAmount + lateFee - discount : 0);
         }, 0);
 
         // Reset form
@@ -1390,11 +1402,15 @@ Falcon House School Administration
         setSelectedStudent("");
         setStudentSearch("");
         setLateFees({});
+        setInstanceDiscounts({});
 
-        const message =
-          totalLateFees > 0
-            ? `Payment successfully recorded! Total amount: Rs. ${totalPaid} (including Rs. ${totalLateFees} late fees)`
-            : `Payment successfully recorded! Total amount: Rs. ${totalPaid}`;
+        let message = `Payment successfully recorded! Total amount: Rs. ${totalPaid}`;
+        if (totalLateFees > 0) {
+          message += ` (including Rs. ${totalLateFees} late fees)`;
+        }
+        if (totalInstanceDiscounts > 0) {
+          message += ` (with Rs. ${totalInstanceDiscounts} discount)`;
+        }
 
         toast.success(message);
       } else {
@@ -1405,11 +1421,6 @@ Falcon House School Administration
       toast.error("Failed to submit fee payment. Please try again.");
     }
   };
-
-  // Keep original function for backwards compatibility but now opens modal
-  // const submitFeePayment = async () => {
-  //   handleSubmitClick(false);
-  // };
 
   return (
     <>
@@ -1430,11 +1441,7 @@ Falcon House School Administration
                   }`
                 : `Full payment of Rs. ${pendingFees
                     .filter((fee) => selectedPendingFees.includes(fee.id))
-                    .reduce(
-                      (sum, fee) =>
-                        sum + fee.remainingBalance + (lateFees[fee.id] || 0),
-                      0
-                    )
+                    .reduce((sum, fee) => sum + getEffectiveAmount(fee), 0)
                     .toLocaleString()}`}
             </DialogDescription>
           </DialogHeader>
@@ -1602,12 +1609,16 @@ Falcon House School Administration
                             <div className="flex flex-col items-end space-y-1">
                               {getStatusBadge(fee.status)}
                               <div className="text-base sm:text-lg font-bold text-green-600">
-                                Rs.{" "}
-                                {fee.remainingBalance + (lateFees[fee.id] || 0)}
+                                Rs. {getEffectiveAmount(fee)}
                               </div>
                               {lateFees[fee.id] > 0 && (
                                 <span className="text-xs text-red-600">
                                   (+ Rs. {lateFees[fee.id]} late fee)
+                                </span>
+                              )}
+                              {instanceDiscounts[fee.id] > 0 && (
+                                <span className="text-xs text-green-600">
+                                  (- Rs. {instanceDiscounts[fee.id]} discount)
                                 </span>
                               )}
                             </div>
@@ -1679,6 +1690,56 @@ Falcon House School Administration
                               </div>
                             </div>
                           )}
+
+                          {/* Instance Discount Input */}
+                          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                              <div className="flex items-center gap-2">
+                                <Percent className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                <span className="font-medium text-green-800 text-sm">
+                                  Add Discount
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                              <Label
+                                htmlFor={`discount-${fee.id}`}
+                                className="text-sm flex-shrink-0"
+                              >
+                                Discount Amount (Rs.)
+                              </Label>
+                              <Input
+                                id={`discount-${fee.id}`}
+                                type="number"
+                                min="0"
+                                step="10"
+                                value={instanceDiscounts[fee.id] || 0}
+                                onChange={(e) => {
+                                  const value = Math.max(
+                                    0,
+                                    Number(e.target.value)
+                                  );
+                                  // Make sure discount doesn't exceed the fee amount + late fee
+                                  const maxDiscount =
+                                    fee.remainingBalance +
+                                    (lateFees[fee.id] || 0);
+                                  const finalValue = Math.min(
+                                    value,
+                                    maxDiscount
+                                  );
+                                  setInstanceDiscounts((prev) => ({
+                                    ...prev,
+                                    [fee.id]: finalValue,
+                                  }));
+                                }}
+                                className="w-full sm:w-24 h-8"
+                                placeholder="0"
+                              />
+                              <span className="text-xs text-green-600">
+                                Will be recorded as discount
+                              </span>
+                            </div>
+                          </div>
 
                           {/* Late Fee Input for Overdue Fees */}
                           {fee.status === "overdue" && (
@@ -1768,7 +1829,12 @@ Falcon House School Administration
                               </span>
                               {fee.discount > 0 && (
                                 <span className="text-green-600 ml-1 block sm:inline">
-                                  (- Rs. {fee.discount} discount)
+                                  (- Rs. {fee.discount} prev discount)
+                                </span>
+                              )}
+                              {instanceDiscounts[fee.id] > 0 && (
+                                <span className="text-green-600 ml-1 block sm:inline">
+                                  (- Rs. {instanceDiscounts[fee.id]} discount)
                                 </span>
                               )}
                               {lateFees[fee.id] > 0 && (
@@ -1778,8 +1844,7 @@ Falcon House School Administration
                               )}
                             </div>
                             <span className="font-semibold text-sm sm:text-base">
-                              Rs.{" "}
-                              {fee.remainingBalance + (lateFees[fee.id] || 0)}
+                              Rs. {getEffectiveAmount(fee)}
                             </span>
                           </div>
                         ))}
@@ -1796,10 +1861,7 @@ Falcon House School Administration
                                 selectedPendingFees.includes(fee.id)
                               )
                               .reduce(
-                                (sum, fee) =>
-                                  sum +
-                                  fee.remainingBalance +
-                                  (lateFees[fee.id] || 0),
+                                (sum, fee) => sum + getEffectiveAmount(fee),
                                 0
                               )}
                           </span>
@@ -1811,6 +1873,21 @@ Falcon House School Administration
                               Rs.{" "}
                               {Object.values(lateFees).reduce(
                                 (sum, fee) => sum + fee,
+                                0
+                              )}
+                            </span>
+                          </div>
+                        )}
+                        {selectedPendingFees.some(
+                          (feeId) => instanceDiscounts[feeId] > 0
+                        ) && (
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs sm:text-sm text-green-600 mt-1 gap-1">
+                            <span>Discounts Applied:</span>
+                            <span>
+                              Rs.{" "}
+                              {selectedPendingFees.reduce(
+                                (sum, feeId) =>
+                                  sum + (instanceDiscounts[feeId] || 0),
                                 0
                               )}
                             </span>
@@ -1875,11 +1952,7 @@ Falcon House School Administration
                                       (f: FeeChallan) => f.id === feeId
                                     );
                                     if (!fee) return total;
-                                    const currentBalance: number =
-                                      fee.remainingBalance || fee.totalAmount;
-                                    const lateFee: number =
-                                      lateFees[feeId] || 0;
-                                    return total + currentBalance + lateFee;
+                                    return total + getEffectiveAmount(fee);
                                   },
                                   0
                                 )}
@@ -1909,10 +1982,7 @@ Falcon House School Administration
                                     (f: FeeChallan) => f.id === feeId
                                   );
                                   if (!fee) return total;
-                                  const currentBalance: number =
-                                    fee.remainingBalance || fee.totalAmount;
-                                  const lateFee: number = lateFees[feeId] || 0;
-                                  return total + currentBalance + lateFee;
+                                  return total + getEffectiveAmount(fee);
                                 }, 0)
                                 .toLocaleString()}
                             </div>
@@ -1960,7 +2030,11 @@ Falcon House School Administration
                                         Late Fee: Rs.{" "}
                                         {item.lateFee.toLocaleString()}
                                       </div>
-                                      <div className="font-medium">
+                                      <div>
+                                        Discount: Rs.{" "}
+                                        {item.instanceDiscount.toLocaleString()}
+                                      </div>
+                                      <div className="font-medium col-span-2">
                                         Remaining: Rs.{" "}
                                         {item.newBalance.toLocaleString()}
                                       </div>
@@ -2021,10 +2095,7 @@ Falcon House School Administration
                               selectedPendingFees.includes(fee.id)
                             )
                             .reduce(
-                              (sum, fee) =>
-                                sum +
-                                fee.remainingBalance +
-                                (lateFees[fee.id] || 0),
+                              (sum, fee) => sum + getEffectiveAmount(fee),
                               0
                             )
                             .toLocaleString()}
@@ -2079,10 +2150,7 @@ Falcon House School Administration
                                 selectedPendingFees.includes(fee.id)
                               )
                               .reduce(
-                                (sum, fee) =>
-                                  sum +
-                                  fee.remainingBalance +
-                                  (lateFees[fee.id] || 0),
+                                (sum, fee) => sum + getEffectiveAmount(fee),
                                 0
                               )
                               .toLocaleString()}
