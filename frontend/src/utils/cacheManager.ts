@@ -1,153 +1,116 @@
 // frontend/src/utils/cacheManager.ts
 
-interface CacheItem<T> {
+interface CacheEntry<T> {
   data: T;
   timestamp: number;
   expiresAt: number;
 }
 
+interface CacheConfig {
+  defaultTTL: number; // Time to live in milliseconds
+  maxEntries: number;
+}
+
 class CacheManager {
-  private static instance: CacheManager;
-  private cache: Map<string, CacheItem<any>>;
-  private readonly DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
+  private cache: Map<string, CacheEntry<any>> = new Map();
+  private config: CacheConfig;
 
-  private constructor() {
-    this.cache = new Map();
-    this.loadFromLocalStorage();
-    this.startCleanupInterval();
-  }
-
-  static getInstance(): CacheManager {
-    if (!CacheManager.instance) {
-      CacheManager.instance = new CacheManager();
-    }
-    return CacheManager.instance;
-  }
-
-  // Load cache from localStorage on initialization
-  private loadFromLocalStorage(): void {
-    try {
-      const stored = localStorage.getItem("app_cache");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        Object.entries(parsed).forEach(([key, value]) => {
-          this.cache.set(key, value as CacheItem<any>);
-        });
-        // Clean expired items
-        this.cleanExpired();
-      }
-    } catch (error) {
-      console.error("Failed to load cache from localStorage:", error);
-    }
-  }
-
-  // Save cache to localStorage
-  private saveToLocalStorage(): void {
-    try {
-      const cacheObject: Record<string, CacheItem<any>> = {};
-      this.cache.forEach((value, key) => {
-        cacheObject[key] = value;
-      });
-      localStorage.setItem("app_cache", JSON.stringify(cacheObject));
-    } catch (error) {
-      console.error("Failed to save cache to localStorage:", error);
-    }
-  }
-
-  // Set cache item
-  set<T>(key: string, data: T, ttl: number = this.DEFAULT_TTL): void {
-    const now = Date.now();
-    const cacheItem: CacheItem<T> = {
-      data,
-      timestamp: now,
-      expiresAt: now + ttl,
+  constructor(config: Partial<CacheConfig> = {}) {
+    this.config = {
+      defaultTTL: 5 * 60 * 1000, // 5 minutes default
+      maxEntries: 50,
+      ...config,
     };
-    this.cache.set(key, cacheItem);
-    this.saveToLocalStorage();
+
+    // Clean expired entries periodically
+    setInterval(() => this.cleanExpired(), 60 * 1000); // Every minute
   }
 
-  // Get cache item
+  /**
+   * Get data from cache
+   */
   get<T>(key: string): T | null {
-    const item = this.cache.get(key);
+    const entry = this.cache.get(key);
 
-    if (!item) {
+    if (!entry) {
       return null;
     }
 
     // Check if expired
-    if (Date.now() > item.expiresAt) {
+    if (Date.now() > entry.expiresAt) {
       this.cache.delete(key);
-      this.saveToLocalStorage();
       return null;
     }
 
-    return item.data as T;
+    return entry.data as T;
   }
 
-  // Check if cache has valid data
-  has(key: string): boolean {
-    const item = this.cache.get(key);
-    if (!item) return false;
+  /**
+   * Set data in cache
+   */
+  set<T>(key: string, data: T, ttl?: number): void {
+    // Enforce max entries limit (LRU-style: remove oldest)
+    if (this.cache.size >= this.config.maxEntries) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey) {
+        this.cache.delete(oldestKey);
+      }
+    }
 
-    if (Date.now() > item.expiresAt) {
+    const now = Date.now();
+    const entry: CacheEntry<T> = {
+      data,
+      timestamp: now,
+      expiresAt: now + (ttl || this.config.defaultTTL),
+    };
+
+    this.cache.set(key, entry);
+  }
+
+  /**
+   * Delete a specific cache entry
+   */
+  delete(key: string): boolean {
+    return this.cache.delete(key);
+  }
+
+  /**
+   * Check if cache has valid entry
+   */
+  has(key: string): boolean {
+    const entry = this.cache.get(key);
+    if (!entry) return false;
+
+    if (Date.now() > entry.expiresAt) {
       this.cache.delete(key);
-      this.saveToLocalStorage();
       return false;
     }
 
     return true;
   }
 
-  // Delete cache item
-  delete(key: string): void {
-    this.cache.delete(key);
-    this.saveToLocalStorage();
-  }
-
-  // Clear all cache
+  /**
+   * Clear all cache
+   */
   clear(): void {
     this.cache.clear();
-    localStorage.removeItem("app_cache");
   }
 
-  // Clear specific pattern
-  clearPattern(pattern: string): void {
-    const keys = Array.from(this.cache.keys()).filter((key) =>
-      key.includes(pattern),
-    );
-    keys.forEach((key) => this.cache.delete(key));
-    this.saveToLocalStorage();
-  }
-
-  // Clean expired items
+  /**
+   * Clean expired entries
+   */
   private cleanExpired(): void {
     const now = Date.now();
-    const expiredKeys: string[] = [];
-
-    this.cache.forEach((value, key) => {
-      if (now > value.expiresAt) {
-        expiredKeys.push(key);
+    for (const [key, entry] of this.cache.entries()) {
+      if (now > entry.expiresAt) {
+        this.cache.delete(key);
       }
-    });
-
-    expiredKeys.forEach((key) => this.cache.delete(key));
-
-    if (expiredKeys.length > 0) {
-      this.saveToLocalStorage();
     }
   }
 
-  // Start cleanup interval (runs every 5 minutes)
-  private startCleanupInterval(): void {
-    setInterval(
-      () => {
-        this.cleanExpired();
-      },
-      5 * 60 * 1000,
-    );
-  }
-
-  // Get cache stats
+  /**
+   * Get cache statistics
+   */
   getStats(): { size: number; keys: string[] } {
     return {
       size: this.cache.size,
@@ -155,32 +118,25 @@ class CacheManager {
     };
   }
 
-  // Invalidate related caches (useful when data changes)
-  invalidateRelated(keys: string[]): void {
-    keys.forEach((key) => this.delete(key));
+  /**
+   * Invalidate multiple cache entries by prefix
+   */
+  invalidateByPrefix(prefix: string): number {
+    let count = 0;
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(prefix)) {
+        this.cache.delete(key);
+        count++;
+      }
+    }
+    return count;
   }
 }
 
 // Export singleton instance
-export const cacheManager = CacheManager.getInstance();
+export const cacheManager = new CacheManager({
+  defaultTTL: 5 * 60 * 1000, // 5 minutes
+  maxEntries: 50,
+});
 
-// Cache key constants
-export const CACHE_KEYS = {
-  STUDENTS: "students",
-  TEACHERS: "teachers",
-  FEE_STRUCTURE: "fee_structure",
-  STUDENT_DISCOUNTS: "student_discounts",
-  FEE_CHALLANS: "fee_challans",
-  PAPER_FUND_CHALLANS: "paper_fund_challans",
-  SUBJECTS: "subjects",
-  EXAMS: "exams",
-  RESULTS: "results",
-} as const;
-
-// Cache TTL constants (in milliseconds)
-export const CACHE_TTL = {
-  SHORT: 2 * 60 * 1000, // 2 minutes - for frequently changing data
-  MEDIUM: 5 * 60 * 1000, // 5 minutes - default
-  LONG: 15 * 60 * 1000, // 15 minutes - for relatively stable data
-  VERY_LONG: 60 * 60 * 1000, // 1 hour - for very stable data
-} as const;
+export default CacheManager;
