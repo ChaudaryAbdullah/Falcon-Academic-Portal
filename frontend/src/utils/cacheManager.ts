@@ -6,11 +6,6 @@ interface CacheItem<T> {
   expiresAt: number;
 }
 
-interface CacheConfig {
-  ttl: number; // Time to live in milliseconds
-  key: string;
-}
-
 class CacheManager {
   private static instance: CacheManager;
   private cache: Map<string, CacheItem<any>>;
