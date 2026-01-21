@@ -1,3 +1,5 @@
+// frontend/src/pages/adminDashboard.tsx (OPTIMIZED VERSION)
+
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
@@ -15,11 +17,14 @@ import {
   Plus,
   Receipt,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import AdminSidebar from "../components/AdminSidebar";
-import axios from "axios";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
+import { apiService } from "../services/apiService";
+import { cacheManager } from "../utils/cacheManager";
 
+// Import your components
 import { StudentManagement } from "../components/StudentManagment";
 import { TeacherManagement } from "../components/TeacherManagment";
 import { FeeManagement } from "../components/FeeManagment";
@@ -29,9 +34,7 @@ import FeeReports from "../components/FeeReports";
 import { PaperFundManagement } from "../components/PaperFundManagement";
 import ResultsManagement from "../components/ResultManagement";
 
-const BACKEND = import.meta.env.VITE_BACKEND;
-
-// Interfaces (keep all your existing interfaces here)
+// Interfaces
 interface Student {
   _id: string;
   rollNumber: string;
@@ -221,6 +224,7 @@ const TAB_REQUIREMENTS: Record<string, (keyof LoadingState)[]> = {
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Initialize with empty arrays - render immediately, no null checks needed
   const [students, setStudents] = useState<Student[]>([]);
@@ -269,100 +273,147 @@ export default function AdminDashboard() {
     }));
   }, [activeStudents]);
 
-  // 🚀 PREFETCH ALL DATA ON MOUNT - This is the key optimization
-  useEffect(() => {
-    if (hasFetched.current) return;
-    hasFetched.current = true;
-
-    const api = axios.create({
-      baseURL: BACKEND,
-      withCredentials: true,
-    });
-
-    // Helper to update loading state
-    const setLoaded = (key: keyof LoadingState) => {
-      setLoading((prev) => ({ ...prev, [key]: false }));
-    };
-
-    // Fire ALL requests simultaneously - don't wait for any to complete
-    // Students
-    api
-      .get("/api/students")
-      .then((res) => {
-        const data = res.data.data || [];
-        setStudents(data);
-        const activeCount = data.filter(
-          (s: Student) => s.status === "active" || !s.status
-        ).length;
-        setCounts((prev) => ({
-          ...prev,
-          students: data.length,
-          activeStudents: activeCount,
-        }));
-      })
-      .catch(console.error)
-      .finally(() => setLoaded("students"));
-
-    // Teachers
-    api
-      .get("/api/teachers")
-      .then((res) => {
-        const data = res.data.data || [];
-        setTeachers(data);
-        setCounts((prev) => ({ ...prev, teachers: data.length }));
-      })
-      .catch(console.error)
-      .finally(() => setLoaded("teachers"));
-
-    // Fee Structure
-    api
-      .get("/api/fee-structures")
-      .then((res) => setFeeStructure(res.data || []))
-      .catch(console.error)
-      .finally(() => setLoaded("feeStructure"));
-
-    // Student Discounts
-    api
-      .get("/api/student-discounts")
-      .then((res) => setStudentDiscounts(res.data || []))
-      .catch(console.error)
-      .finally(() => setLoaded("studentDiscounts"));
-
-    // Fee Challans
-    api
-      .get("/api/fees")
-      .then((res) => setChallans(res.data.data || []))
-      .catch(console.error)
-      .finally(() => setLoaded("challans"));
-
-    // Paper Fund Challans
-    api
-      .get("/api/paperFund")
-      .then((res) => setPaperFundChallans(res.data.data || []))
-      .catch(console.error)
-      .finally(() => setLoaded("paperFundChallans"));
-
-    // Subjects
-    api
-      .get("/api/subjects", { params: { isActive: true } })
-      .then((res) => setSubjects(res.data.data || []))
-      .catch(console.error)
-      .finally(() => setLoaded("subjects"));
-
-    // Exams
-    api
-      .get("/api/exams", { params: { isActive: true } })
-      .then((res) => setExams(res.data.data || []))
-      .catch(console.error)
-      .finally(() => setLoaded("exams"));
-
-    // Results
-    api
-      .get("/api/results")
-      .then((res) => setResults(res.data.data || []))
-      .catch(console.error)
-      .finally(() => setLoaded("results"));
+  // Helper to update loading state
+  const setLoaded = useCallback((key: keyof LoadingState) => {
+    setLoading((prev) => ({ ...prev, [key]: false }));
   }, []);
+
+  // 🚀 PREFETCH ALL DATA ON MOUNT with caching
+  const fetchAllData = useCallback(
+    async (forceRefresh = false) => {
+      if (hasFetched.current && !forceRefresh) return;
+      hasFetched.current = true;
+
+      if (forceRefresh) {
+        setIsRefreshing(true);
+        // Reset loading states for refresh
+        setLoading({
+          students: true,
+          teachers: true,
+          feeStructure: true,
+          studentDiscounts: true,
+          challans: true,
+          paperFundChallans: true,
+          subjects: true,
+          exams: true,
+          results: true,
+        });
+      }
+
+      const fetchOptions = { forceRefresh };
+
+      // Fetch all data in parallel using the caching service
+      try {
+        const [
+          studentsData,
+          teachersData,
+          feeStructureData,
+          discountsData,
+          challansData,
+          paperFundData,
+          subjectsData,
+          examsData,
+          resultsData,
+        ] = await Promise.allSettled([
+          apiService.getStudents(fetchOptions),
+          apiService.getTeachers(fetchOptions),
+          apiService.getFeeStructures(fetchOptions),
+          apiService.getStudentDiscounts(fetchOptions),
+          apiService.getFeeChallans(fetchOptions),
+          apiService.getPaperFundChallans(fetchOptions),
+          apiService.getSubjects(fetchOptions),
+          apiService.getExams(fetchOptions),
+          apiService.getResults(fetchOptions),
+        ]);
+
+        // Process students
+        if (studentsData.status === "fulfilled") {
+          const data = studentsData.value;
+          setStudents(data);
+          const activeCount = data.filter(
+            (s: Student) => s.status === "active" || !s.status,
+          ).length;
+          setCounts((prev) => ({
+            ...prev,
+            students: data.length,
+            activeStudents: activeCount,
+          }));
+        }
+        setLoaded("students");
+
+        // Process teachers
+        if (teachersData.status === "fulfilled") {
+          const data = teachersData.value;
+          setTeachers(data);
+          setCounts((prev) => ({ ...prev, teachers: data.length }));
+        }
+        setLoaded("teachers");
+
+        // Process fee structure
+        if (feeStructureData.status === "fulfilled") {
+          setFeeStructure(feeStructureData.value);
+        }
+        setLoaded("feeStructure");
+
+        // Process discounts
+        if (discountsData.status === "fulfilled") {
+          setStudentDiscounts(discountsData.value);
+        }
+        setLoaded("studentDiscounts");
+
+        // Process challans
+        if (challansData.status === "fulfilled") {
+          setChallans(challansData.value);
+        }
+        setLoaded("challans");
+
+        // Process paper fund
+        if (paperFundData.status === "fulfilled") {
+          setPaperFundChallans(paperFundData.value);
+        }
+        setLoaded("paperFundChallans");
+
+        // Process subjects
+        if (subjectsData.status === "fulfilled") {
+          setSubjects(subjectsData.value);
+        }
+        setLoaded("subjects");
+
+        // Process exams
+        if (examsData.status === "fulfilled") {
+          setExams(examsData.value);
+        }
+        setLoaded("exams");
+
+        // Process results
+        if (resultsData.status === "fulfilled") {
+          setResults(resultsData.value);
+        }
+        setLoaded("results");
+
+        if (forceRefresh) {
+          toast.success("Data refreshed successfully!");
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast.error("Failed to load some data. Please try again.");
+      } finally {
+        setIsRefreshing(false);
+      }
+    },
+    [setLoaded],
+  );
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
+
+  // Manual refresh function
+  const handleRefresh = useCallback(() => {
+    hasFetched.current = false;
+    fetchAllData(true);
+  }, [fetchAllData]);
 
   // Check if tab data is ready
   const isTabReady = useCallback(
@@ -371,73 +422,82 @@ export default function AdminDashboard() {
       if (requirements.length === 0) return true;
       return requirements.every((req) => !loading[req]);
     },
-    [loading]
+    [loading],
   );
 
-  // Wrapper setters for child components
+  // Wrapper setters for child components with cache invalidation
   const handleSetStudents = useCallback(
     (value: React.SetStateAction<Student[]>) => {
       setStudents((prev) =>
-        typeof value === "function" ? value(prev) : value
+        typeof value === "function" ? value(prev) : value,
       );
+      // Invalidate cache when students change
+      cacheManager.delete("students");
     },
-    []
+    [],
   );
 
   const handleSetTeachers = useCallback(
     (value: React.SetStateAction<Teacher[]>) => {
       setTeachers((prev) =>
-        typeof value === "function" ? value(prev) : value
+        typeof value === "function" ? value(prev) : value,
       );
+      cacheManager.delete("teachers");
     },
-    []
+    [],
   );
 
   const handleSetFeeStructure = useCallback(
     (value: React.SetStateAction<FeeStructureType[]>) => {
       setFeeStructure((prev) =>
-        typeof value === "function" ? value(prev) : value
+        typeof value === "function" ? value(prev) : value,
       );
+      cacheManager.delete("feeStructures");
     },
-    []
+    [],
   );
 
   const handleSetChallans = useCallback(
     (value: React.SetStateAction<FeeChallan[]>) => {
       setChallans((prev) =>
-        typeof value === "function" ? value(prev) : value
+        typeof value === "function" ? value(prev) : value,
       );
+      cacheManager.delete("feeChallans");
     },
-    []
+    [],
   );
 
   const handleSetPaperFundChallans = useCallback(
     (value: React.SetStateAction<PaperFundChallan[]>) => {
       setPaperFundChallans((prev) =>
-        typeof value === "function" ? value(prev) : value
+        typeof value === "function" ? value(prev) : value,
       );
+      cacheManager.delete("paperFundChallans");
     },
-    []
+    [],
   );
 
   const handleSetSubjects = useCallback(
     (value: React.SetStateAction<Subject[]>) => {
       setSubjects((prev) =>
-        typeof value === "function" ? value(prev) : value
+        typeof value === "function" ? value(prev) : value,
       );
+      cacheManager.delete("subjects");
     },
-    []
+    [],
   );
 
   const handleSetExams = useCallback((value: React.SetStateAction<Exam[]>) => {
     setExams((prev) => (typeof value === "function" ? value(prev) : value));
+    cacheManager.delete("exams");
   }, []);
 
   const handleSetResults = useCallback(
     (value: React.SetStateAction<Result[]>) => {
       setResults((prev) => (typeof value === "function" ? value(prev) : value));
+      cacheManager.delete("results");
     },
-    []
+    [],
   );
 
   // Render content based on active tab
@@ -446,7 +506,10 @@ export default function AdminDashboard() {
     if (!isTabReady(activeTab)) {
       return (
         <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-2" />
+            <p className="text-sm text-gray-600">Loading data...</p>
+          </div>
         </div>
       );
     }
@@ -518,13 +581,27 @@ export default function AdminDashboard() {
       default:
         return (
           <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">
-                Admin Dashboard
-              </h1>
-              <p className="text-muted-foreground">
-                Manage students and teachers in your educational institution
-              </p>
+            {/* Header with refresh button */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Admin Dashboard
+                </h1>
+                <p className="text-muted-foreground">
+                  Manage students and teachers in your educational institution
+                </p>
+              </div>
+              <Button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                variant="outline"
+                className="gap-2"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                />
+                {isRefreshing ? "Refreshing..." : "Refresh Data"}
+              </Button>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
