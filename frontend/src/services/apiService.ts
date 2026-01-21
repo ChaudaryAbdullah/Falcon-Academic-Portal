@@ -29,7 +29,7 @@ class ApiService {
     this.api = axios.create({
       baseURL: BACKEND,
       withCredentials: true,
-      timeout: 30000, // 30 second timeout
+      timeout: 800000, // 8 min timeout
     });
 
     // Add response interceptor for error handling
