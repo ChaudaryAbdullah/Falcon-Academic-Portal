@@ -431,7 +431,6 @@ export default function AdminDashboard() {
       setStudents((prev) =>
         typeof value === "function" ? value(prev) : value,
       );
-      // Invalidate cache when students change
       cacheManager.delete("students");
     },
     [],

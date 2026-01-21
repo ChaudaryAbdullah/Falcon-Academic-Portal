@@ -1,13 +1,24 @@
 // frontend/src/services/apiService.ts
 
 import axios, { type AxiosInstance } from "axios";
-import { cacheManager, CACHE_KEYS, CACHE_TTL } from "../utils/cacheManager";
+import { cacheManager } from "../utils/cacheManager";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
+// Cache TTL configurations (in milliseconds)
+const CACHE_TTL = {
+  students: 5 * 60 * 1000, // 5 minutes
+  teachers: 5 * 60 * 1000, // 5 minutes
+  feeStructures: 10 * 60 * 1000, // 10 minutes (changes less frequently)
+  studentDiscounts: 5 * 60 * 1000, // 5 minutes
+  feeChallans: 2 * 60 * 1000, // 2 minutes (changes frequently)
+  paperFundChallans: 2 * 60 * 1000, // 2 minutes
+  subjects: 15 * 60 * 1000, // 15 minutes (rarely changes)
+  exams: 10 * 60 * 1000, // 10 minutes
+  results: 5 * 60 * 1000, // 5 minutes
+};
+
 interface FetchOptions {
-  useCache?: boolean;
-  cacheTTL?: number;
   forceRefresh?: boolean;
 }
 
@@ -18,268 +29,387 @@ class ApiService {
     this.api = axios.create({
       baseURL: BACKEND,
       withCredentials: true,
+      timeout: 30000, // 30 second timeout
     });
+
+    // Add response interceptor for error handling
+    this.api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        console.error("API Error:", error.response?.data || error.message);
+        throw error;
+      },
+    );
   }
 
-  // Generic fetch with caching
+  /**
+   * Generic fetch with caching
+   */
   private async fetchWithCache<T>(
-    cacheKey: string,
+    key: string,
     fetchFn: () => Promise<T>,
+    ttl: number,
     options: FetchOptions = {},
   ): Promise<T> {
-    const {
-      useCache = true,
-      cacheTTL = CACHE_TTL.MEDIUM,
-      forceRefresh = false,
-    } = options;
+    const { forceRefresh = false } = options;
 
-    // If force refresh, skip cache check
-    if (!forceRefresh && useCache) {
-      const cached = cacheManager.get<T>(cacheKey);
-      if (cached) {
-        console.log(`Cache hit: ${cacheKey}`);
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = cacheManager.get<T>(key);
+      if (cached !== null) {
+        console.log(`Cache hit: ${key}`);
         return cached;
       }
     }
 
-    console.log(`Cache miss: ${cacheKey}, fetching...`);
-    const data = await fetchFn();
+    console.log(`Cache miss: ${key}, fetching...`);
 
-    if (useCache) {
-      cacheManager.set(cacheKey, data, cacheTTL);
+    try {
+      const data = await fetchFn();
+      cacheManager.set(key, data, ttl);
+      return data;
+    } catch (error) {
+      // If fetch fails but we have stale cache, return it
+      const staleCache = cacheManager.get<T>(key);
+      if (staleCache !== null) {
+        console.warn(`Fetch failed, returning stale cache for: ${key}`);
+        return staleCache;
+      }
+      throw error;
     }
-
-    return data;
   }
 
-  // Students API
-  async getStudents(options?: FetchOptions) {
+  /**
+   * Strip heavy data (like images) for lighter caching
+   */
+  //   private stripHeavyData<T extends Record<string, any>>(
+  //     data: T[],
+  //     fieldsToRemove: string[] = ["img"],
+  //   ): T[] {
+  //     return data.map((item) => {
+  //       const stripped = { ...item };
+  //       fieldsToRemove.forEach((field) => {
+  //         if (field in stripped) {
+  //           delete stripped[field];
+  //         }
+  //       });
+  //       return stripped;
+  //     });
+  //   }
+
+  // ============ STUDENTS ============
+  async getStudents(options: FetchOptions = {}): Promise<any[]> {
     return this.fetchWithCache(
-      CACHE_KEYS.STUDENTS,
+      "students",
       async () => {
         const res = await this.api.get("/api/students");
         return res.data.data || [];
       },
-      { ...options, cacheTTL: CACHE_TTL.MEDIUM },
+      CACHE_TTL.students,
+      options,
     );
   }
 
-  async createStudent(data: FormData) {
-    const result = await this.api.post("/api/students", data, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    // Invalidate students cache
-    cacheManager.delete(CACHE_KEYS.STUDENTS);
-    return result.data.data;
+  // For when you need students with images (not cached to avoid size issues)
+  async getStudentsWithImages(): Promise<any[]> {
+    const res = await this.api.get("/api/students");
+    return res.data.data || [];
   }
 
-  async updateStudent(id: string, data: FormData) {
-    const result = await this.api.put(`/api/students/${id}`, data, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    // Invalidate students cache
-    cacheManager.delete(CACHE_KEYS.STUDENTS);
-    return result.data.data;
+  async createStudent(data: any): Promise<any> {
+    const res = await this.api.post("/api/students", data);
+    cacheManager.delete("students");
+    return res.data;
   }
 
-  async deleteStudent(id: string) {
-    await this.api.delete(`/api/students/${id}`);
-    cacheManager.delete(CACHE_KEYS.STUDENTS);
+  async updateStudent(id: string, data: any): Promise<any> {
+    const res = await this.api.put(`/api/students/${id}`, data);
+    cacheManager.delete("students");
+    return res.data;
   }
 
-  // Teachers API
-  async getTeachers(options?: FetchOptions) {
+  async deleteStudent(id: string): Promise<any> {
+    const res = await this.api.delete(`/api/students/${id}`);
+    cacheManager.delete("students");
+    return res.data;
+  }
+
+  // ============ TEACHERS ============
+  async getTeachers(options: FetchOptions = {}): Promise<any[]> {
     return this.fetchWithCache(
-      CACHE_KEYS.TEACHERS,
+      "teachers",
       async () => {
         const res = await this.api.get("/api/teachers");
         return res.data.data || [];
       },
-      { ...options, cacheTTL: CACHE_TTL.LONG },
+      CACHE_TTL.teachers,
+      options,
     );
   }
 
-  async createTeacher(data: any) {
-    const result = await this.api.post("/api/teachers", data);
-    cacheManager.delete(CACHE_KEYS.TEACHERS);
-    return result.data.data;
+  async createTeacher(data: any): Promise<any> {
+    const res = await this.api.post("/api/teachers", data);
+    cacheManager.delete("teachers");
+    return res.data;
   }
 
-  // Fee Structure API
-  async getFeeStructures(options?: FetchOptions) {
+  async updateTeacher(id: string, data: any): Promise<any> {
+    const res = await this.api.put(`/api/teachers/${id}`, data);
+    cacheManager.delete("teachers");
+    return res.data;
+  }
+
+  async deleteTeacher(id: string): Promise<any> {
+    const res = await this.api.delete(`/api/teachers/${id}`);
+    cacheManager.delete("teachers");
+    return res.data;
+  }
+
+  // ============ FEE STRUCTURES ============
+  async getFeeStructures(options: FetchOptions = {}): Promise<any[]> {
     return this.fetchWithCache(
-      CACHE_KEYS.FEE_STRUCTURE,
+      "feeStructures",
       async () => {
         const res = await this.api.get("/api/fee-structures");
         return res.data || [];
       },
-      { ...options, cacheTTL: CACHE_TTL.VERY_LONG },
+      CACHE_TTL.feeStructures,
+      options,
     );
   }
 
-  async createFeeStructure(data: any) {
-    const result = await this.api.post("/api/fee-structures", data);
-    cacheManager.delete(CACHE_KEYS.FEE_STRUCTURE);
-    return result.data;
+  async createFeeStructure(data: any): Promise<any> {
+    const res = await this.api.post("/api/fee-structures", data);
+    cacheManager.delete("feeStructures");
+    return res.data;
   }
 
-  async updateFeeStructure(id: string, data: any) {
-    const result = await this.api.put(`/api/fee-structures/${id}`, data);
-    cacheManager.delete(CACHE_KEYS.FEE_STRUCTURE);
-    return result.data;
+  async updateFeeStructure(id: string, data: any): Promise<any> {
+    const res = await this.api.put(`/api/fee-structures/${id}`, data);
+    cacheManager.delete("feeStructures");
+    return res.data;
   }
 
-  // Student Discounts API
-  async getStudentDiscounts(options?: FetchOptions) {
+  async deleteFeeStructure(id: string): Promise<any> {
+    const res = await this.api.delete(`/api/fee-structures/${id}`);
+    cacheManager.delete("feeStructures");
+    return res.data;
+  }
+
+  // ============ STUDENT DISCOUNTS ============
+  async getStudentDiscounts(options: FetchOptions = {}): Promise<any[]> {
     return this.fetchWithCache(
-      CACHE_KEYS.STUDENT_DISCOUNTS,
+      "studentDiscounts",
       async () => {
         const res = await this.api.get("/api/student-discounts");
         return res.data || [];
       },
-      { ...options, cacheTTL: CACHE_TTL.LONG },
+      CACHE_TTL.studentDiscounts,
+      options,
     );
   }
 
-  async createOrUpdateDiscount(data: any) {
-    const result = await this.api.post("/api/student-discounts", data);
-    cacheManager.delete(CACHE_KEYS.STUDENT_DISCOUNTS);
-    return result.data;
+  async createStudentDiscount(data: any): Promise<any> {
+    const res = await this.api.post("/api/student-discounts", data);
+    cacheManager.delete("studentDiscounts");
+    return res.data;
   }
 
-  // Fee Challans API
-  async getFeeChallans(options?: FetchOptions) {
+  async updateStudentDiscount(id: string, data: any): Promise<any> {
+    const res = await this.api.put(`/api/student-discounts/${id}`, data);
+    cacheManager.delete("studentDiscounts");
+    return res.data;
+  }
+
+  async deleteStudentDiscount(id: string): Promise<any> {
+    const res = await this.api.delete(`/api/student-discounts/${id}`);
+    cacheManager.delete("studentDiscounts");
+    return res.data;
+  }
+
+  // ============ FEE CHALLANS ============
+  async getFeeChallans(options: FetchOptions = {}): Promise<any[]> {
     return this.fetchWithCache(
-      CACHE_KEYS.FEE_CHALLANS,
+      "feeChallans",
       async () => {
         const res = await this.api.get("/api/fees");
         return res.data.data || [];
       },
-      { ...options, cacheTTL: CACHE_TTL.SHORT },
+      CACHE_TTL.feeChallans,
+      options,
     );
   }
 
-  async generateBulkFees(data: any) {
-    const result = await this.api.post("/api/fees/generate-bulk", data);
-    cacheManager.delete(CACHE_KEYS.FEE_CHALLANS);
-    return result.data;
+  async createFeeChallan(data: any): Promise<any> {
+    const res = await this.api.post("/api/fees", data);
+    cacheManager.delete("feeChallans");
+    return res.data;
   }
 
-  async updateFeeStatus(data: any) {
-    const result = await this.api.patch("/api/fees/bulk-update", data);
-    cacheManager.delete(CACHE_KEYS.FEE_CHALLANS);
-    return result.data;
+  async updateFeeChallan(id: string, data: any): Promise<any> {
+    const res = await this.api.put(`/api/fees/${id}`, data);
+    cacheManager.delete("feeChallans");
+    return res.data;
   }
 
-  // Paper Fund API
-  async getPaperFundChallans(options?: FetchOptions) {
+  async deleteFeeChallan(id: string): Promise<any> {
+    const res = await this.api.delete(`/api/fees/${id}`);
+    cacheManager.delete("feeChallans");
+    return res.data;
+  }
+
+  // ============ PAPER FUND CHALLANS ============
+  async getPaperFundChallans(options: FetchOptions = {}): Promise<any[]> {
     return this.fetchWithCache(
-      CACHE_KEYS.PAPER_FUND_CHALLANS,
+      "paperFundChallans",
       async () => {
         const res = await this.api.get("/api/paperFund");
         return res.data.data || [];
       },
-      { ...options, cacheTTL: CACHE_TTL.SHORT },
+      CACHE_TTL.paperFundChallans,
+      options,
     );
   }
 
-  async generateBulkPaperFund(data: any) {
-    const result = await this.api.post("/api/paperFund/generate-bulk", data);
-    cacheManager.delete(CACHE_KEYS.PAPER_FUND_CHALLANS);
-    return result.data;
+  async createPaperFundChallan(data: any): Promise<any> {
+    const res = await this.api.post("/api/paperFund", data);
+    cacheManager.delete("paperFundChallans");
+    return res.data;
   }
 
-  // Subjects API
-  async getSubjects(options?: FetchOptions) {
+  async updatePaperFundChallan(id: string, data: any): Promise<any> {
+    const res = await this.api.put(`/api/paperFund/${id}`, data);
+    cacheManager.delete("paperFundChallans");
+    return res.data;
+  }
+
+  async deletePaperFundChallan(id: string): Promise<any> {
+    const res = await this.api.delete(`/api/paperFund/${id}`);
+    cacheManager.delete("paperFundChallans");
+    return res.data;
+  }
+
+  // ============ SUBJECTS ============
+  async getSubjects(options: FetchOptions = {}): Promise<any[]> {
     return this.fetchWithCache(
-      CACHE_KEYS.SUBJECTS,
+      "subjects",
       async () => {
         const res = await this.api.get("/api/subjects", {
           params: { isActive: true },
         });
         return res.data.data || [];
       },
-      { ...options, cacheTTL: CACHE_TTL.VERY_LONG },
+      CACHE_TTL.subjects,
+      options,
     );
   }
 
-  async createSubject(data: any) {
-    const result = await this.api.post("/api/subjects", data);
-    cacheManager.delete(CACHE_KEYS.SUBJECTS);
-    return result.data.data;
+  async createSubject(data: any): Promise<any> {
+    const res = await this.api.post("/api/subjects", data);
+    cacheManager.delete("subjects");
+    return res.data;
   }
 
-  // Exams API
-  async getExams(options?: FetchOptions) {
+  async updateSubject(id: string, data: any): Promise<any> {
+    const res = await this.api.put(`/api/subjects/${id}`, data);
+    cacheManager.delete("subjects");
+    return res.data;
+  }
+
+  async deleteSubject(id: string): Promise<any> {
+    const res = await this.api.delete(`/api/subjects/${id}`);
+    cacheManager.delete("subjects");
+    return res.data;
+  }
+
+  // ============ EXAMS ============
+  async getExams(options: FetchOptions = {}): Promise<any[]> {
     return this.fetchWithCache(
-      CACHE_KEYS.EXAMS,
+      "exams",
       async () => {
         const res = await this.api.get("/api/exams", {
           params: { isActive: true },
         });
         return res.data.data || [];
       },
-      { ...options, cacheTTL: CACHE_TTL.LONG },
+      CACHE_TTL.exams,
+      options,
     );
   }
 
-  async createExam(data: any) {
-    const result = await this.api.post("/api/exams", data);
-    cacheManager.delete(CACHE_KEYS.EXAMS);
-    return result.data.data;
+  async createExam(data: any): Promise<any> {
+    const res = await this.api.post("/api/exams", data);
+    cacheManager.delete("exams");
+    return res.data;
   }
 
-  // Results API
-  async getResults(options?: FetchOptions) {
+  async updateExam(id: string, data: any): Promise<any> {
+    const res = await this.api.put(`/api/exams/${id}`, data);
+    cacheManager.delete("exams");
+    return res.data;
+  }
+
+  async deleteExam(id: string): Promise<any> {
+    const res = await this.api.delete(`/api/exams/${id}`);
+    cacheManager.delete("exams");
+    return res.data;
+  }
+
+  // ============ RESULTS ============
+  async getResults(options: FetchOptions = {}): Promise<any[]> {
     return this.fetchWithCache(
-      CACHE_KEYS.RESULTS,
+      "results",
       async () => {
         const res = await this.api.get("/api/results");
         return res.data.data || [];
       },
-      { ...options, cacheTTL: CACHE_TTL.SHORT },
+      CACHE_TTL.results,
+      options,
     );
   }
 
-  async bulkCreateResults(data: any) {
-    const result = await this.api.post("/api/results/bulk", data);
-    cacheManager.delete(CACHE_KEYS.RESULTS);
-    return result.data;
+  async createResult(data: any): Promise<any> {
+    const res = await this.api.post("/api/results", data);
+    cacheManager.delete("results");
+    return res.data;
   }
 
-  // Utility: Clear all cache
-  clearAllCache() {
+  async updateResult(id: string, data: any): Promise<any> {
+    const res = await this.api.put(`/api/results/${id}`, data);
+    cacheManager.delete("results");
+    return res.data;
+  }
+
+  async deleteResult(id: string): Promise<any> {
+    const res = await this.api.delete(`/api/results/${id}`);
+    cacheManager.delete("results");
+    return res.data;
+  }
+
+  // ============ UTILITY METHODS ============
+
+  /**
+   * Clear all caches
+   */
+  clearAllCaches(): void {
     cacheManager.clear();
   }
 
-  // Utility: Refresh specific cache
-  async refreshCache(key: string) {
-    const options = { forceRefresh: true };
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    return cacheManager.getStats();
+  }
 
-    switch (key) {
-      case CACHE_KEYS.STUDENTS:
-        return this.getStudents(options);
-      case CACHE_KEYS.TEACHERS:
-        return this.getTeachers(options);
-      case CACHE_KEYS.FEE_STRUCTURE:
-        return this.getFeeStructures(options);
-      case CACHE_KEYS.STUDENT_DISCOUNTS:
-        return this.getStudentDiscounts(options);
-      case CACHE_KEYS.FEE_CHALLANS:
-        return this.getFeeChallans(options);
-      case CACHE_KEYS.PAPER_FUND_CHALLANS:
-        return this.getPaperFundChallans(options);
-      case CACHE_KEYS.SUBJECTS:
-        return this.getSubjects(options);
-      case CACHE_KEYS.EXAMS:
-        return this.getExams(options);
-      case CACHE_KEYS.RESULTS:
-        return this.getResults(options);
-      default:
-        throw new Error(`Unknown cache key: ${key}`);
-    }
+  /**
+   * Get the axios instance for custom requests
+   */
+  getAxiosInstance(): AxiosInstance {
+    return this.api;
   }
 }
 
 // Export singleton instance
 export const apiService = new ApiService();
+export default ApiService;
