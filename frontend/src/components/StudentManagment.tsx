@@ -303,20 +303,30 @@ export function StudentManagement({
   };
 
   // Filter students for promotion tab (only active students)
-  const studentsForPromotion = students.filter((s) => {
-    const isActive = s.status === "active" || !s.status;
-    const matchesClass =
-      !promotionClassFilter || s.class === promotionClassFilter;
-    const matchesSection =
-      !promotionSectionFilter || s.section === promotionSectionFilter;
-    const matchesSearch =
-      !promotionSearchTerm ||
-      s.studentName.toLowerCase().includes(promotionSearchTerm.toLowerCase()) ||
-      s.rollNumber?.toLowerCase().includes(promotionSearchTerm.toLowerCase()) ||
-      s.fatherName?.toLowerCase().includes(promotionSearchTerm.toLowerCase());
+  const studentsForPromotion = students
+    .sort((a, b) => {
+      const rollA = a.rollNumber || "";
+      const rollB = b.rollNumber || "";
+      return rollA.localeCompare(rollB, undefined, { numeric: true });
+    })
+    .filter((s) => {
+      const isActive = s.status === "active" || !s.status;
+      const matchesClass =
+        !promotionClassFilter || s.class === promotionClassFilter;
+      const matchesSection =
+        !promotionSectionFilter || s.section === promotionSectionFilter;
+      const matchesSearch =
+        !promotionSearchTerm ||
+        s.studentName
+          .toLowerCase()
+          .includes(promotionSearchTerm.toLowerCase()) ||
+        s.rollNumber
+          ?.toLowerCase()
+          .includes(promotionSearchTerm.toLowerCase()) ||
+        s.fatherName?.toLowerCase().includes(promotionSearchTerm.toLowerCase());
 
-    return isActive && matchesClass && matchesSection && matchesSearch;
-  });
+      return isActive && matchesClass && matchesSection && matchesSearch;
+    });
 
   // Reports Tab State
   const [reportType, setReportType] = useState<
@@ -333,7 +343,7 @@ export function StudentManagement({
       "section",
       "fatherName",
       "fPhoneNumber",
-    ])
+    ]),
   );
   const [reportSearchTerm, setReportSearchTerm] = useState("");
 
@@ -344,11 +354,11 @@ export function StudentManagement({
     promotionIndexOfLastStudent - promotionStudentsPerPage;
   const currentPromotionStudents = studentsForPromotion.slice(
     promotionIndexOfFirstStudent,
-    promotionIndexOfLastStudent
+    promotionIndexOfLastStudent,
   );
   const promotionTotalPages = Math.max(
     1,
-    Math.ceil(studentsForPromotion.length / promotionStudentsPerPage)
+    Math.ceil(studentsForPromotion.length / promotionStudentsPerPage),
   );
 
   // Handle select all for promotion
@@ -364,7 +374,7 @@ export function StudentManagement({
   // Handle individual selection for promotion
   const handleSelectStudentForPromotion = (
     studentId: string,
-    checked: boolean
+    checked: boolean,
   ) => {
     const newSelected = new Set(selectedStudentsForPromotion);
     if (checked) {
@@ -382,7 +392,7 @@ export function StudentManagement({
 
   // Open bulk action dialog
   const openBulkActionDialog = (
-    actionType: "promote" | "demote" | "passout"
+    actionType: "promote" | "demote" | "passout",
   ) => {
     if (selectedStudentsForPromotion.size === 0) {
       toast.error("Please select at least one student");
@@ -397,7 +407,7 @@ export function StudentManagement({
     setIsProcessingBulkAction(true);
     const selectedStudentIds = Array.from(selectedStudentsForPromotion);
     const selectedStudentsList = students.filter((s) =>
-      selectedStudentIds.includes(s._id)
+      selectedStudentIds.includes(s._id),
     );
 
     let successCount = 0;
@@ -414,14 +424,14 @@ export function StudentManagement({
         const response = await axios.put(
           `${BACKEND}/api/students/${student._id}`,
           { class: nextClass },
-          { headers: { "Content-Type": "application/json" } }
+          { headers: { "Content-Type": "application/json" } },
         );
 
         if (response.data.success) {
           setStudents((prev: Student[]) =>
             prev.map((s) =>
-              s._id === student._id ? { ...s, class: nextClass } : s
-            )
+              s._id === student._id ? { ...s, class: nextClass } : s,
+            ),
           );
           successCount++;
         } else {
@@ -450,7 +460,7 @@ export function StudentManagement({
     setIsProcessingBulkAction(true);
     const selectedStudentIds = Array.from(selectedStudentsForPromotion);
     const selectedStudentsList = students.filter((s) =>
-      selectedStudentIds.includes(s._id)
+      selectedStudentIds.includes(s._id),
     );
 
     let successCount = 0;
@@ -467,14 +477,14 @@ export function StudentManagement({
         const response = await axios.put(
           `${BACKEND}/api/students/${student._id}`,
           { class: prevClass },
-          { headers: { "Content-Type": "application/json" } }
+          { headers: { "Content-Type": "application/json" } },
         );
 
         if (response.data.success) {
           setStudents((prev: Student[]) =>
             prev.map((s) =>
-              s._id === student._id ? { ...s, class: prevClass } : s
-            )
+              s._id === student._id ? { ...s, class: prevClass } : s,
+            ),
           );
           successCount++;
         } else {
@@ -503,7 +513,7 @@ export function StudentManagement({
     setIsProcessingBulkAction(true);
     const selectedStudentIds = Array.from(selectedStudentsForPromotion);
     const selectedStudentsList = students.filter((s) =>
-      selectedStudentIds.includes(s._id)
+      selectedStudentIds.includes(s._id),
     );
 
     let successCount = 0;
@@ -517,12 +527,12 @@ export function StudentManagement({
             passOutYear: bulkPassOutData.passOutYear,
             passOutClass: student.class,
             reason: bulkPassOutData.reason,
-          }
+          },
         );
 
         if (response.data.success) {
           setStudents((prev: Student[]) =>
-            prev.map((s) => (s._id === student._id ? response.data.data : s))
+            prev.map((s) => (s._id === student._id ? response.data.data : s)),
           );
           successCount++;
         } else {
@@ -531,7 +541,7 @@ export function StudentManagement({
       } catch (error) {
         console.error(
           `Error passing out student ${student.studentName}:`,
-          error
+          error,
         );
         failCount++;
       }
@@ -671,7 +681,7 @@ export function StudentManagement({
 
     if (student.img?.data) {
       setImagePreview(
-        `data:${student.img.contentType};base64,${student.img.data}`
+        `data:${student.img.contentType};base64,${student.img.data}`,
       );
     }
 
@@ -704,18 +714,18 @@ export function StudentManagement({
     try {
       const response = await axios.put(
         `${BACKEND}/api/students/${selectedStudentForPassOut._id}/pass-out`,
-        passOutData
+        passOutData,
       );
 
       if (response.data.success) {
         toast.success(
-          `${selectedStudentForPassOut.studentName} has been marked as passed out`
+          `${selectedStudentForPassOut.studentName} has been marked as passed out`,
         );
 
         setStudents(
           students.map((s) =>
-            s._id === selectedStudentForPassOut._id ? response.data.data : s
-          )
+            s._id === selectedStudentForPassOut._id ? response.data.data : s,
+          ),
         );
 
         setPassOutDialogOpen(false);
@@ -725,7 +735,7 @@ export function StudentManagement({
       console.error("Error passing out student:", error);
       if (axios.isAxiosError(error) && error.response) {
         toast.error(
-          error.response.data.message || "Failed to pass out student"
+          error.response.data.message || "Failed to pass out student",
         );
       } else {
         toast.error("Failed to pass out student. Please try again.");
@@ -766,18 +776,18 @@ export function StudentManagement({
     try {
       const response = await axios.put(
         `${BACKEND}/api/students/${selectedStudentForStrikeOff._id}/strike-off`,
-        { reason: strikeOffReason }
+        { reason: strikeOffReason },
       );
 
       if (response.data.success) {
         toast.success(
-          `${selectedStudentForStrikeOff.studentName} has been struck off`
+          `${selectedStudentForStrikeOff.studentName} has been struck off`,
         );
 
         setStudents(
           students.map((s) =>
-            s._id === selectedStudentForStrikeOff._id ? response.data.data : s
-          )
+            s._id === selectedStudentForStrikeOff._id ? response.data.data : s,
+          ),
         );
 
         setStrikeOffDialogOpen(false);
@@ -788,7 +798,7 @@ export function StudentManagement({
       console.error("Error striking off student:", error);
       if (axios.isAxiosError(error) && error.response) {
         toast.error(
-          error.response.data.message || "Failed to strike off student"
+          error.response.data.message || "Failed to strike off student",
         );
       } else {
         toast.error("Failed to strike off student. Please try again.");
@@ -818,18 +828,18 @@ export function StudentManagement({
 
     try {
       const response = await axios.put(
-        `${BACKEND}/api/students/${selectedStudentForReactivate._id}/reactivate`
+        `${BACKEND}/api/students/${selectedStudentForReactivate._id}/reactivate`,
       );
 
       if (response.data.success) {
         toast.success(
-          `${selectedStudentForReactivate.studentName} has been reactivated`
+          `${selectedStudentForReactivate.studentName} has been reactivated`,
         );
 
         setStudents(
           students.map((s) =>
-            s._id === selectedStudentForReactivate._id ? response.data.data : s
-          )
+            s._id === selectedStudentForReactivate._id ? response.data.data : s,
+          ),
         );
 
         setReactivateDialogOpen(false);
@@ -839,7 +849,7 @@ export function StudentManagement({
       console.error("Error reactivating student:", error);
       if (axios.isAxiosError(error) && error.response) {
         toast.error(
-          error.response.data.message || "Failed to reactivate student"
+          error.response.data.message || "Failed to reactivate student",
         );
       } else {
         toast.error("Failed to reactivate student. Please try again.");
@@ -883,13 +893,15 @@ export function StudentManagement({
             headers: {
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
         toast.success("Student updated successfully!");
 
         const updatedStudent = response.data.data;
         setStudents(
-          students.map((s) => (s._id === editingStudentId ? updatedStudent : s))
+          students.map((s) =>
+            s._id === editingStudentId ? updatedStudent : s,
+          ),
         );
       } else {
         response = await axios.post(`${BACKEND}/api/students`, formDataObj, {
@@ -910,7 +922,7 @@ export function StudentManagement({
         toast.error(
           `Failed to save student: ${
             error.response.data.message || "Please try again."
-          }`
+          }`,
         );
       } else {
         toast.error("Failed to save student. Please try again.");
@@ -920,7 +932,7 @@ export function StudentManagement({
 
   const handleInputChange = (
     field: keyof Omit<Student, "_id">,
-    value: string
+    value: string,
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -1018,70 +1030,76 @@ export function StudentManagement({
     return String(value);
   };
 
-  const filteredStudents = students.filter((student) => {
-    try {
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch =
-        !searchTerm ||
-        [
-          student.rollNumber,
-          student.studentName,
-          student.fatherName,
-          student.motherName,
-          student.gender,
-          student.fPhoneNumber,
-          student.mPhoneNumber,
-          student.fatherCnic,
-          student.motherCnic,
-          student.bform,
-          student.address,
-          student.email,
-          student.fatherOccupation,
-          student.motherOccupation,
-        ].some((field) =>
-          safeToString(field).toLowerCase().includes(searchLower)
+  const filteredStudents = students
+    .sort((a, b) => {
+      const rollA = a.rollNumber || "";
+      const rollB = b.rollNumber || "";
+      return rollA.localeCompare(rollB, undefined, { numeric: true });
+    })
+    .filter((student) => {
+      try {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch =
+          !searchTerm ||
+          [
+            student.rollNumber,
+            student.studentName,
+            student.fatherName,
+            student.motherName,
+            student.gender,
+            student.fPhoneNumber,
+            student.mPhoneNumber,
+            student.fatherCnic,
+            student.motherCnic,
+            student.bform,
+            student.address,
+            student.email,
+            student.fatherOccupation,
+            student.motherOccupation,
+          ].some((field) =>
+            safeToString(field).toLowerCase().includes(searchLower),
+          );
+
+        const matchesClass =
+          !filters.class || safeToString(student.class) === filters.class;
+        const matchesSection =
+          !filters.section || safeToString(student.section) === filters.section;
+        const matchesGender =
+          !filters.gender || safeToString(student.gender) === filters.gender;
+        const matchesFatherOccupation =
+          !filters.fatherOccupation ||
+          safeToString(student.fatherOccupation) === filters.fatherOccupation;
+        const matchesMotherOccupation =
+          !filters.motherOccupation ||
+          safeToString(student.motherOccupation) === filters.motherOccupation;
+        const matchesStatus =
+          !filters.status || safeToString(student.status) === filters.status;
+
+        return (
+          matchesSearch &&
+          matchesClass &&
+          matchesSection &&
+          matchesGender &&
+          matchesFatherOccupation &&
+          matchesMotherOccupation &&
+          matchesStatus
         );
-
-      const matchesClass =
-        !filters.class || safeToString(student.class) === filters.class;
-      const matchesSection =
-        !filters.section || safeToString(student.section) === filters.section;
-      const matchesGender =
-        !filters.gender || safeToString(student.gender) === filters.gender;
-      const matchesFatherOccupation =
-        !filters.fatherOccupation ||
-        safeToString(student.fatherOccupation) === filters.fatherOccupation;
-      const matchesMotherOccupation =
-        !filters.motherOccupation ||
-        safeToString(student.motherOccupation) === filters.motherOccupation;
-      const matchesStatus =
-        !filters.status || safeToString(student.status) === filters.status;
-
-      return (
-        matchesSearch &&
-        matchesClass &&
-        matchesSection &&
-        matchesGender &&
-        matchesFatherOccupation &&
-        matchesMotherOccupation &&
-        matchesStatus
-      );
-    } catch (error) {
-      console.error("Error filtering student:", error, student);
-      return false;
-    }
-  });
+      } catch (error) {
+        console.error("Error filtering student:", error, student);
+        return false;
+      }
+    });
 
   const indexOfLastStudent = currentPage * studentsPerPage;
   const indexOfFirstStudent = indexOfLastStudent - studentsPerPage;
   const currentStudents = filteredStudents.slice(
     indexOfFirstStudent,
-    indexOfLastStudent
+    indexOfLastStudent,
   );
 
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredStudents.length / studentsPerPage)
+    Math.ceil(filteredStudents.length / studentsPerPage),
   );
 
   const handlePageChange = (page: number) => {
@@ -1126,22 +1144,33 @@ export function StudentManagement({
 
   // Filter students for reports
   const getReportStudents = () => {
-    return students.filter((s) => {
-      const matchesClass = !reportClassFilter || s.class === reportClassFilter;
-      const matchesSection =
-        !reportSectionFilter || s.section === reportSectionFilter;
-      const matchesStatus =
-        !reportStatusFilter ||
-        s.status === reportStatusFilter ||
-        (!s.status && reportStatusFilter === "active");
-      const matchesSearch =
-        !reportSearchTerm ||
-        s.studentName.toLowerCase().includes(reportSearchTerm.toLowerCase()) ||
-        s.rollNumber?.toLowerCase().includes(reportSearchTerm.toLowerCase()) ||
-        s.fatherName?.toLowerCase().includes(reportSearchTerm.toLowerCase());
+    return students
+      .sort((a, b) => {
+        const rollA = a.rollNumber || "";
+        const rollB = b.rollNumber || "";
+        return rollA.localeCompare(rollB, undefined, { numeric: true });
+      })
+      .filter((s) => {
+        const matchesClass =
+          !reportClassFilter || s.class === reportClassFilter;
+        const matchesSection =
+          !reportSectionFilter || s.section === reportSectionFilter;
+        const matchesStatus =
+          !reportStatusFilter ||
+          s.status === reportStatusFilter ||
+          (!s.status && reportStatusFilter === "active");
+        const matchesSearch =
+          !reportSearchTerm ||
+          s.studentName
+            .toLowerCase()
+            .includes(reportSearchTerm.toLowerCase()) ||
+          s.rollNumber
+            ?.toLowerCase()
+            .includes(reportSearchTerm.toLowerCase()) ||
+          s.fatherName?.toLowerCase().includes(reportSearchTerm.toLowerCase());
 
-      return matchesClass && matchesSection && matchesStatus && matchesSearch;
-    });
+        return matchesClass && matchesSection && matchesStatus && matchesSearch;
+      });
   };
 
   // Generate and print report
@@ -1180,7 +1209,7 @@ export function StudentManagement({
           <td>${
             getImageUrl(s)
               ? `<img src="${getImageUrl(
-                  s
+                  s,
                 )}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;" />`
               : "-"
           }</td>
@@ -1190,7 +1219,7 @@ export function StudentManagement({
           <td>${s.class}</td>
           <td>${s.section}</td>
         </tr>
-      `
+      `,
         )
         .join("");
     } else if (reportType === "contact") {
@@ -1217,7 +1246,7 @@ export function StudentManagement({
           <td>${s.class}</td>
           <td>${s.section}</td>
         </tr>
-      `
+      `,
         )
         .join("");
     } else {
@@ -1245,14 +1274,14 @@ export function StudentManagement({
                   value === "passedOut"
                     ? "Passed Out"
                     : value === "struckOff"
-                    ? "Struck Off"
-                    : "Active";
+                      ? "Struck Off"
+                      : "Active";
               }
               return `<td>${value || "-"}</td>`;
             })
             .join("")}
         </tr>
-      `
+      `,
         )
         .join("");
     }
@@ -1261,8 +1290,8 @@ export function StudentManagement({
       reportType === "student"
         ? "Student List"
         : reportType === "contact"
-        ? "Contact List"
-        : "Custom Report";
+          ? "Contact List"
+          : "Custom Report";
     const filterInfo = `
       ${reportClassFilter ? `Class: ${reportClassFilter} | ` : ""}
       ${reportSectionFilter ? `Section: ${reportSectionFilter} | ` : ""}
@@ -1272,8 +1301,8 @@ export function StudentManagement({
               reportStatusFilter === "active"
                 ? "Active"
                 : reportStatusFilter === "passedOut"
-                ? "Passed Out"
-                : "Struck Off"
+                  ? "Passed Out"
+                  : "Struck Off"
             } | `
           : ""
       }
@@ -1788,7 +1817,7 @@ export function StudentManagement({
                             }
                             onCheckedChange={() =>
                               toggleColumnVisibility(
-                                key as keyof ColumnVisibility
+                                key as keyof ColumnVisibility,
                               )
                             }
                           >
@@ -1823,7 +1852,7 @@ export function StudentManagement({
                         onValueChange={(value: string) =>
                           handleFilterChange(
                             "class",
-                            value === "all" ? "" : value
+                            value === "all" ? "" : value,
                           )
                         }
                       >
@@ -1848,7 +1877,7 @@ export function StudentManagement({
                         onValueChange={(value: string) =>
                           handleFilterChange(
                             "section",
-                            value === "all" ? "" : value
+                            value === "all" ? "" : value,
                           )
                         }
                       >
@@ -1873,7 +1902,7 @@ export function StudentManagement({
                         onValueChange={(value: string) =>
                           handleFilterChange(
                             "gender",
-                            value === "all" ? "" : value
+                            value === "all" ? "" : value,
                           )
                         }
                       >
@@ -1898,7 +1927,7 @@ export function StudentManagement({
                         onValueChange={(value: string) =>
                           handleFilterChange(
                             "status",
-                            value === "all" ? "" : value
+                            value === "all" ? "" : value,
                           )
                         }
                       >
@@ -1923,7 +1952,7 @@ export function StudentManagement({
                         onValueChange={(value: string) =>
                           handleFilterChange(
                             "fatherOccupation",
-                            value === "all" ? "" : value
+                            value === "all" ? "" : value,
                           )
                         }
                       >
@@ -1937,7 +1966,7 @@ export function StudentManagement({
                               <SelectItem key={occupation} value={occupation}>
                                 {occupation}
                               </SelectItem>
-                            )
+                            ),
                           )}
                         </SelectContent>
                       </Select>
@@ -2005,8 +2034,8 @@ export function StudentManagement({
                         {filters.status === "passedOut"
                           ? "Passed Out"
                           : filters.status === "struckOff"
-                          ? "Struck Off"
-                          : "Active"}
+                            ? "Struck Off"
+                            : "Active"}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -2161,8 +2190,8 @@ export function StudentManagement({
                             student.status === "struckOff"
                               ? "bg-red-50"
                               : student.status === "passedOut"
-                              ? "bg-blue-50"
-                              : ""
+                                ? "bg-blue-50"
+                                : ""
                           }
                         >
                           {columnVisibility.image && (
@@ -2435,7 +2464,7 @@ export function StudentManagement({
                         value={promotionSectionFilter || "all"}
                         onValueChange={(value) => {
                           setPromotionSectionFilter(
-                            value === "all" ? "" : value
+                            value === "all" ? "" : value,
                           );
                           setSelectedStudentsForPromotion(new Set());
                           setPromotionCurrentPage(1);
@@ -2567,12 +2596,12 @@ export function StudentManagement({
                             <TableCell>
                               <Checkbox
                                 checked={selectedStudentsForPromotion.has(
-                                  student._id
+                                  student._id,
                                 )}
                                 onCheckedChange={(checked) =>
                                   handleSelectStudentForPromotion(
                                     student._id,
-                                    checked as boolean
+                                    checked as boolean,
                                   )
                                 }
                                 aria-label={`Select ${student.studentName}`}
@@ -2645,7 +2674,7 @@ export function StudentManagement({
                       variant="outline"
                       onClick={() =>
                         setPromotionCurrentPage((p) =>
-                          Math.min(promotionTotalPages, p + 1)
+                          Math.min(promotionTotalPages, p + 1),
                         )
                       }
                       disabled={promotionCurrentPage === promotionTotalPages}
@@ -2664,7 +2693,7 @@ export function StudentManagement({
                     <p className="text-2xl font-bold">
                       {
                         students.filter(
-                          (s) => s.status === "active" || !s.status
+                          (s) => s.status === "active" || !s.status,
                         ).length
                       }
                     </p>
@@ -2690,7 +2719,7 @@ export function StudentManagement({
                         students.filter(
                           (s) =>
                             (s.status === "active" || !s.status) &&
-                            s.class === "10"
+                            s.class === "10",
                         ).length
                       }
                     </p>
@@ -3237,7 +3266,7 @@ export function StudentManagement({
                         )}
                       </div>
                     </div>
-                  )
+                  ),
                 )}
               </div>
             </div>
@@ -3293,8 +3322,8 @@ export function StudentManagement({
                 bulkActionType === "promote"
                   ? "bg-green-600 hover:bg-green-700"
                   : bulkActionType === "demote"
-                  ? "bg-orange-600 hover:bg-orange-700"
-                  : "bg-blue-600 hover:bg-blue-700"
+                    ? "bg-orange-600 hover:bg-orange-700"
+                    : "bg-blue-600 hover:bg-blue-700"
               }
             >
               {isProcessingBulkAction ? (
@@ -3317,8 +3346,8 @@ export function StudentManagement({
                   {bulkActionType === "promote"
                     ? "Promotion"
                     : bulkActionType === "demote"
-                    ? "Demotion"
-                    : "Pass Out"}
+                      ? "Demotion"
+                      : "Pass Out"}
                 </>
               )}
             </Button>
