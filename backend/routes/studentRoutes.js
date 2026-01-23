@@ -7,6 +7,7 @@ import {
   deleteStudent,
   getStudentImage,
   upload,
+  getStudentsPaginated,
   passOutStudent,
   strikeOffStudent,
   reactivateStudent,
@@ -14,6 +15,8 @@ import {
 } from "../controllers/studentController.js";
 
 const router = express.Router();
+
+router.get("/paginated", getStudentsPaginated);
 
 //Create a new student with image upload
 router.post("/", upload.single("image"), createStudent);

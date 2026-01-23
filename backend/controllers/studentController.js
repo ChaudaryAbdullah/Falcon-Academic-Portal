@@ -124,18 +124,25 @@ export const createStudent = async (req, res) => {
   }
 };
 
-// Get All Students with Images
+// Get All Students with Images - Optimized
 export const getStudents = async (req, res) => {
   try {
-    const students = await Student.find();
+    // Use lean() for faster queries and select only necessary fields initially
+    const students = await Student.find()
+      .lean() // Returns plain JavaScript objects instead of Mongoose documents
+      .select("-__v") // Exclude version key
+      .sort({ rollNumber: 1 }); // Sort by roll number in ascending order
 
     // Convert image buffers to base64 for all students
     const studentsWithImages = students.map((student) => {
-      const studentObj = student.toObject();
-      if (studentObj.img && studentObj.img.data) {
-        studentObj.img.data = studentObj.img.data.toString("base64");
+      if (student.img && student.img.data) {
+        student.img.data = student.img.data.toString("base64");
       }
-      return studentObj;
+      // Set default status if empty
+      if (!student.status || student.status === "") {
+        student.status = "active";
+      }
+      return student;
     });
 
     res.status(200).json({ success: true, data: studentsWithImages });
@@ -144,10 +151,11 @@ export const getStudents = async (req, res) => {
   }
 };
 
-// Get Single Student with Image
+// Get Single Student with Image - Optimized
 export const getStudentById = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id);
+    const student = await Student.findById(req.params.id).lean().select("-__v");
+
     if (!student) {
       return res
         .status(404)
@@ -155,12 +163,16 @@ export const getStudentById = async (req, res) => {
     }
 
     // Convert image buffer to base64
-    const studentObj = student.toObject();
-    if (studentObj.img && studentObj.img.data) {
-      studentObj.img.data = studentObj.img.data.toString("base64");
+    if (student.img && student.img.data) {
+      student.img.data = student.img.data.toString("base64");
     }
 
-    res.status(200).json({ success: true, data: studentObj });
+    // Set default status if empty
+    if (!student.status || student.status === "") {
+      student.status = "active";
+    }
+
+    res.status(200).json({ success: true, data: student });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -285,7 +297,11 @@ export const passOutStudent = async (req, res) => {
       });
     }
 
-    if (student.status !== "active") {
+    if (
+      student.status !== "active" &&
+      student.status !== "" &&
+      student.status
+    ) {
       return res.status(400).json({
         success: false,
         message: `Student is already ${
@@ -339,7 +355,11 @@ export const strikeOffStudent = async (req, res) => {
       });
     }
 
-    if (student.status !== "active") {
+    if (
+      student.status !== "active" &&
+      student.status !== "" &&
+      student.status
+    ) {
       return res.status(400).json({
         success: false,
         message: `Student is already ${
@@ -382,7 +402,11 @@ export const reactivateStudent = async (req, res) => {
       });
     }
 
-    if (student.status === "active") {
+    if (
+      student.status === "active" ||
+      !student.status ||
+      student.status === ""
+    ) {
       return res.status(400).json({
         success: false,
         message: "Student is already active",
@@ -413,7 +437,7 @@ export const reactivateStudent = async (req, res) => {
   }
 };
 
-// Get Students by Status
+// Get Students by Status - Optimized
 export const getStudentsByStatus = async (req, res) => {
   try {
     const { status } = req.params;
@@ -425,17 +449,107 @@ export const getStudentsByStatus = async (req, res) => {
       });
     }
 
-    const students = await Student.find({ status });
+    // Handle active status to include empty status fields
+    const query =
+      status === "active"
+        ? {
+            $or: [
+              { status: "active" },
+              { status: { $exists: false } },
+              { status: "" },
+            ],
+          }
+        : { status };
+
+    const students = await Student.find(query)
+      .lean()
+      .select("-__v")
+      .sort({ rollNumber: 1 });
 
     const studentsWithImages = students.map((student) => {
-      const studentObj = student.toObject();
-      if (studentObj.img && studentObj.img.data) {
-        studentObj.img.data = studentObj.img.data.toString("base64");
+      if (student.img && student.img.data) {
+        student.img.data = student.img.data.toString("base64");
       }
-      return studentObj;
+      // Set default status if empty
+      if (!student.status || student.status === "") {
+        student.status = "active";
+      }
+      return student;
     });
 
     res.status(200).json({ success: true, data: studentsWithImages });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get Students with Pagination - For better performance with large datasets
+export const getStudentsPaginated = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+
+    const { class: classFilter, section, status, search } = req.query;
+
+    // Build query
+    let query = {};
+
+    if (classFilter) query.class = classFilter;
+    if (section) query.section = section;
+
+    // Handle status filter
+    if (status === "active") {
+      query.$or = [
+        { status: "active" },
+        { status: { $exists: false } },
+        { status: "" },
+      ];
+    } else if (status) {
+      query.status = status;
+    }
+
+    // Handle search
+    if (search) {
+      query.$or = [
+        { studentName: { $regex: search, $options: "i" } },
+        { rollNumber: { $regex: search, $options: "i" } },
+        { fatherName: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Get total count for pagination
+    const total = await Student.countDocuments(query);
+
+    // Get paginated results
+    const students = await Student.find(query)
+      .lean()
+      .select("-__v")
+      .sort({ rollNumber: 1 })
+      .skip(skip)
+      .limit(limit);
+
+    // Convert images
+    const studentsWithImages = students.map((student) => {
+      if (student.img && student.img.data) {
+        student.img.data = student.img.data.toString("base64");
+      }
+      if (!student.status || student.status === "") {
+        student.status = "active";
+      }
+      return student;
+    });
+
+    res.status(200).json({
+      success: true,
+      data: studentsWithImages,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalStudents: total,
+        limit,
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
