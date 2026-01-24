@@ -13,11 +13,13 @@ const studentSchema = mongoose.Schema(
     rollNumber: {
       type: String,
       unique: true,
+      index: true,
     },
     studentName: {
       type: String,
       required: true,
       trim: true,
+      index: true,
     },
     dob: {
       type: Date,
@@ -36,10 +38,12 @@ const studentSchema = mongoose.Schema(
     class: {
       type: String,
       required: true,
+      index: true,
     },
     section: {
       type: String,
       required: true,
+      index: true,
     },
     gender: {
       type: String,
@@ -106,6 +110,7 @@ const studentSchema = mongoose.Schema(
       type: String,
       enum: ["active", "passedOut", "struckOff"],
       default: "active",
+      index: true,
     },
     statusDate: {
       type: Date,
@@ -121,7 +126,14 @@ const studentSchema = mongoose.Schema(
       type: String,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    indexes: [
+      { class: 1, section: 1 },
+      { status: 1, class: 1 },
+      { rollNumber: 1, status: 1 },
+    ],
+  },
 );
 
 // Auto-generate roll number atomically
@@ -134,7 +146,7 @@ studentSchema.pre("save", async function (next) {
       const counter = await Counter.findOneAndUpdate(
         { _id: prefix },
         { $inc: { seq: 1 } },
-        { new: true, upsert: true }
+        { new: true, upsert: true },
       );
 
       const nextNumber = String(counter.seq).padStart(4, "0");

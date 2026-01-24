@@ -1,13 +1,11 @@
 import { Student } from "../models/student.js";
 import bcrypt from "bcrypt";
 import multer from "multer";
-import path from "path";
 
 // Configure multer for handling file uploads
-const storage = multer.memoryStorage(); // Store files in memory as Buffer
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  // Check if the file is an image
   if (file.mimetype.startsWith("image/")) {
     cb(null, true);
   } else {
@@ -17,25 +15,32 @@ const fileFilter = (req, file, cb) => {
 
 export const upload = multer({
   storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: fileFilter,
 });
+
+// Helper function to convert image to base64
+const imageToBase64 = (student) => {
+  if (student.img && student.img.data) {
+    student.img.data = student.img.data.toString("base64");
+  }
+  if (!student.status || student.status === "") {
+    student.status = "active";
+  }
+  return student;
+};
 
 // Create Student with Image Upload
 export const createStudent = async (req, res) => {
   try {
-    // Handle empty email and password
     if (req.body.email === "" || req.body.email === null) {
       req.body.email = undefined;
     }
 
     if (req.body.password === "" || req.body.password === null) {
-      req.body.password = "12345678"; // Default password
+      req.body.password = "12345678";
     }
 
-    // Handle image upload
     let imageData = null;
     if (req.file) {
       imageData = {
@@ -44,7 +49,6 @@ export const createStudent = async (req, res) => {
       };
     }
 
-    // Create student data object
     const studentData = {
       ...req.body,
       ...(imageData && { img: imageData }),
@@ -52,7 +56,6 @@ export const createStudent = async (req, res) => {
 
     const student = await Student.create(studentData);
 
-    // Convert image buffer to base64 for response (if exists)
     const responseStudent = student.toObject();
     if (responseStudent.img && responseStudent.img.data) {
       responseStudent.img.data = responseStudent.img.data.toString("base64");
@@ -62,7 +65,6 @@ export const createStudent = async (req, res) => {
   } catch (error) {
     console.error("Error creating student:", error);
 
-    // Handle multer errors
     if (error instanceof multer.MulterError) {
       if (error.code === "LIMIT_FILE_SIZE") {
         return res.status(400).json({
@@ -78,7 +80,6 @@ export const createStudent = async (req, res) => {
       });
     }
 
-    // Handle custom file filter errors
     if (error.message === "Only image files are allowed!") {
       return res.status(400).json({
         success: false,
@@ -88,7 +89,6 @@ export const createStudent = async (req, res) => {
       });
     }
 
-    // Duplicate key error
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
       const value = error.keyValue[field];
@@ -101,7 +101,6 @@ export const createStudent = async (req, res) => {
       });
     }
 
-    // Validation error
     if (error.name === "ValidationError") {
       const errors = Object.values(error.errors).map((err) => ({
         field: err.path,
@@ -124,56 +123,63 @@ export const createStudent = async (req, res) => {
   }
 };
 
-// Get All Students with Images - Optimized
+// ⚡ OPTIMIZED: Get All Students - with projection and streaming
 export const getStudents = async (req, res) => {
   try {
-    // Use lean() for faster queries and select only necessary fields initially
-    const students = await Student.find()
-      .lean() // Returns plain JavaScript objects instead of Mongoose documents
-      .select("-__v") // Exclude version key
-      .sort({ rollNumber: 1 }); // Sort by roll number in ascending order
+    // Use aggregation pipeline for better performance
+    const students = await Student.aggregate([
+      {
+        $project: {
+          __v: 0, // Exclude version key
+        },
+      },
+      {
+        $sort: { rollNumber: 1 },
+      },
+    ]).exec();
 
-    // Convert image buffers to base64 for all students
-    const studentsWithImages = students.map((student) => {
-      if (student.img && student.img.data) {
-        student.img.data = student.img.data.toString("base64");
-      }
-      // Set default status if empty
-      if (!student.status || student.status === "") {
-        student.status = "active";
-      }
-      return student;
+    // Convert images in parallel batches
+    const batchSize = 50;
+    const batches = [];
+
+    for (let i = 0; i < students.length; i += batchSize) {
+      const batch = students.slice(i, i + batchSize);
+      batches.push(batch.map(imageToBase64));
+    }
+
+    const processedStudents = batches.flat();
+
+    res.status(200).json({
+      success: true,
+      data: processedStudents,
+      count: processedStudents.length,
     });
-
-    res.status(200).json({ success: true, data: studentsWithImages });
   } catch (error) {
+    console.error("Error fetching students:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Get Single Student with Image - Optimized
+// ⚡ OPTIMIZED: Get Single Student
 export const getStudentById = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id).lean().select("-__v");
+    const student = await Student.findById(req.params.id)
+      .select("-__v")
+      .lean()
+      .exec();
 
     if (!student) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Student not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
     }
 
-    // Convert image buffer to base64
-    if (student.img && student.img.data) {
-      student.img.data = student.img.data.toString("base64");
-    }
+    const processedStudent = imageToBase64(student);
 
-    // Set default status if empty
-    if (!student.status || student.status === "") {
-      student.status = "active";
-    }
-
-    res.status(200).json({ success: true, data: student });
+    res.status(200).json({ success: true, data: processedStudent });
   } catch (error) {
+    console.error("Error fetching student:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -183,7 +189,6 @@ export const updateStudent = async (req, res) => {
   try {
     let updateData = { ...req.body };
 
-    // Handle image upload if a new image is provided
     if (req.file) {
       updateData.img = {
         data: req.file.buffer,
@@ -191,7 +196,6 @@ export const updateStudent = async (req, res) => {
       };
     }
 
-    // If password is being updated, hash it before saving
     if (updateData.password) {
       const salt = await bcrypt.genSalt(10);
       updateData.password = await bcrypt.hash(updateData.password, salt);
@@ -200,15 +204,15 @@ export const updateStudent = async (req, res) => {
     const student = await Student.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
-    });
+    }).select("-__v");
 
     if (!student) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Student not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
     }
 
-    // Convert image buffer to base64 for response
     const responseStudent = student.toObject();
     if (responseStudent.img && responseStudent.img.data) {
       responseStudent.img.data = responseStudent.img.data.toString("base64");
@@ -216,7 +220,8 @@ export const updateStudent = async (req, res) => {
 
     res.status(200).json({ success: true, data: responseStudent });
   } catch (error) {
-    // Handle multer errors
+    console.error("Error updating student:", error);
+
     if (error instanceof multer.MulterError) {
       if (error.code === "LIMIT_FILE_SIZE") {
         return res.status(400).json({
@@ -232,7 +237,6 @@ export const updateStudent = async (req, res) => {
       });
     }
 
-    // Handle duplicate key errors
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
       const value = error.keyValue[field];
@@ -253,32 +257,40 @@ export const updateStudent = async (req, res) => {
 export const deleteStudent = async (req, res) => {
   try {
     const student = await Student.findByIdAndDelete(req.params.id);
+
     if (!student) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Student not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
     }
-    res
-      .status(200)
-      .json({ success: true, message: "Student deleted successfully" });
+
+    res.status(200).json({
+      success: true,
+      message: "Student deleted successfully",
+    });
   } catch (error) {
+    console.error("Error deleting student:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Get Student Image by ID (optional endpoint for serving images directly)
+// Get Student Image by ID
 export const getStudentImage = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id);
+    const student = await Student.findById(req.params.id).select("img").lean();
+
     if (!student || !student.img || !student.img.data) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Image not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Image not found",
+      });
     }
 
     res.set("Content-Type", student.img.contentType);
     res.send(student.img.data);
   } catch (error) {
+    console.error("Error fetching image:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -390,7 +402,7 @@ export const strikeOffStudent = async (req, res) => {
   }
 };
 
-// Reactivate Student (optional - to undo pass out or struck off)
+// Reactivate Student
 export const reactivateStudent = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
@@ -437,7 +449,7 @@ export const reactivateStudent = async (req, res) => {
   }
 };
 
-// Get Students by Status - Optimized
+// ⚡ OPTIMIZED: Get Students by Status
 export const getStudentsByStatus = async (req, res) => {
   try {
     const { status } = req.params;
@@ -449,7 +461,7 @@ export const getStudentsByStatus = async (req, res) => {
       });
     }
 
-    // Handle active status to include empty status fields
+    // Build query - handle active status to include empty/null status
     const query =
       status === "active"
         ? {
@@ -462,28 +474,25 @@ export const getStudentsByStatus = async (req, res) => {
         : { status };
 
     const students = await Student.find(query)
-      .lean()
       .select("-__v")
-      .sort({ rollNumber: 1 });
+      .sort({ rollNumber: 1 })
+      .lean()
+      .exec();
 
-    const studentsWithImages = students.map((student) => {
-      if (student.img && student.img.data) {
-        student.img.data = student.img.data.toString("base64");
-      }
-      // Set default status if empty
-      if (!student.status || student.status === "") {
-        student.status = "active";
-      }
-      return student;
+    const processedStudents = students.map(imageToBase64);
+
+    res.status(200).json({
+      success: true,
+      data: processedStudents,
+      count: processedStudents.length,
     });
-
-    res.status(200).json({ success: true, data: studentsWithImages });
   } catch (error) {
+    console.error("Error fetching students by status:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Get Students with Pagination - For better performance with large datasets
+// ⚡ OPTIMIZED: Get Students with Pagination
 export const getStudentsPaginated = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -518,31 +527,23 @@ export const getStudentsPaginated = async (req, res) => {
       ];
     }
 
-    // Get total count for pagination
-    const total = await Student.countDocuments(query);
+    // Use parallel execution for count and data fetch
+    const [total, students] = await Promise.all([
+      Student.countDocuments(query),
+      Student.find(query)
+        .select("-__v")
+        .sort({ rollNumber: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+    ]);
 
-    // Get paginated results
-    const students = await Student.find(query)
-      .lean()
-      .select("-__v")
-      .sort({ rollNumber: 1 })
-      .skip(skip)
-      .limit(limit);
-
-    // Convert images
-    const studentsWithImages = students.map((student) => {
-      if (student.img && student.img.data) {
-        student.img.data = student.img.data.toString("base64");
-      }
-      if (!student.status || student.status === "") {
-        student.status = "active";
-      }
-      return student;
-    });
+    const processedStudents = students.map(imageToBase64);
 
     res.status(200).json({
       success: true,
-      data: studentsWithImages,
+      data: processedStudents,
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(total / limit),
@@ -551,6 +552,7 @@ export const getStudentsPaginated = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Error fetching paginated students:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
