@@ -1,4 +1,5 @@
 import express from "express";
+import { cacheMiddleware } from "../middleware/cache.js";
 import {
   createStudent,
   getStudents,
@@ -16,13 +17,13 @@ import {
 
 const router = express.Router();
 
-router.get("/paginated", getStudentsPaginated);
+router.get("/paginated", cacheMiddleware(30000), getStudentsPaginated);
 
 //Create a new student with image upload
 router.post("/", upload.single("image"), createStudent);
 
 // Get all students
-router.get("/", getStudents);
+router.get("/", cacheMiddleware(30000), getStudents);
 
 // Get a single student by ID
 router.get("/:id", getStudentById);
@@ -40,6 +41,6 @@ router.delete("/:id", deleteStudent);
 router.put("/:id/pass-out", passOutStudent);
 router.put("/:id/strike-off", strikeOffStudent);
 router.put("/:id/reactivate", reactivateStudent);
-router.get("/status/:status", getStudentsByStatus);
+router.get("/status/:status", cacheMiddleware(30000), getStudentsByStatus);
 
 export default router;

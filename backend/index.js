@@ -14,6 +14,7 @@ import PaperFundRoutes from "./routes/paperFundRoutes.js";
 import resultRoutes from "./routes/resultRoutes.js";
 import subjectRoutes from "./routes/subjectRoutes.js";
 import examRoutes from "./routes/examRoutes.js";
+import compression from "compression";
 
 dotenv.config();
 const FRONTEND = process.env.FRONTEND;
@@ -54,10 +55,20 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-app.use(cors(corsOptions));
-// app.options("*", cors(corsOptions));
-
 // Middleware
+app.use(
+  compression({
+    level: 6, // Balance between speed and compression
+    threshold: 1024, // Only compress responses > 1KB
+    filter: (req, res) => {
+      if (req.headers["x-no-compression"]) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  }),
+);
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -73,7 +84,7 @@ app.use(
       maxAge: 360000000,
       sameSite: "lax",
     },
-  })
+  }),
 );
 
 // Routes
@@ -114,7 +125,7 @@ server
 
       server.listen(fallbackPort).on("listening", () => {
         console.log(
-          `Fallback: Server is running on http://localhost:${fallbackPort}`
+          `Fallback: Server is running on http://localhost:${fallbackPort}`,
         );
 
         mongoose
