@@ -306,24 +306,24 @@ export default function AdminDashboard() {
       try {
         const [
           studentsData,
-          // teachersData,
-          // feeStructureData,
-          // discountsData,
-          // challansData,
-          // paperFundData,
-          // subjectsData,
-          // examsData,
-          // resultsData,
+          teachersData,
+          feeStructureData,
+          discountsData,
+          challansData,
+          paperFundData,
+          subjectsData,
+          examsData,
+          resultsData,
         ] = await Promise.allSettled([
           apiService.getStudents(fetchOptions),
-          // apiService.getTeachers(fetchOptions),
-          // apiService.getFeeStructures(fetchOptions),
-          // apiService.getStudentDiscounts(fetchOptions),
-          // apiService.getFeeChallans(fetchOptions),
-          // apiService.getPaperFundChallans(fetchOptions),
-          // apiService.getSubjects(fetchOptions),
-          // apiService.getExams(fetchOptions),
-          // apiService.getResults(fetchOptions),
+          apiService.getTeachers(fetchOptions),
+          apiService.getFeeStructures(fetchOptions),
+          apiService.getStudentDiscounts(fetchOptions),
+          apiService.getFeeChallans(fetchOptions),
+          apiService.getPaperFundChallans(fetchOptions),
+          apiService.getSubjects(fetchOptions),
+          apiService.getExams(fetchOptions),
+          apiService.getResults(fetchOptions),
         ]);
 
         // Process students
@@ -342,55 +342,54 @@ export default function AdminDashboard() {
         setLoaded("students");
 
         // Process teachers
-        // if (teachersData.status === "fulfilled") {
-        //   const data = teachersData.value;
-        //   setTeachers(data);
-        //   setCounts((prev) => ({ ...prev, teachers: data.length }));
-        // }
-        // setLoaded("teachers");
+        if (teachersData.status === "fulfilled") {
+          const data = teachersData.value;
+          setTeachers(data);
+          setCounts((prev) => ({ ...prev, teachers: data.length }));
+        }
+        setLoaded("teachers");
 
-        // // Process fee structure
-        // if (feeStructureData.status === "fulfilled") {
-        //   setFeeStructure(feeStructureData.value);
-        // }
-        // setLoaded("feeStructure");
+        // Process fee structure
+        if (feeStructureData.status === "fulfilled") {
+          setFeeStructure(feeStructureData.value);
+        }
+        setLoaded("feeStructure");
 
-        // // Process discounts
-        // if (discountsData.status === "fulfilled") {
-        //   setStudentDiscounts(discountsData.value);
-        // }
-        // setLoaded("studentDiscounts");
+        // Process discounts
+        if (discountsData.status === "fulfilled") {
+          setStudentDiscounts(discountsData.value);
+        }
+        setLoaded("studentDiscounts");
 
-        // // Process challans
-        // if (challansData.status === "fulfilled") {
-        //   setChallans(challansData.value);
-        // }
-        // setLoaded("challans");
+        // Process challans
+        if (challansData.status === "fulfilled") {
+          setChallans(challansData.value);
+        }
+        setLoaded("challans");
 
-        // // Process paper fund
-        // if (paperFundData.status === "fulfilled") {
-        //   setPaperFundChallans(paperFundData.value);
-        // }
-        // setLoaded("paperFundChallans");
+        // Process paper fund
+        if (paperFundData.status === "fulfilled") {
+          setPaperFundChallans(paperFundData.value);
+        }
+        setLoaded("paperFundChallans");
 
-        // // Process subjects
-        // if (subjectsData.status === "fulfilled") {
-        //   setSubjects(subjectsData.value);
-        // }
-        // setLoaded("subjects");
+        // Process subjects
+        if (subjectsData.status === "fulfilled") {
+          setSubjects(subjectsData.value);
+        }
+        setLoaded("subjects");
 
-        // // Process exams
-        // if (examsData.status === "fulfilled") {
-        //   setExams(examsData.value);
-        // }
-        // setLoaded("exams");
+        // Process exams
+        if (examsData.status === "fulfilled") {
+          setExams(examsData.value);
+        }
+        setLoaded("exams");
 
-        // // Process results
-        // if (resultsData.status === "fulfilled") {
-        //   setResults(resultsData.value);
-        // }
-        // setLoaded("results");
-        setStudentDiscounts([]); // Temporary stubs
+        // Process results
+        if (resultsData.status === "fulfilled") {
+          setResults(resultsData.value);
+        }
+        setLoaded("results");
 
         if (forceRefresh) {
           toast.success("Data refreshed successfully!");
