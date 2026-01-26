@@ -123,14 +123,14 @@ export const createStudent = async (req, res) => {
   }
 };
 
-// ⚡ OPTIMIZED: Get All Students - with projection and streaming
+// ⚡ OPTIMIZED: Get All Students WITHOUT images
 export const getStudents = async (req, res) => {
   try {
-    // Use aggregation pipeline for better performance
     const students = await Student.aggregate([
       {
         $project: {
-          __v: 0, // Exclude version key
+          __v: 0,
+          img: 0, // EXCLUDE images completely
         },
       },
       {
@@ -138,16 +138,51 @@ export const getStudents = async (req, res) => {
       },
     ]).exec();
 
-    // Convert images in parallel batches
-    const batchSize = 50;
-    const batches = [];
+    // No need to process images since we excluded them
+    const processedStudents = students.map((student) => {
+      if (!student.status || student.status === "") {
+        student.status = "active";
+      }
+      return student;
+    });
 
-    for (let i = 0; i < students.length; i += batchSize) {
-      const batch = students.slice(i, i + batchSize);
-      batches.push(batch.map(imageToBase64));
-    }
+    res.status(200).json({
+      success: true,
+      data: processedStudents,
+      count: processedStudents.length,
+    });
+  } catch (error) {
+    console.error("Error fetching students:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
-    const processedStudents = batches.flat();
+// ⚡ NEW: Get Students with Image Placeholders (lightweight)
+export const getStudentsLight = async (req, res) => {
+  try {
+    const students = await Student.aggregate([
+      {
+        $project: {
+          __v: 0,
+          img: 0, // Don't include actual image data
+        },
+      },
+      {
+        $addFields: {
+          hasImage: { $cond: [{ $ifNull: ["$img", false] }, true, false] },
+        },
+      },
+      {
+        $sort: { rollNumber: 1 },
+      },
+    ]).exec();
+
+    const processedStudents = students.map((student) => {
+      if (!student.status || student.status === "") {
+        student.status = "active";
+      }
+      return student;
+    });
 
     res.status(200).json({
       success: true,
@@ -291,6 +326,43 @@ export const getStudentImage = async (req, res) => {
     res.send(student.img.data);
   } catch (error) {
     console.error("Error fetching image:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ⚡ NEW: Batch Get Student Images
+export const getBatchStudentImages = async (req, res) => {
+  try {
+    const { ids } = req.body; // Array of student IDs
+
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid request. 'ids' array is required",
+      });
+    }
+
+    const students = await Student.find(
+      { _id: { $in: ids } },
+      { _id: 1, img: 1 },
+    ).lean();
+
+    const images = students.reduce((acc, student) => {
+      if (student.img && student.img.data) {
+        acc[student._id] = {
+          data: student.img.data.toString("base64"),
+          contentType: student.img.contentType,
+        };
+      }
+      return acc;
+    }, {});
+
+    res.status(200).json({
+      success: true,
+      data: images,
+    });
+  } catch (error) {
+    console.error("Error fetching batch images:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -461,7 +533,6 @@ export const getStudentsByStatus = async (req, res) => {
       });
     }
 
-    // Build query - handle active status to include empty/null status
     const query =
       status === "active"
         ? {
@@ -474,12 +545,17 @@ export const getStudentsByStatus = async (req, res) => {
         : { status };
 
     const students = await Student.find(query)
-      .select("-__v")
+      .select("-__v -img") // EXCLUDE images
       .sort({ rollNumber: 1 })
       .lean()
       .exec();
 
-    const processedStudents = students.map(imageToBase64);
+    const processedStudents = students.map((student) => {
+      if (!student.status || student.status === "") {
+        student.status = "active";
+      }
+      return student;
+    });
 
     res.status(200).json({
       success: true,
@@ -492,7 +568,7 @@ export const getStudentsByStatus = async (req, res) => {
   }
 };
 
-// ⚡ OPTIMIZED: Get Students with Pagination
+// ⚡ OPTIMIZED: Get Students with Pagination WITHOUT images
 export const getStudentsPaginated = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -501,13 +577,11 @@ export const getStudentsPaginated = async (req, res) => {
 
     const { class: classFilter, section, status, search } = req.query;
 
-    // Build query
     let query = {};
 
     if (classFilter) query.class = classFilter;
     if (section) query.section = section;
 
-    // Handle status filter
     if (status === "active") {
       query.$or = [
         { status: "active" },
@@ -518,7 +592,6 @@ export const getStudentsPaginated = async (req, res) => {
       query.status = status;
     }
 
-    // Handle search
     if (search) {
       query.$or = [
         { studentName: { $regex: search, $options: "i" } },
@@ -527,11 +600,10 @@ export const getStudentsPaginated = async (req, res) => {
       ];
     }
 
-    // Use parallel execution for count and data fetch
     const [total, students] = await Promise.all([
       Student.countDocuments(query),
       Student.find(query)
-        .select("-__v")
+        .select("-__v -img") // EXCLUDE images
         .sort({ rollNumber: 1 })
         .skip(skip)
         .limit(limit)
@@ -539,7 +611,12 @@ export const getStudentsPaginated = async (req, res) => {
         .exec(),
     ]);
 
-    const processedStudents = students.map(imageToBase64);
+    const processedStudents = students.map((student) => {
+      if (!student.status || student.status === "") {
+        student.status = "active";
+      }
+      return student;
+    });
 
     res.status(200).json({
       success: true,

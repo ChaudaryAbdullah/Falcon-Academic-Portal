@@ -9,11 +9,11 @@ const BACKEND = import.meta.env.VITE_BACKEND;
 const CACHE_TTL = {
   students: 5 * 60 * 1000, // 5 minutes
   teachers: 5 * 60 * 1000, // 5 minutes
-  feeStructures: 10 * 60 * 1000, // 10 minutes (changes less frequently)
+  feeStructures: 10 * 60 * 1000, // 10 minutes
   studentDiscounts: 5 * 60 * 1000, // 5 minutes
-  feeChallans: 2 * 60 * 1000, // 2 minutes (changes frequently)
+  feeChallans: 2 * 60 * 1000, // 2 minutes
   paperFundChallans: 2 * 60 * 1000, // 2 minutes
-  subjects: 15 * 60 * 1000, // 15 minutes (rarely changes)
+  subjects: 15 * 60 * 1000, // 15 minutes
   exams: 10 * 60 * 1000, // 10 minutes
   results: 5 * 60 * 1000, // 5 minutes
 };
@@ -29,10 +29,9 @@ class ApiService {
     this.api = axios.create({
       baseURL: BACKEND,
       withCredentials: true,
-      timeout: 800000, // 8 min timeout
+      timeout: 30000, // 30 second timeout
     });
 
-    // Add response interceptor for error handling
     this.api.interceptors.response.use(
       (response) => response,
       (error) => {
@@ -42,9 +41,6 @@ class ApiService {
     );
   }
 
-  /**
-   * Generic fetch with caching
-   */
   private async fetchWithCache<T>(
     key: string,
     fetchFn: () => Promise<T>,
@@ -53,7 +49,6 @@ class ApiService {
   ): Promise<T> {
     const { forceRefresh = false } = options;
 
-    // Check cache first (unless force refresh)
     if (!forceRefresh) {
       const cached = cacheManager.get<T>(key);
       if (cached !== null) {
@@ -69,7 +64,6 @@ class ApiService {
       cacheManager.set(key, data, ttl);
       return data;
     } catch (error) {
-      // If fetch fails but we have stale cache, return it
       const staleCache = cacheManager.get<T>(key);
       if (staleCache !== null) {
         console.warn(`Fetch failed, returning stale cache for: ${key}`);
@@ -79,25 +73,11 @@ class ApiService {
     }
   }
 
-  /**
-   * Strip heavy data (like images) for lighter caching
-   */
-  //   private stripHeavyData<T extends Record<string, any>>(
-  //     data: T[],
-  //     fieldsToRemove: string[] = ["img"],
-  //   ): T[] {
-  //     return data.map((item) => {
-  //       const stripped = { ...item };
-  //       fieldsToRemove.forEach((field) => {
-  //         if (field in stripped) {
-  //           delete stripped[field];
-  //         }
-  //       });
-  //       return stripped;
-  //     });
-  //   }
+  // ============ STUDENTS (OPTIMIZED) ============
 
-  // ============ STUDENTS ============
+  /**
+   * Get all students WITHOUT images (fast, cached)
+   */
   async getStudents(options: FetchOptions = {}): Promise<any[]> {
     return this.fetchWithCache(
       "students",
@@ -110,27 +90,93 @@ class ApiService {
     );
   }
 
-  // For when you need students with images (not cached to avoid size issues)
+  /**
+   * Get students with lightweight data (hasImage flag only)
+   */
+  async getStudentsLight(options: FetchOptions = {}): Promise<any[]> {
+    return this.fetchWithCache(
+      "students_light",
+      async () => {
+        const res = await this.api.get("/api/students/light");
+        return res.data.data || [];
+      },
+      CACHE_TTL.students,
+      options,
+    );
+  }
+
+  /**
+   * Get paginated students WITHOUT images (fast)
+   */
+  async getStudentsPaginated(
+    page: number = 1,
+    limit: number = 50,
+    filters: any = {},
+  ): Promise<any> {
+    const cacheKey = `students_page_${page}_${limit}_${JSON.stringify(filters)}`;
+
+    return this.fetchWithCache(
+      cacheKey,
+      async () => {
+        const res = await this.api.get("/api/students/paginated", {
+          params: { page, limit, ...filters },
+        });
+        return res.data;
+      },
+      CACHE_TTL.students,
+    );
+  }
+
+  /**
+   * Get single student WITH image
+   */
+  async getStudentById(id: string): Promise<any> {
+    const res = await this.api.get(`/api/students/${id}`);
+    return res.data.data;
+  }
+
+  /**
+   * Get student image URL
+   */
+  getStudentImageUrl(id: string): string {
+    return `${BACKEND}/api/students/${id}/image`;
+  }
+
+  /**
+   * Load multiple student images in batch
+   */
+  async loadStudentImages(ids: string[]): Promise<Record<string, any>> {
+    const res = await this.api.post("/api/students/images/batch", { ids });
+    return res.data.data || {};
+  }
+
+  /**
+   * For when you absolutely need students with images (avoid if possible)
+   */
   async getStudentsWithImages(): Promise<any[]> {
+    console.warn(
+      "Loading students with images - this is slow! Consider using lazy loading instead.",
+    );
     const res = await this.api.get("/api/students");
     return res.data.data || [];
   }
 
   async createStudent(data: any): Promise<any> {
     const res = await this.api.post("/api/students", data);
-    cacheManager.delete("students");
+    // Clear all student-related caches
+    cacheManager.invalidateByPrefix("students");
     return res.data;
   }
 
   async updateStudent(id: string, data: any): Promise<any> {
     const res = await this.api.put(`/api/students/${id}`, data);
-    cacheManager.delete("students");
+    cacheManager.invalidateByPrefix("students");
     return res.data;
   }
 
   async deleteStudent(id: string): Promise<any> {
     const res = await this.api.delete(`/api/students/${id}`);
-    cacheManager.delete("students");
+    cacheManager.invalidateByPrefix("students");
     return res.data;
   }
 
@@ -387,29 +433,18 @@ class ApiService {
   }
 
   // ============ UTILITY METHODS ============
-
-  /**
-   * Clear all caches
-   */
   clearAllCaches(): void {
     cacheManager.clear();
   }
 
-  /**
-   * Get cache statistics
-   */
   getCacheStats() {
     return cacheManager.getStats();
   }
 
-  /**
-   * Get the axios instance for custom requests
-   */
   getAxiosInstance(): AxiosInstance {
     return this.api;
   }
 }
 
-// Export singleton instance
 export const apiService = new ApiService();
 export default ApiService;
