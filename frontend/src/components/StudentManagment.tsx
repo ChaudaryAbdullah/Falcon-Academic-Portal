@@ -2,7 +2,7 @@
 
 import type React from "react";
 import axios from "axios";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -87,6 +87,8 @@ import {
   Printer,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLazyStudentImages } from "../hooks/useLazyStudentImages";
+import { LazyStudentImage } from "./LazyStudentImage";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -179,6 +181,7 @@ export function StudentManagement({
   students,
   setStudents,
 }: StudentManagementProps) {
+  const { images, loadImages } = useLazyStudentImages();
   const [formData, setFormData] = useState<Omit<Student, "_id">>({
     rollNumber: "",
     studentName: "",
@@ -1102,6 +1105,10 @@ export function StudentManagement({
     Math.ceil(filteredStudents.length / studentsPerPage),
   );
 
+  useEffect(() => {
+    const visibleIds = currentStudents.map((s) => s._id);
+    loadImages(visibleIds);
+  }, [currentStudents, loadImages]);
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
@@ -2196,17 +2203,12 @@ export function StudentManagement({
                         >
                           {columnVisibility.image && (
                             <TableCell>
-                              {getImageUrl(student) ? (
-                                <img
-                                  src={getImageUrl(student)!}
-                                  alt={`${student.studentName}'s photo`}
-                                  className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-lg border"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-                                  <User className="h-4 w-4 sm:h-6 sm:w-6 text-gray-400" />
-                                </div>
-                              )}
+                              <LazyStudentImage
+                                studentId={student._id}
+                                studentName={student.studentName}
+                                imageUrl={images[student._id]}
+                                onLoadImage={(id) => loadImages([id])}
+                              />
                             </TableCell>
                           )}
                           {columnVisibility.rollNumber && (
