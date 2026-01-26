@@ -9,7 +9,7 @@ export const createPaperFund = async (req, res) => {
       .findById(record._id)
       .populate(
         "studentId",
-        "studentName fatherName mPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section",
       );
     res.status(201).json({ success: true, data: populated });
   } catch (error) {
@@ -17,16 +17,18 @@ export const createPaperFund = async (req, res) => {
   }
 };
 
-// Get All PaperFund Records
+// Get All PaperFund Records - OPTIMIZED
 export const getPaperFunds = async (req, res) => {
   try {
     const funds = await paperFund
       .find({})
       .populate(
         "studentId",
-        "studentName fatherName mPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section",
       )
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
 
     const transformed = funds.map((fund) => ({
       id: fund._id.toString(),
@@ -61,7 +63,7 @@ export const getPaperFundById = async (req, res) => {
       .findById(req.params.id)
       .populate(
         "studentId",
-        "studentName fatherName mPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section",
       );
     if (!fund)
       return res
@@ -83,7 +85,7 @@ export const updatePaperFund = async (req, res) => {
       })
       .populate(
         "studentId",
-        "studentName fatherName mPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section",
       );
 
     if (!fund)
@@ -121,7 +123,7 @@ export const getPaperFundByStudentId = async (req, res) => {
       .find({ studentId })
       .populate(
         "studentId",
-        "studentName fatherName mPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section",
       );
 
     if (!funds || funds.length === 0) {
@@ -154,7 +156,7 @@ export const bulkUpdatePaperFundStatus = async (req, res) => {
     }
 
     const validObjectIds = ids.filter((id) =>
-      mongoose.Types.ObjectId.isValid(id)
+      mongoose.Types.ObjectId.isValid(id),
     );
     if (validObjectIds.length === 0) {
       return res.status(400).json({ success: false, message: "No valid IDs" });
@@ -166,14 +168,14 @@ export const bulkUpdatePaperFundStatus = async (req, res) => {
 
     const result = await paperFund.updateMany(
       { _id: { $in: validObjectIds } },
-      { $set: updateData }
+      { $set: updateData },
     );
 
     const updated = await paperFund
       .find({ _id: { $in: validObjectIds } })
       .populate(
         "studentId",
-        "studentName fatherName mPhoneNumber rollNumber class section"
+        "studentName fatherName mPhoneNumber rollNumber class section",
       );
 
     res.status(200).json({
@@ -228,7 +230,7 @@ export const generateBulkPaperFund = async (req, res) => {
           .findById(newRecord._id)
           .populate(
             "studentId",
-            "studentName fatherName mPhoneNumber rollNumber class section"
+            "studentName fatherName mPhoneNumber rollNumber class section",
           );
 
         // Transform to match frontend format

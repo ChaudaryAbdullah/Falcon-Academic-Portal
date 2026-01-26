@@ -22,6 +22,9 @@ interface FetchOptions {
   forceRefresh?: boolean;
 }
 
+// Track pending requests to prevent duplicate calls
+const pendingRequests = new Map<string, Promise<any>>();
+
 class ApiService {
   private api: AxiosInstance;
 
@@ -49,6 +52,12 @@ class ApiService {
   ): Promise<T> {
     const { forceRefresh = false } = options;
 
+    // Check if request is already pending
+    if (pendingRequests.has(key)) {
+      console.log(`Deduplicating request: ${key}`);
+      return pendingRequests.get(key)!;
+    }
+
     if (!forceRefresh) {
       const cached = cacheManager.get<T>(key);
       if (cached !== null) {
@@ -59,18 +68,28 @@ class ApiService {
 
     console.log(`Cache miss: ${key}, fetching...`);
 
-    try {
-      const data = await fetchFn();
-      cacheManager.set(key, data, ttl);
-      return data;
-    } catch (error) {
-      const staleCache = cacheManager.get<T>(key);
-      if (staleCache !== null) {
-        console.warn(`Fetch failed, returning stale cache for: ${key}`);
-        return staleCache;
+    // Create the promise and store it
+    const fetchPromise = (async () => {
+      try {
+        const data = await fetchFn();
+        cacheManager.set(key, data, ttl);
+        return data;
+      } catch (error) {
+        const staleCache = cacheManager.get<T>(key);
+        if (staleCache !== null) {
+          console.warn(`Fetch failed, returning stale cache for: ${key}`);
+          return staleCache;
+        }
+        throw error;
+      } finally {
+        // Remove from pending requests when done
+        pendingRequests.delete(key);
       }
-      throw error;
-    }
+    })();
+
+    // Store the pending request
+    pendingRequests.set(key, fetchPromise);
+    return fetchPromise;
   }
 
   // ============ STUDENTS (OPTIMIZED) ============

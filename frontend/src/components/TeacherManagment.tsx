@@ -2,7 +2,7 @@
 
 import type React from "react";
 import axios from "axios";
-import { useState } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import {
   Card,
   CardContent,
@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "./ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 const BACKEND = import.meta.env.VITE_BACKEND; // your backend URL
 
@@ -43,6 +43,22 @@ interface TeacherManagementProps {
   setTeachers: (teachers: Teacher[]) => void;
 }
 
+// Memoized teacher row to prevent re-renders
+const TeacherRow = memo(({ teacher }: { teacher: Teacher }) => (
+  <TableRow>
+    <TableCell className="font-medium">{teacher.fullName}</TableCell>
+    <TableCell>{teacher.fatherHusbandName}</TableCell>
+    <TableCell>
+      Rs. {Number.parseInt(teacher.salary).toLocaleString()}
+    </TableCell>
+    <TableCell>{teacher.cnic}</TableCell>
+    <TableCell>{new Date(teacher.dob).toLocaleDateString()}</TableCell>
+    <TableCell>{teacher.phoneNumber}</TableCell>
+    <TableCell>{teacher.email}</TableCell>
+  </TableRow>
+));
+TeacherRow.displayName = "TeacherRow";
+
 export function TeacherManagement({
   teachers,
   setTeachers,
@@ -58,49 +74,63 @@ export function TeacherManagement({
     password: "",
   });
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const teachersPerPage = 20;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
 
-    try {
-      // Send formData to backend API
-      const response = await axios.post(`${BACKEND}/api/teachers`, formData);
-      toast.success("Teacher added successfully!");
-      // Backend returns created student object
-      const newTeacher = response.data.data;
-      setTeachers([...teachers, newTeacher]);
-      setFormData({
-        fullName: "",
-        fatherHusbandName: "",
-        salary: "",
-        cnic: "",
-        dob: "",
-        phoneNumber: "",
-        email: "",
-        password: "",
-      });
-    } catch (error) {
-      console.error("Error adding Teacher:", error);
-      toast.error("Failed to add Teacher. Please try again.");
-    }
-  };
-
-  const handleInputChange = (
-    field: keyof Omit<Teacher, "id">,
-    value: string
-  ) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const filteredTeachers = teachers.filter(
-    (teacher) =>
-      teacher.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      teacher.fatherHusbandName
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      teacher.cnic.includes(searchTerm) ||
-      teacher.email.toLowerCase().includes(searchTerm.toLowerCase())
+      try {
+        const response = await axios.post(`${BACKEND}/api/teachers`, formData);
+        toast.success("Teacher added successfully!");
+        const newTeacher = response.data.data;
+        setTeachers([...teachers, newTeacher]);
+        setFormData({
+          fullName: "",
+          fatherHusbandName: "",
+          salary: "",
+          cnic: "",
+          dob: "",
+          phoneNumber: "",
+          email: "",
+          password: "",
+        });
+      } catch (error) {
+        console.error("Error adding Teacher:", error);
+        toast.error("Failed to add Teacher. Please try again.");
+      }
+    },
+    [formData, teachers, setTeachers],
   );
+
+  const handleInputChange = useCallback(
+    (field: keyof Omit<Teacher, "id">, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    },
+    [],
+  );
+
+  const filteredTeachers = useMemo(
+    () =>
+      teachers.filter(
+        (teacher) =>
+          teacher.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          teacher.fatherHusbandName
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          teacher.cnic.includes(searchTerm) ||
+          teacher.email.toLowerCase().includes(searchTerm.toLowerCase()),
+      ),
+    [teachers, searchTerm],
+  );
+
+  const paginatedTeachers = useMemo(() => {
+    const startIndex = (currentPage - 1) * teachersPerPage;
+    return filteredTeachers.slice(startIndex, startIndex + teachersPerPage);
+  }, [filteredTeachers, currentPage]);
+
+  const totalPages = Math.ceil(filteredTeachers.length / teachersPerPage);
 
   return (
     <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
@@ -232,7 +262,7 @@ export function TeacherManagement({
         <TabsContent value="list">
           <Card>
             <CardHeader>
-              <CardTitle>Teachers List ({teachers.length})</CardTitle>
+              <CardTitle>Teachers List ({filteredTeachers.length})</CardTitle>
               <CardDescription>
                 View and search all registered teachers
               </CardDescription>
@@ -241,7 +271,10 @@ export function TeacherManagement({
                 <Input
                   placeholder="Search teachers..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1); // Reset to first page on search
+                  }}
                   className="max-w-sm"
                 />
               </div>
@@ -261,39 +294,55 @@ export function TeacherManagement({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredTeachers.length === 0 ? (
+                    {paginatedTeachers.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
-                          className="text-center text-muted-foreground"
+                          colSpan={7}
+                          className="text-center text-muted-foreground py-8"
                         >
-                          No teachers found
+                          {filteredTeachers.length === 0
+                            ? "No teachers found"
+                            : "Loading..."}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredTeachers.map((teacher) => (
-                        <TableRow key={teacher._id}>
-                          <TableCell className="font-medium">
-                            {teacher.fullName}
-                          </TableCell>
-                          <TableCell>{teacher.fatherHusbandName}</TableCell>
-                          <TableCell>
-                            Rs.{" "}
-                            {Number.parseInt(teacher.salary).toLocaleString()}
-                          </TableCell>
-                          <TableCell>{teacher.cnic}</TableCell>
-                          <TableCell>
-                            {" "}
-                            {new Date(teacher.dob).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>{teacher.phoneNumber}</TableCell>
-                          <TableCell>{teacher.email}</TableCell>
-                        </TableRow>
+                      paginatedTeachers.map((teacher) => (
+                        <TeacherRow key={teacher._id} teacher={teacher} />
                       ))
                     )}
                   </TableBody>
                 </Table>
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <span className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages} (
+                    {filteredTeachers.length} total)
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
