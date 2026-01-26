@@ -93,7 +93,7 @@ export function ViewRecordsTab({
     try {
       if (!challan.studentId.mPhoneNumber) {
         toast.error(
-          `Phone number not available for ${challan.studentId.studentName}. Please update the student's phone number first.`
+          `Phone number not available for ${challan.studentId.studentName}. Please update the student's phone number first.`,
         );
         return;
       }
@@ -113,7 +113,7 @@ export function ViewRecordsTab({
           phoneNumber = "92" + phoneNumber;
         } else {
           toast.error(
-            `Invalid phone number format for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`
+            `Invalid phone number format for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`,
           );
           return;
         }
@@ -121,7 +121,7 @@ export function ViewRecordsTab({
 
       if (phoneNumber.length < 12 || phoneNumber.length > 13) {
         toast.error(
-          `Invalid phone number length for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`
+          `Invalid phone number length for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`,
         );
         return;
       }
@@ -141,7 +141,7 @@ export function ViewRecordsTab({
             ) {
               dueDate = `${currentYear}-${String(currentMonth + 1).padStart(
                 2,
-                "0"
+                "0",
               )}-10`;
             } else {
               const tomorrow = new Date(today);
@@ -197,8 +197,8 @@ ${
   challan.status === "paid"
     ? "Thank you for your payment!"
     : challan.status === "overdue"
-    ? "This payment is overdue. Please pay as soon as possible to avoid additional charges."
-    : "Please pay before the due date to avoid late fees."
+      ? "This payment is overdue. Please pay as soon as possible to avoid additional charges."
+      : "Please pay before the due date to avoid late fees."
 }
 
 Best regards,
@@ -206,7 +206,7 @@ Falcon House School Administration
     `.trim();
 
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
-        message
+        message,
       )}`;
 
       window.open(whatsappUrl, "_blank");
@@ -215,12 +215,12 @@ Falcon House School Administration
         await axios.patch(
           `${BACKEND}/api/fees/${challan.id}/whatsapp`,
           { sentToWhatsApp: true },
-          { withCredentials: true }
+          { withCredentials: true },
         );
 
         setChallans(((prevChallans: FeeChallan[]) =>
           prevChallans.map((c) =>
-            c.id === challan.id ? { ...c, sentToWhatsApp: true } : c
+            c.id === challan.id ? { ...c, sentToWhatsApp: true } : c,
           )) as unknown as FeeChallan[]);
       } catch (error) {
         console.error("Error updating WhatsApp status:", error);
@@ -255,8 +255,8 @@ Falcon House School Administration
           const base64String = btoa(
             data.data.reduce(
               (acc: string, byte: number) => acc + String.fromCharCode(byte),
-              ""
-            )
+              "",
+            ),
           );
           return `data:${contentType};base64,${base64String}`;
         }
@@ -266,8 +266,8 @@ Falcon House School Administration
           const base64String = btoa(
             Array.from(data).reduce(
               (acc: string, byte: number) => acc + String.fromCharCode(byte),
-              ""
-            )
+              "",
+            ),
           );
           return `data:${contentType};base64,${base64String}`;
         }
@@ -277,8 +277,8 @@ Falcon House School Administration
           const base64String = btoa(
             new Uint8Array(data).reduce(
               (acc: string, byte: number) => acc + String.fromCharCode(byte),
-              ""
-            )
+              "",
+            ),
           );
           return `data:${contentType};base64,${base64String}`;
         }
@@ -488,8 +488,8 @@ Falcon House School Administration
             <p><strong>Father Name:</strong> ${challan.studentId.fatherName}</p>
             <p><strong>Reg Number:</strong> ${challan.studentId.rollNumber}</p>
             <p><strong>Class:</strong> ${challan.studentId.class} ${
-      challan.studentId.section
-    }</p>
+              challan.studentId.section
+            }</p>
             <p><strong>Month/Year:</strong> ${challan.month} ${challan.year}</p>
             <p><strong>Due Date:</strong> ${challan.dueDate}</p>
             <p><strong>Challan code:</strong> ${
@@ -650,7 +650,7 @@ Falcon House School Administration
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentChallans = filteredChallans.slice(
     indexOfFirstItem,
-    indexOfLastItem
+    indexOfLastItem,
   );
 
   const totalPages = Math.ceil(filteredChallans.length / itemsPerPage);
