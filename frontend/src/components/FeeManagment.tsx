@@ -94,7 +94,7 @@ interface FeeManagementProps {
   setFeeStructure: (feeStuctures: ClassFeeStructure[]) => void;
   studentDiscounts: StudentDiscount[];
   challans: FeeChallan[];
-  setChallans: (challans: FeeChallan[]) => void;
+  setChallans: (challans: FeeChallan[] | ((prev: FeeChallan[]) => FeeChallan[])) => void;
 }
 
 export function FeeManagement({
