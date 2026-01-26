@@ -74,7 +74,7 @@ const feeSchema = mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Ensure one fee record per student per month
