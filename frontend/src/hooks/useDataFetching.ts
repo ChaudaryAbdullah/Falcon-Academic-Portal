@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { apiService } from "../services/apiService";
+// import { apiService } from "../services/apiService";
 
 /**
  * Hook for paginated data fetching with built-in optimization
@@ -83,7 +83,7 @@ export function useApiMetrics() {
     averageResponseTime: 0,
   });
 
-  const requestStartTime = useRef(0);
+  //   const requestStartTime = useRef(0);
 
   const logRequest = useCallback(
     (isCacheHit: boolean, responseTime: number) => {
