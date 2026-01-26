@@ -7,7 +7,7 @@ export const createFee = async (req, res) => {
     const fee = await Fee.create(req.body);
     const populatedFee = await Fee.findById(fee._id).populate(
       "studentId",
-      "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
     );
     res.status(201).json({ success: true, data: populatedFee });
   } catch (error) {
@@ -15,15 +15,17 @@ export const createFee = async (req, res) => {
   }
 };
 
-// Get All Fee Records
+// Get All Fee Records - OPTIMIZED
 export const getFees = async (req, res) => {
   try {
     const fees = await Fee.find({})
       .populate(
         "studentId",
-        "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
+        "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
       )
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean() // Add .lean() for better performance
+      .exec();
 
     // Transform data to match frontend expectations
     const transformedFees = fees.map((fee) => ({
@@ -112,7 +114,7 @@ export const generateBulkFees = async (req, res) => {
         const newFee = await Fee.create(feeData);
         const populatedFee = await Fee.findById(newFee._id).populate(
           "studentId",
-          "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
+          "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
         );
 
         createdChallans.push(populatedFee);
@@ -140,7 +142,7 @@ export const getFeeById = async (req, res) => {
   try {
     const fee = await Fee.findById(req.params.id).populate(
       "studentId",
-      "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
     );
     if (!fee)
       return res
@@ -160,7 +162,7 @@ export const updateFee = async (req, res) => {
       runValidators: true,
     }).populate(
       "studentId",
-      "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
     );
 
     if (!fee)
@@ -196,7 +198,7 @@ export const getFeeByStudentId = async (req, res) => {
 
     const fees = await Fee.find({ studentId }).populate(
       "studentId",
-      "img studentName fatherName mPhoneNumber rollNumber class section"
+      "img studentName fatherName mPhoneNumber rollNumber class section",
     );
 
     if (!fees || fees.length === 0) {
@@ -268,7 +270,7 @@ export const bulkUpdateFeeStatus = async (req, res) => {
     // Update the fees
     const result = await Fee.updateMany(
       { _id: { $in: validObjectIds } },
-      { $set: updateData }
+      { $set: updateData },
     );
 
     if (result.matchedCount === 0) {
@@ -283,7 +285,7 @@ export const bulkUpdateFeeStatus = async (req, res) => {
       _id: { $in: validObjectIds },
     }).populate(
       "studentId",
-      "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
     );
 
     res.status(200).json({
@@ -313,10 +315,10 @@ export const updateWhatsAppStatus = async (req, res) => {
     const fee = await Fee.findByIdAndUpdate(
       feeId,
       { sentToWhatsApp: sentToWhatsApp },
-      { new: true }
+      { new: true },
     ).populate(
       "studentId",
-      "img studentName fatherName mPhoneNumber rollNumber class section discountCode"
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
     );
 
     if (!fee) {
@@ -442,7 +444,7 @@ export const getClassSectionReport = async (req, res) => {
           section: 1,
           studentName: 1,
         },
-      }
+      },
     );
 
     const reportData = await Fee.aggregate(pipeline);
@@ -452,15 +454,15 @@ export const getClassSectionReport = async (req, res) => {
       totalStudents: reportData.length,
       totalExpected: reportData.reduce(
         (sum, record) => sum + (record.totalFee || 0),
-        0
+        0,
       ),
       totalCollected: reportData.reduce(
         (sum, record) => sum + (record.paidAmount || 0),
-        0
+        0,
       ),
       totalPending: reportData.reduce(
         (sum, record) => sum + (record.pendingAmount || 0),
-        0
+        0,
       ),
     };
 
@@ -493,7 +495,7 @@ export const getStudentReport = async (req, res) => {
     const fees = await Fee.find({ studentId })
       .populate(
         "studentId",
-        "img studentName fatherName mPhoneNumber rollNumber class section"
+        "img studentName fatherName mPhoneNumber rollNumber class section",
       )
       .sort({ year: -1, month: -1 });
 
@@ -791,7 +793,7 @@ export const getDailyReport = async (req, res) => {
     // Calculate summary statistics
     const totalCollected = dailyTransactions.reduce(
       (sum, transaction) => sum + (transaction.amount || 0),
-      0
+      0,
     );
 
     // Get total expected for the day (all pending fees that were due on or before this date)
@@ -905,12 +907,12 @@ export const getDailyCollectionSummary = async (req, res) => {
     // Calculate total for the period
     const periodTotal = dailySummary.reduce(
       (sum, day) => sum + day.totalCollected,
-      0
+      0,
     );
 
     const totalTransactions = dailySummary.reduce(
       (sum, day) => sum + day.transactionCount,
-      0
+      0,
     );
 
     res.status(200).json({
@@ -1006,7 +1008,8 @@ export const getTodayCollectionSummary = async (req, res) => {
     const percentageChange =
       yesterdayTotal > 0
         ? Math.round(
-            ((todayData.totalCollected - yesterdayTotal) / yesterdayTotal) * 100
+            ((todayData.totalCollected - yesterdayTotal) / yesterdayTotal) *
+              100,
           )
         : 0;
 
@@ -1188,7 +1191,7 @@ export const submitPartialPayment = async (req, res) => {
       const paymentForThisFee = Math.min(remainingAmount, totalRequired);
       const newRemainingBalance = Math.max(
         0,
-        totalRequired - paymentForThisFee
+        totalRequired - paymentForThisFee,
       );
       const newStatus = newRemainingBalance <= 0 ? "paid" : "pending";
 
@@ -1218,7 +1221,7 @@ export const submitPartialPayment = async (req, res) => {
         runValidators: true,
       }).populate(
         "studentId",
-        "img studentName fatherName mPhoneNumber rollNumber class section"
+        "img studentName fatherName mPhoneNumber rollNumber class section",
       );
 
       if (!updatedFee) {
@@ -1244,7 +1247,7 @@ export const submitPartialPayment = async (req, res) => {
 
     // Log the transaction for audit purposes
     console.log(
-      `Partial payment processed: Student ${studentId}, Amount: ${amount}, Fees updated: ${updatedFees.length}`
+      `Partial payment processed: Student ${studentId}, Amount: ${amount}, Fees updated: ${updatedFees.length}`,
     );
 
     res.status(200).json({
@@ -1286,7 +1289,7 @@ export const getPartialPaymentSummary = async (req, res) => {
 
     // Convert string IDs to ObjectIds
     const validObjectIds = selectedFeeIds.map(
-      (id) => new mongoose.Types.ObjectId(id)
+      (id) => new mongoose.Types.ObjectId(id),
     );
 
     const fees = await Fee.find({
@@ -1295,7 +1298,7 @@ export const getPartialPaymentSummary = async (req, res) => {
       status: { $in: ["pending", "overdue"] },
     }).populate(
       "studentId",
-      "img studentName fatherName mPhoneNumber rollNumber class section"
+      "img studentName fatherName mPhoneNumber rollNumber class section",
     );
 
     const summary = fees.map((fee) => ({
@@ -1313,7 +1316,7 @@ export const getPartialPaymentSummary = async (req, res) => {
 
     const totalOutstanding = summary.reduce(
       (sum, fee) => sum + fee.remainingBalance,
-      0
+      0,
     );
 
     res.status(200).json({

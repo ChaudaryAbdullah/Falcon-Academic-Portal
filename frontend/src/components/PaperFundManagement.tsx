@@ -1,6 +1,6 @@
 "use client";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { GeneratePaperFundTab } from "./tabs/GeneratePaperFund";
 import { SubmitPaperFundPaymentTab } from "./tabs/SubmitPaperFund";
@@ -72,7 +72,7 @@ interface PaperFundManagementProps {
   setChallans: (
     challans:
       | PaperFundChallan[]
-      | ((prev: PaperFundChallan[]) => PaperFundChallan[])
+      | ((prev: PaperFundChallan[]) => PaperFundChallan[]),
   ) => void;
 }
 
@@ -83,28 +83,82 @@ export function PaperFundManagement({
   setChallans,
 }: PaperFundManagementProps) {
   const [whatsappMessage] = useState(
-    "Dear {fatherName}, this is a reminder that the paper fund for {studentName} (Roll No: {rollNumber}) is due on {dueDate}. The amount due is {paperFundAmount}. Please ensure timely payment to avoid any inconvenience. Thank you."
+    "Dear {fatherName}, this is a reminder that the paper fund for {studentName} (Roll No: {rollNumber}) is due on {dueDate}. The amount due is {paperFundAmount}. Please ensure timely payment to avoid any inconvenience. Thank you.",
+  );
+  const hasInitialized = useRef(false);
+
+  const updateOverdueStatuses = useCallback(
+    (challansData: PaperFundChallan[]): PaperFundChallan[] => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      return challansData.map((challan) => {
+        if (challan.status === "pending" && challan.dueDate) {
+          const dueDate = new Date(challan.dueDate);
+          dueDate.setHours(0, 0, 0, 0);
+
+          if (dueDate < today) {
+            return {
+              ...challan,
+              status: "overdue" as const,
+            };
+          }
+        }
+        return challan;
+      });
+    },
+    [],
   );
 
+  const syncOverdueStatusesWithBackend = useCallback(
+    async (updatedChallans: PaperFundChallan[]) => {
+      try {
+        const overdueChallans = updatedChallans.filter(
+          (challan) => challan.status === "overdue",
+        );
+
+        if (overdueChallans.length > 0) {
+          const feeIdsToUpdate = overdueChallans.map((c) => c.id);
+          await axios.patch(
+            `${BACKEND}/api/paperFund/bulk-update`,
+            {
+              ids: feeIdsToUpdate,
+              status: "overdue",
+            },
+            { withCredentials: true },
+          );
+
+          console.log(
+            `Updated ${overdueChallans.length} paper fund challans to overdue status`,
+          );
+        }
+      } catch (error) {
+        console.error("Error syncing overdue statuses with backend:", error);
+      }
+    },
+    [],
+  );
+
+  // Initialize overdue statuses once
   useEffect(() => {
-    // Only run if challans exist
-    if (!challans || challans.length === 0) {
+    if (!challans || challans.length === 0 || hasInitialized.current) {
       return;
     }
 
+    hasInitialized.current = true;
     const updatedChallans = updateOverdueStatuses(challans);
-
-    // Only update if there are actual changes
     const hasChanges = updatedChallans.some(
-      (challan, index) => challan.status !== challans[index]?.status
+      (challan, index) => challan.status !== challans[index]?.status,
     );
 
     if (hasChanges) {
       setChallans(updatedChallans);
-      syncOverdueStatusesWithBackend(updatedChallans, challans);
+      syncOverdueStatusesWithBackend(updatedChallans);
     }
+  }, []);
 
-    // Set up interval for checking overdue statuses every hour
+  // Check overdue statuses every 60 minutes
+  useEffect(() => {
     const checkOverdueInterval = setInterval(() => {
       setChallans((prevChallans: PaperFundChallan[]) => {
         if (!prevChallans || prevChallans.length === 0) {
@@ -113,76 +167,19 @@ export function PaperFundManagement({
 
         const updatedChallans = updateOverdueStatuses(prevChallans);
         const hasChanges = updatedChallans.some(
-          (challan, index) => challan.status !== prevChallans[index]?.status
+          (challan, index) => challan.status !== prevChallans[index]?.status,
         );
 
         if (hasChanges) {
-          syncOverdueStatusesWithBackend(updatedChallans, prevChallans);
+          syncOverdueStatusesWithBackend(updatedChallans);
           return updatedChallans;
         }
         return prevChallans;
       });
-    }, 60 * 60 * 1000); // Check every hour instead of 100 * 60 * 1000
+    }, 60 * 60 * 1000); // Check every 60 minutes
 
     return () => clearInterval(checkOverdueInterval);
-  }, [challans]); // Only re-run when challans array length changes
-
-  const updateOverdueStatuses = (
-    challansData: PaperFundChallan[]
-  ): PaperFundChallan[] => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return challansData.map((challan) => {
-      if (challan.status === "pending" && challan.dueDate) {
-        const dueDate = new Date(challan.dueDate);
-        dueDate.setHours(0, 0, 0, 0);
-
-        if (dueDate < today) {
-          return {
-            ...challan,
-            status: "overdue" as const,
-          };
-        }
-      }
-      return challan;
-    });
-  };
-
-  const syncOverdueStatusesWithBackend = async (
-    updatedChallans: PaperFundChallan[],
-    originalChallans: PaperFundChallan[]
-  ) => {
-    try {
-      const overdueChallans = updatedChallans.filter((challan, index) => {
-        const originalChallan = originalChallans[index];
-        return (
-          originalChallan &&
-          originalChallan.status === "pending" &&
-          challan.status === "overdue"
-        );
-      });
-
-      if (overdueChallans.length > 0) {
-        const feeIdsToUpdate = overdueChallans.map((c) => c.id);
-        await axios.patch(
-          `${BACKEND}/api/paperFund/bulk-update`,
-          {
-            ids: feeIdsToUpdate,
-            status: "overdue",
-          },
-          { withCredentials: true }
-        );
-
-        console.log(
-          `Updated ${overdueChallans.length} paper fund challans to overdue status`
-        );
-      }
-    } catch (error) {
-      console.error("Error syncing overdue statuses with backend:", error);
-      // Optionally show user notification about sync failure
-    }
-  };
+  }, [updateOverdueStatuses, syncOverdueStatusesWithBackend]);
 
   return (
     <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">

@@ -1,6 +1,6 @@
 ("use client");
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { GenerateFeeTab } from "./tabs/GenerateFee";
 import { SubmitPaymentTab } from "./tabs/SubmitFee";
@@ -94,7 +94,7 @@ interface FeeManagementProps {
   setFeeStructure: (feeStuctures: ClassFeeStructure[]) => void;
   studentDiscounts: StudentDiscount[];
   challans: FeeChallan[];
-  setChallans: (challans: FeeChallan[]) => void;
+  setChallans: (challans: FeeChallan[] | ((prev: FeeChallan[]) => FeeChallan[])) => void;
 }
 
 export function FeeManagement({
@@ -106,80 +106,99 @@ export function FeeManagement({
   setChallans,
 }: FeeManagementProps) {
   const [whatsappMessage, setWhatsappMessage] = useState("");
+  const [isCheckingOverdue, setIsCheckingOverdue] = useState(false);
 
-  useEffect(() => {
-    const updatedChallans = updateOverdueStatuses(challans);
-    setChallans(updatedChallans);
-    syncOverdueStatusesWithBackend(updatedChallans);
-  }, []);
+  const updateOverdueStatuses = useCallback(
+    (challansData: FeeChallan[]): FeeChallan[] => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-  const updateOverdueStatuses = (challansData: FeeChallan[]): FeeChallan[] => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+      return challansData.map((challan) => {
+        if (challan.status === "pending" && challan.dueDate) {
+          const dueDate = new Date(challan.dueDate);
+          dueDate.setHours(0, 0, 0, 0);
 
-    return challansData.map((challan) => {
-      if (challan.status === "pending" && challan.dueDate) {
-        const dueDate = new Date(challan.dueDate);
-        dueDate.setHours(0, 0, 0, 0);
-
-        if (dueDate < today) {
-          return {
-            ...challan,
-            status: "overdue" as const,
-          };
+          if (dueDate < today) {
+            return {
+              ...challan,
+              status: "overdue" as const,
+            };
+          }
         }
-      }
-      return challan;
-    });
-  };
-
-  const syncOverdueStatusesWithBackend = async (
-    updatedChallans: FeeChallan[]
-  ) => {
-    try {
-      const overdueChallans = updatedChallans.filter((challan, index) => {
-        const originalChallan = challans[index];
-        return (
-          originalChallan &&
-          originalChallan.status === "pending" &&
-          challan.status === "overdue"
-        );
+        return challan;
       });
+    },
+    [],
+  );
 
-      if (overdueChallans.length > 0) {
-        const feeIdsToUpdate = overdueChallans.map((c) => c.id);
-        await axios.patch(
-          `${BACKEND}/api/fees/bulk-update`,
-          {
-            feeIds: feeIdsToUpdate,
-            status: "overdue",
-          },
-          { withCredentials: true }
-        );
-      }
-    } catch (error) {
-      console.error("Error syncing overdue statuses with backend:", error);
-    }
-  };
-
-  useEffect(() => {
-    const checkOverdueInterval = setInterval(() => {
-      setChallans(((prevChallans: FeeChallan[]) => {
-        const updatedChallans = updateOverdueStatuses(prevChallans);
-        const hasChanges = updatedChallans.some(
-          (challan, index) => challan.status !== prevChallans[index]?.status
+  const syncOverdueStatusesWithBackend = useCallback(
+    async (updatedChallans: FeeChallan[]) => {
+      try {
+        const overdueChallans = updatedChallans.filter(
+          (challan) => challan.status === "overdue",
         );
 
-        if (hasChanges) {
-          syncOverdueStatusesWithBackend(updatedChallans);
-          return updatedChallans;
+        if (overdueChallans.length > 0) {
+          const feeIdsToUpdate = overdueChallans.map((c) => c.id);
+          await axios.patch(
+            `${BACKEND}/api/fees/bulk-update`,
+            {
+              feeIds: feeIdsToUpdate,
+              status: "overdue",
+            },
+            { withCredentials: true },
+          );
         }
-        return prevChallans;
-      }) as unknown as FeeChallan[]);
-    }, 10 * 60 * 1000);
+      } catch (error) {
+        console.error("Error syncing overdue statuses with backend:", error);
+      }
+    },
+    [],
+  );
+
+  // Check overdue status once on mount
+  useEffect(() => {
+    if (challans.length === 0 || isCheckingOverdue) return;
+
+    setIsCheckingOverdue(true);
+    const updatedChallans = updateOverdueStatuses(challans);
+    const hasChanges = updatedChallans.some(
+      (challan, index) => challan.status !== challans[index]?.status,
+    );
+
+    if (hasChanges) {
+      setChallans(updatedChallans);
+      syncOverdueStatusesWithBackend(updatedChallans);
+    }
+    setIsCheckingOverdue(false);
+  }, []); // Only run once
+
+  // Check overdue status every 10 minutes instead of continuously
+  useEffect(() => {
+    const checkOverdueInterval = setInterval(
+      () => {
+        setChallans((prevChallans: FeeChallan[]) => {
+          if (!prevChallans || prevChallans.length === 0) {
+            return prevChallans;
+          }
+
+          const updatedChallans = updateOverdueStatuses(prevChallans);
+          const hasChanges = updatedChallans.some(
+            (challan, index) => challan.status !== prevChallans[index]?.status,
+          );
+
+          if (hasChanges) {
+            syncOverdueStatusesWithBackend(updatedChallans);
+            return updatedChallans;
+          }
+          return prevChallans;
+        });
+      },
+      10 * 60 * 1000,
+    ); // 10 minutes
 
     return () => clearInterval(checkOverdueInterval);
-  }, []);
+  }, [updateOverdueStatuses, syncOverdueStatusesWithBackend]);
 
   return (
     <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
