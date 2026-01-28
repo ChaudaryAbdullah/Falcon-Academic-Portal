@@ -21,14 +21,28 @@ import {
   getChallanStats,
   getFeesForPrint,
   getPendingFees,
+  // NEW ENDPOINTS
+  getAllFeesInternal,
+  getFeesForStudents,
+  getGeneratedDates,
 } from "../controllers/feeController.js";
 
 const router = express.Router();
 
 // ============ OPTIMIZED ROUTES ============
 
-// Get paginated fees with filters (MAIN ENDPOINT)
+// Get paginated fees with filters (MAIN ENDPOINT - for ViewFee tab)
 router.get("/", getFees);
+
+// Get ALL fees for internal operations (Submit Fee, Generate Fee tabs)
+// Use with caution - returns all records
+router.get("/internal/all", getAllFeesInternal);
+
+// Get fees for specific students (batch checking)
+router.post("/internal/students", getFeesForStudents);
+
+// Get unique generated dates (for print dropdowns)
+router.get("/internal/dates", getGeneratedDates);
 
 // Get filter options (months, years, statuses)
 router.get("/filter-options", getFilterOptions);
@@ -36,7 +50,7 @@ router.get("/filter-options", getFilterOptions);
 // Get challan statistics
 router.get("/stats", getChallanStats);
 
-// Get fees for bulk printing
+// Get fees for bulk printing (with images)
 router.get("/print", getFeesForPrint);
 
 // Get pending fees for a student
