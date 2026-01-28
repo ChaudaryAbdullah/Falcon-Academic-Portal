@@ -1,6 +1,6 @@
 "use client";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -30,6 +30,7 @@ import {
   Printer,
   X,
   Percent,
+  Loader2,
 } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { toast } from "sonner";
@@ -41,46 +42,10 @@ interface Student {
   rollNumber: string;
   studentName: string;
   fatherName: string;
-  fatherCnic: string;
-  motherCnic: string;
-  bform: string;
-  dob: string;
-  section: string;
-  gender: string;
-  fPhoneNumber: string;
-  mPhoneNumber: string;
-  fatherOccupation: string;
-  motherName: string;
-  motherOccupation: string;
   class: string;
-  email: string;
-  password: string;
-  address: string;
+  section: string;
+  mPhoneNumber: string;
   discountCode: string;
-  img?: {
-    data: string;
-    contentType: string;
-  };
-}
-
-interface PaymentBreakdown {
-  feeId: string;
-  month: string;
-  year: string;
-  originalAmount: number;
-  currentBalance: number;
-  lateFee: number;
-  instanceDiscount: number;
-  totalRequired: number;
-  paymentAmount: number;
-  newBalance: number;
-  status: "paid" | "pending";
-}
-
-interface PaymentSummary {
-  totalPaid: number;
-  breakdown: PaymentBreakdown[];
-  remainingAmount: number;
 }
 
 interface FeeChallan {
@@ -110,6 +75,26 @@ interface FeeChallan {
   sentToWhatsApp: boolean;
 }
 
+interface PaymentBreakdown {
+  feeId: string;
+  month: string;
+  year: string;
+  originalAmount: number;
+  currentBalance: number;
+  lateFee: number;
+  instanceDiscount: number;
+  totalRequired: number;
+  paymentAmount: number;
+  newBalance: number;
+  status: "paid" | "pending";
+}
+
+interface PaymentSummary {
+  totalPaid: number;
+  breakdown: PaymentBreakdown[];
+  remainingAmount: number;
+}
+
 interface SubmitPaymentTabProps {
   students: Student[];
   challans: FeeChallan[];
@@ -118,8 +103,8 @@ interface SubmitPaymentTabProps {
 
 export function SubmitPaymentTab({
   students,
-  challans,
-  setChallans,
+  challans: _initialChallans,
+  setChallans: _setParentChallans,
 }: SubmitPaymentTabProps) {
   const [selectedStudent, setSelectedStudent] = useState<string>("");
   const [studentSearch, setStudentSearch] = useState("");
@@ -132,34 +117,74 @@ export function SubmitPaymentTab({
   }>({});
   const [partialPaymentMode, setPartialPaymentMode] = useState(false);
   const [partialAmount, setPartialAmount] = useState("");
-  const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(
-    null
-  );
+  const [paymentSummary, setPaymentSummary] = useState<any | null>(null);
+  const [isLoadingFees, setIsLoadingFees] = useState(false);
+
+  // All challans loaded from backend
+  const [allChallans, setAllChallans] = useState<FeeChallan[]>([]);
+  const [isLoadingAllChallans, setIsLoadingAllChallans] = useState(true);
 
   // Modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isPartialSubmit, setIsPartialSubmit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const filteredStudents = students.filter(
-    (student) =>
-      student.studentName.toLowerCase().includes(studentSearch.toLowerCase()) ||
-      student.rollNumber.toLowerCase().includes(studentSearch.toLowerCase()) ||
-      student.fatherName.toLowerCase().includes(studentSearch.toLowerCase())
-  );
+   // Load ALL challans on mount (for checking existing fees)
+  useEffect(() => {
+    loadAllChallans();
+  }, []);
 
-  const getPendingFeesForStudent = (studentId: string) => {
-    return challans
-      .filter(
-        (challan) =>
-          challan.studentId._id === studentId &&
-          (challan.status === "pending" || challan.status === "overdue")
-      )
-      .map((challan) => ({
-        ...challan,
-        displayAmount: challan.totalAmount - challan.arrears,
-      }));
+  const loadAllChallans = async () => {
+    try {
+      setIsLoadingAllChallans(true);
+      const response = await axios.get(
+        `${BACKEND}/api/fees/internal/all?excludeImages=true`,
+        { withCredentials: true }
+      );
+
+      if (response.data.success) {
+        setAllChallans(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error loading all challans:", error);
+      toast.error("Failed to load fee records");
+    } finally {
+      setIsLoadingAllChallans(false);
+    }
   };
+
+  const filteredStudents = useMemo(() => {
+    return students.filter(
+      (student) =>
+        student.studentName.toLowerCase().includes(studentSearch.toLowerCase()) ||
+        student.rollNumber.toLowerCase().includes(studentSearch.toLowerCase()) ||
+        student.fatherName.toLowerCase().includes(studentSearch.toLowerCase())
+    );
+  }, [students, studentSearch]);
+
+  const getPendingFeesForStudent = async (studentId: string) => {
+    setIsLoadingFees(true);
+    try {
+      // Fetch pending fees from backend
+      const response = await axios.get<{ success: boolean; data: FeeChallan[] }>(
+        `${BACKEND}/api/fees/pending/${studentId}`,
+        { withCredentials: true }
+      );
+
+      if (response.data.success) {
+        return response.data.data;
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching pending fees:", error);
+      toast.error("Failed to load pending fees");
+      return [];
+    } finally {
+      setIsLoadingFees(false);
+    }
+  };
+
+
 
   // Helper function to calculate effective amount for a fee
   const getEffectiveAmount = (fee: FeeChallan) => {
@@ -366,7 +391,7 @@ Falcon House School Administration
       <p style="font-size: 11pt; font-weight: bold; margin-bottom: 1mm;">Payment Allocation:</p>
       ${paymentSummaryData.breakdown
         .map(
-          (item) => `
+          (item: PaymentBreakdown) => `
         <div style="font-size: 10pt; margin-bottom: 0.5mm;">
           <span>${item.month} ${item.year}:</span>
           <span style="float: right;">Rs. ${item.paymentAmount.toLocaleString()} ${
@@ -978,7 +1003,7 @@ Falcon House School Administration
     <strong>Payment Allocation:</strong>
     ${paymentSummaryData.breakdown
       .map(
-        (item) => `
+        (item: PaymentBreakdown) => `
       <div class="allocation-item">
         ${item.month} ${
           item.year
@@ -1050,20 +1075,16 @@ Falcon House School Administration
     }
   };
 
-  const simulatePartialPayment = (amount: string): PaymentSummary | null => {
+  const simulatePartialPayment = (amount: string): any | null => {
     if (!amount || parseFloat(amount) <= 0) return null;
 
     const selectedFees = pendingFees
       .filter((fee: FeeChallan) => selectedPendingFees.includes(fee.id))
       .sort((a: FeeChallan, b: FeeChallan) => {
-        // Sort by year first (oldest first)
         const yearA = parseInt(a.year);
         const yearB = parseInt(b.year);
-        if (yearA !== yearB) {
-          return yearA - yearB;
-        }
+        if (yearA !== yearB) return yearA - yearB;
 
-        // Then sort by month (oldest first for FIFO)
         const months: { [key: string]: number } = {
           January: 1,
           February: 2,
@@ -1085,7 +1106,7 @@ Falcon House School Administration
       });
 
     let remainingAmount: number = parseFloat(amount);
-    const paymentBreakdown: PaymentBreakdown[] = [];
+    const paymentBreakdown: any[] = [];
 
     for (const fee of selectedFees) {
       if (remainingAmount <= 0) break;
@@ -1128,7 +1149,7 @@ Falcon House School Administration
     };
   };
 
-  const submitPartialPayment = async (): Promise<void> => {
+    const submitPartialPayment = async (): Promise<void> => {
     if (
       !selectedStudent ||
       selectedPendingFees.length === 0 ||
@@ -1165,9 +1186,9 @@ Falcon House School Administration
     }
 
     try {
-      // First update any instance discounts and late fees to the database
+      // Update discounts and late fees first
       for (const feeId of selectedPendingFees) {
-        const fee = challans.find((c) => c.id === feeId);
+        const fee = allChallans.find((c) => c.id === feeId);
         if (!fee) continue;
 
         const instanceDiscount = instanceDiscounts[feeId] || 0;
@@ -1176,10 +1197,8 @@ Falcon House School Administration
         if (instanceDiscount > 0 || lateFee > 0) {
           const newDiscount = fee.discount + instanceDiscount;
           const newMiscFee = fee.miscFee + lateFee;
-          // Recalculate totalAmount with new discount and late fee
           const newTotalAmount =
             fee.tutionFee + fee.examFee + newMiscFee - newDiscount;
-          // Adjust remainingBalance for the discount (late fee will be handled by partial payment API)
           const adjustedRemainingBalance = Math.max(
             0,
             fee.remainingBalance - instanceDiscount
@@ -1206,18 +1225,12 @@ Falcon House School Administration
           selectedFeeIds: selectedPendingFees,
           partialAmount: amount,
           lateFees: lateFees,
-          instanceDiscounts: instanceDiscounts, // Pass instance discounts to backend
+          instanceDiscounts: instanceDiscounts,
         },
         { withCredentials: true }
       );
 
       if (response.data.success) {
-        // Refresh the fees list
-        const fetchResponse = await axios.get(`${BACKEND}/api/fees`, {
-          withCredentials: true,
-        });
-        setChallans(fetchResponse.data.data);
-
         toast.success(
           `Partial payment of Rs. ${amount.toLocaleString()} submitted successfully!`
         );
@@ -1238,24 +1251,26 @@ Falcon House School Administration
 
   useEffect(() => {
     if (selectedStudent) {
-      const pending = getPendingFeesForStudent(selectedStudent);
-      setPendingFees(pending);
-      const initialLateFees: { [key: string]: number } = {};
-      pending.forEach((fee) => {
-        if (fee.status === "overdue") {
-          initialLateFees[fee.id] = 0;
-        }
+      const pendingPromise = getPendingFeesForStudent(selectedStudent);
+      pendingPromise.then((pending: FeeChallan[]) => {
+        setPendingFees(pending);
+        const initialLateFees: { [key: string]: number } = {};
+        pending.forEach((fee: FeeChallan) => {
+          if (fee.status === "overdue") {
+            initialLateFees[fee.id] = 0;
+          }
+        });
+        setLateFees(initialLateFees);
+        setInstanceDiscounts({});
       });
-      setLateFees(initialLateFees);
-      setInstanceDiscounts({});
     } else {
       setPendingFees([]);
       setLateFees({});
       setInstanceDiscounts({});
     }
-  }, [selectedStudent, challans]);
+  }, [selectedStudent]);
 
-  const handleStudentSelect = (student: Student) => {
+  const handleStudentSelect = async (student: Student) => {
     setSelectedStudent(student._id);
     setStudentSearch(
       `${student.studentName} - ${student.fatherName} (ID: ${student._id})`
@@ -1264,15 +1279,28 @@ Falcon House School Administration
     setSelectedPendingFees([]);
     setLateFees({});
     setInstanceDiscounts({});
+
+    // Load pending fees for this student
+    const fees = await getPendingFeesForStudent(student._id);
+    setPendingFees(fees);
+
+    // Initialize late fees for overdue
+    const initialLateFees: { [key: string]: number } = {};
+    fees.forEach((fee: FeeChallan) => {
+      if (fee.status === "overdue") {
+        initialLateFees[fee.id] = 0;
+      }
+    });
+    setLateFees(initialLateFees);
   };
 
-  const handleSearchChange = (value: string) => {
+   const handleSearchChange = (value: string) => {
     setStudentSearch(value);
     setSelectedStudent("");
     setShowStudentDropdown(value.length > 0);
   };
 
-  const getStatusBadge = (status: string) => {
+   const getStatusBadge = (status: string) => {
     switch (status) {
       case "paid":
         return (
@@ -1292,7 +1320,7 @@ Falcon House School Administration
   };
 
   // Handler to open modal when clicking submit
-  const handleSubmitClick = (isPartial: boolean) => {
+   const handleSubmitClick = (isPartial: boolean) => {
     if (!selectedStudent || selectedPendingFees.length === 0) {
       toast.error(
         "Please select a student and at least one fee challan to process payment."
@@ -1323,6 +1351,12 @@ Falcon House School Administration
         await submitFeePaymentInternal();
       }
 
+      // Refresh all challans after successful payment
+      await loadAllChallans();
+      
+      // Update parent component
+      _setParentChallans(allChallans);
+
       setShowPaymentModal(false);
     } catch (error) {
       console.error("Error processing payment:", error);
@@ -1335,7 +1369,7 @@ Falcon House School Administration
   // Internal submit function without modal
   const submitFeePaymentInternal = async () => {
     try {
-      // Check if any fees have late fees or instance discounts that need to be updated first
+      // Check if any fees have late fees or instance discounts
       const feesWithUpdates = selectedPendingFees.filter(
         (feeId) =>
           (lateFees[feeId] && lateFees[feeId] > 0) ||
@@ -1345,7 +1379,7 @@ Falcon House School Administration
       // Update late fees and discounts if any exist
       if (feesWithUpdates.length > 0) {
         for (const feeId of feesWithUpdates) {
-          const fee = challans.find((c) => c.id === feeId);
+          const fee = allChallans.find((c) => c.id === feeId);
           if (!fee) continue;
 
           const lateFee = lateFees[feeId] || 0;
@@ -1374,13 +1408,6 @@ Falcon House School Administration
       );
 
       if (updateResponse.status === 200) {
-        // Refresh the fees list
-        const fetchResponse = await axios.get(`${BACKEND}/api/fees`, {
-          withCredentials: true,
-        });
-        setChallans(fetchResponse.data.data);
-
-        // Calculate total amount paid including late fees and discounts
         const totalLateFees = Object.values(lateFees).reduce(
           (sum, fee) => sum + fee,
           0
@@ -1391,7 +1418,7 @@ Falcon House School Administration
         );
 
         const totalPaid = selectedPendingFees.reduce((sum, feeId) => {
-          const fee = challans.find((c) => c.id === feeId);
+          const fee = allChallans.find((c) => c.id === feeId);
           const lateFee = lateFees[feeId] || 0;
           const discount = instanceDiscounts[feeId] || 0;
           return sum + (fee ? fee.totalAmount + lateFee - discount : 0);
@@ -1421,6 +1448,19 @@ Falcon House School Administration
       toast.error("Failed to submit fee payment. Please try again.");
     }
   };
+
+   if (isLoadingAllChallans) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mr-2" />
+            <span>Loading fee records...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -1539,8 +1579,16 @@ Falcon House School Administration
               )}
             </div>
 
+            {/* Loading State */}
+            {isLoadingFees && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-600 mr-2" />
+                <span>Loading pending fees...</span>
+              </div>
+            )}
+
             {/* Selected Student Fee Challans */}
-            {selectedStudent && (
+            {selectedStudent && !isLoadingFees && (
               <div className="space-y-4">
                 <div className="border rounded-lg p-3 sm:p-4 bg-blue-50">
                   <h3 className="font-semibold text-blue-800 mb-3 flex flex-wrap items-center gap-2 text-sm sm:text-base">
@@ -2188,7 +2236,7 @@ Falcon House School Administration
             )}
 
             {/* No Student Selected State */}
-            {!selectedStudent && (
+            {!selectedStudent && !isLoadingFees &&  (
               <div className="text-center py-8 sm:py-12">
                 <User className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-base sm:text-lg font-medium text-gray-600 mb-2">

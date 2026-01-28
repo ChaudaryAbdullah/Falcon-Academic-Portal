@@ -1768,3 +1768,249 @@ export const getPartialPaymentSummary = async (req, res) => {
     });
   }
 };
+
+
+// ============ GET ALL FEES (FOR INTERNAL OPERATIONS) ============
+// This endpoint returns all fees without pagination for:
+// - Submit Fee tab (needs to see all pending fees)
+// - Generate Fee tab (needs to check existing challans)
+// - Print operations (needs specific sets of challans)
+
+export const getAllFeesInternal = async (req, res) => {
+  try {
+    const { status, studentId, excludeImages = "true" } = req.query;
+
+    // Build match conditions
+    const matchConditions = {};
+
+    if (status && status !== "all") {
+      matchConditions.status = status;
+    }
+
+    if (studentId) {
+      matchConditions.studentId = new mongoose.Types.ObjectId(studentId);
+    }
+
+    // Use aggregation for performance
+    const pipeline = [
+      {
+        $lookup: {
+          from: "students",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "student",
+        },
+      },
+      { $unwind: "$student" },
+    ];
+
+    if (Object.keys(matchConditions).length > 0) {
+      pipeline.push({ $match: matchConditions });
+    }
+
+    // Project based on excludeImages flag
+    if (excludeImages === "true") {
+      pipeline.push({
+        $project: {
+          _id: 1,
+          studentId: {
+            _id: "$student._id",
+            studentName: "$student.studentName",
+            fatherName: "$student.fatherName",
+            mPhoneNumber: "$student.mPhoneNumber",
+            rollNumber: "$student.rollNumber",
+            class: "$student.class",
+            section: "$student.section",
+            discountCode: "$student.discountCode",
+            // Exclude img
+          },
+          month: 1,
+          year: 1,
+          tutionFee: 1,
+          remainingBalance: 1,
+          examFee: 1,
+          miscFee: 1,
+          arrears: 1,
+          discount: 1,
+          totalAmount: 1,
+          dueDate: 1,
+          status: 1,
+          generatedDate: 1,
+          paidDate: 1,
+          sentToWhatsApp: 1,
+        },
+      });
+    } else {
+      // Include images for print
+      pipeline.push({
+        $project: {
+          _id: 1,
+          studentId: {
+            _id: "$student._id",
+            studentName: "$student.studentName",
+            fatherName: "$student.fatherName",
+            mPhoneNumber: "$student.mPhoneNumber",
+            rollNumber: "$student.rollNumber",
+            class: "$student.class",
+            section: "$student.section",
+            discountCode: "$student.discountCode",
+            img: "$student.img",
+          },
+          month: 1,
+          year: 1,
+          tutionFee: 1,
+          remainingBalance: 1,
+          examFee: 1,
+          miscFee: 1,
+          arrears: 1,
+          discount: 1,
+          totalAmount: 1,
+          dueDate: 1,
+          status: 1,
+          generatedDate: 1,
+          paidDate: 1,
+          sentToWhatsApp: 1,
+        },
+      });
+    }
+
+    // Sort by creation date
+    pipeline.push({ $sort: { createdAt: -1 } });
+
+    // Safety limit (max 50,000 records)
+    pipeline.push({ $limit: 50000 });
+
+    const fees = await Fee.aggregate(pipeline);
+
+    // Transform data
+    const transformedFees = fees.map((fee) => ({
+      id: fee._id.toString(),
+      studentId: {
+        _id: fee.studentId._id.toString(),
+        studentName: fee.studentId.studentName,
+        fatherName: fee.studentId.fatherName,
+        mPhoneNumber: fee.studentId.mPhoneNumber,
+        rollNumber: fee.studentId.rollNumber,
+        class: fee.studentId.class,
+        section: fee.studentId.section,
+        discountCode: fee.studentId.discountCode,
+        img: fee.studentId.img || null,
+      },
+      month: fee.month,
+      year: fee.year,
+      tutionFee: fee.tutionFee,
+      remainingBalance: fee.remainingBalance,
+      examFee: fee.examFee,
+      miscFee: fee.miscFee,
+      arrears: fee.arrears,
+      discount: fee.discount,
+      totalAmount: fee.totalAmount,
+      dueDate: fee.dueDate?.toISOString().split("T")[0] || "",
+      status: fee.status,
+      generatedDate: fee.generatedDate?.toISOString().split("T")[0] || "",
+      paidDate: fee.paidDate?.toISOString().split("T")[0] || "",
+      sentToWhatsApp: fee.sentToWhatsApp,
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: transformedFees,
+      count: transformedFees.length,
+    });
+  } catch (error) {
+    console.error("Error in getAllFeesInternal:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============ GET FEES FOR SPECIFIC STUDENTS ============
+// Optimized endpoint for checking existing challans when generating fees
+export const getFeesForStudents = async (req, res) => {
+  try {
+    const { studentIds, month, year } = req.body;
+
+    if (!studentIds || !Array.isArray(studentIds)) {
+      return res.status(400).json({
+        success: false,
+        message: "studentIds array is required",
+      });
+    }
+
+    const objectIds = studentIds.map((id) => new mongoose.Types.ObjectId(id));
+
+    const matchConditions = {
+      studentId: { $in: objectIds },
+    };
+
+    if (month) {
+      matchConditions.month = month;
+    }
+
+    if (year) {
+      matchConditions.year = year.toString();
+    }
+
+    // Use lean for better performance
+    const fees = await Fee.find(matchConditions)
+      .select(
+        "studentId month year status totalAmount remainingBalance generatedDate"
+      )
+      .lean();
+
+    // Create a map for quick lookup
+    const feeMap = {};
+    fees.forEach((fee) => {
+      const key = `${fee.studentId}-${fee.month}-${fee.year}`;
+      feeMap[key] = {
+        id: fee._id.toString(),
+        studentId: fee.studentId.toString(),
+        month: fee.month,
+        year: fee.year,
+        status: fee.status,
+        totalAmount: fee.totalAmount,
+        remainingBalance: fee.remainingBalance,
+        generatedDate: fee.generatedDate?.toISOString().split("T")[0] || "",
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: feeMap,
+      count: fees.length,
+    });
+  } catch (error) {
+    console.error("Error in getFeesForStudents:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============ GET UNIQUE GENERATED DATES ============
+// For print dropdowns
+export const getGeneratedDates = async (req, res) => {
+  try {
+    const cacheKey = "generated_dates";
+    const cached = cache.get(cacheKey);
+
+    if (cached) {
+      return res.status(200).json({ success: true, data: cached });
+    }
+
+    const dates = await Fee.distinct("generatedDate");
+
+    // Format and sort dates
+    const formattedDates = dates
+      .filter(Boolean)
+      .map((date) => new Date(date).toISOString().split("T")[0])
+      .sort((a, b) => new Date(b) - new Date(a));
+
+    cache.set(cacheKey, formattedDates, 300); // Cache for 5 minutes
+
+    res.status(200).json({
+      success: true,
+      data: formattedDates,
+    });
+  } catch (error) {
+    console.error("Error getting generated dates:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
