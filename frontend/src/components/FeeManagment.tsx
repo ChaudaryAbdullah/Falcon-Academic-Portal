@@ -94,7 +94,9 @@ interface FeeManagementProps {
   setFeeStructure: (feeStuctures: ClassFeeStructure[]) => void;
   studentDiscounts: StudentDiscount[];
   challans: FeeChallan[];
-  setChallans: (challans: FeeChallan[] | ((prev: FeeChallan[]) => FeeChallan[])) => void;
+  setChallans: (
+    challans: FeeChallan[] | ((prev: FeeChallan[]) => FeeChallan[]),
+  ) => void;
 }
 
 export function FeeManagement({
@@ -259,11 +261,7 @@ export function FeeManagement({
         </TabsContent>
 
         <TabsContent value="list" className="mt-4 sm:mt-6">
-          <ViewRecordsTab
-            challans={challans}
-            setChallans={setChallans}
-            whatsappMessage={whatsappMessage}
-          />
+          <ViewRecordsTab whatsappMessage={whatsappMessage} />
         </TabsContent>
 
         <TabsContent value="settings" className="mt-4 sm:mt-6">

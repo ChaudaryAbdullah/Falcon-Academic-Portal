@@ -1,6 +1,6 @@
 "use client";
 import axios from "axios";
-import { useState } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -34,8 +34,12 @@ import {
   Filter,
   X,
   Printer,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useDebouncedValue } from "../../hooks/useDebounce";
 
 const BACKEND = import.meta.env.VITE_BACKEND;
 
@@ -43,10 +47,6 @@ interface FeeChallan {
   id: string;
   studentId: {
     _id: string;
-    img?: {
-      data: string;
-      contentType: string;
-    };
     rollNumber: string;
     studentName: string;
     fatherName: string;
@@ -70,17 +70,40 @@ interface FeeChallan {
   sentToWhatsApp: boolean;
 }
 
+interface PaginationMeta {
+  currentPage: number;
+  totalPages: number;
+  totalRecords: number;
+  limit: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  startRecord: number;
+  endRecord: number;
+}
+
+interface FilterOptions {
+  months: string[];
+  years: string[];
+  statuses: string[];
+}
+
 interface ViewRecordsTabProps {
-  challans: FeeChallan[];
-  setChallans: (challans: FeeChallan[]) => void;
   whatsappMessage: string;
 }
 
-export function ViewRecordsTab({
-  challans,
-  setChallans,
-  whatsappMessage,
-}: ViewRecordsTabProps) {
+export function ViewRecordsTab({ whatsappMessage }: ViewRecordsTabProps) {
+  const [challans, setChallans] = useState<FeeChallan[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    currentPage: 1,
+    totalPages: 1,
+    totalRecords: 0,
+    limit: 50,
+    hasNextPage: false,
+    hasPrevPage: false,
+    startRecord: 0,
+    endRecord: 0,
+  });
+  const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Filter states
@@ -89,11 +112,120 @@ export function ViewRecordsTab({
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [whatsappFilter, setWhatsappFilter] = useState<string>("all");
 
+  // Filter options
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+    months: [],
+    years: [],
+    statuses: [],
+  });
+
+  // Debounced search
+  const debouncedSearch = useDebouncedValue(searchTerm, 500);
+
+  // Fetch filter options once
+  useEffect(() => {
+    fetchFilterOptions();
+  }, []);
+
+  const fetchFilterOptions = async () => {
+    try {
+      const response = await axios.get(`${BACKEND}/api/fees/filter-options`, {
+        withCredentials: true,
+      });
+      if (response.data.success) {
+        setFilterOptions(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching filter options:", error);
+    }
+  };
+
+  // Fetch fees with pagination and filters
+  const fetchFees = useCallback(
+    async (page: number = 1) => {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: pagination.limit.toString(),
+        });
+
+        if (statusFilter && statusFilter !== "all") {
+          params.append("status", statusFilter);
+        }
+        if (monthFilter && monthFilter !== "all") {
+          params.append("month", monthFilter);
+        }
+        if (yearFilter && yearFilter !== "all") {
+          params.append("year", yearFilter);
+        }
+        if (whatsappFilter && whatsappFilter !== "all") {
+          params.append("whatsapp", whatsappFilter);
+        }
+        if (debouncedSearch.trim()) {
+          params.append("search", debouncedSearch.trim());
+        }
+
+        const response = await axios.get(
+          `${BACKEND}/api/fees?${params.toString()}`,
+          { withCredentials: true },
+        );
+
+        if (response.data.success) {
+          setChallans(response.data.data);
+          setPagination(response.data.pagination);
+        }
+      } catch (error) {
+        console.error("Error fetching fees:", error);
+        toast.error("Failed to load fee records");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [
+      pagination.limit,
+      statusFilter,
+      monthFilter,
+      yearFilter,
+      whatsappFilter,
+      debouncedSearch,
+    ],
+  );
+
+  // Fetch fees when filters change
+  useEffect(() => {
+    fetchFees(1); // Reset to page 1 when filters change
+  }, [statusFilter, monthFilter, yearFilter, whatsappFilter, debouncedSearch]);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      fetchFees(newPage);
+    }
+  };
+
+  const clearAllFilters = () => {
+    setStatusFilter("all");
+    setMonthFilter("all");
+    setYearFilter("all");
+    setWhatsappFilter("all");
+    setSearchTerm("");
+  };
+
+  const activeFiltersCount = useMemo(() => {
+    return [
+      statusFilter !== "all",
+      monthFilter !== "all",
+      yearFilter !== "all",
+      whatsappFilter !== "all",
+      searchTerm.length > 0,
+    ].filter(Boolean).length;
+  }, [statusFilter, monthFilter, yearFilter, whatsappFilter, searchTerm]);
+
   const sendFeeReminder = async (challan: FeeChallan) => {
     try {
       if (!challan.studentId.mPhoneNumber) {
         toast.error(
-          `Phone number not available for ${challan.studentId.studentName}. Please update the student's phone number first.`,
+          `Phone number not available for ${challan.studentId.studentName}`,
         );
         return;
       }
@@ -112,65 +244,22 @@ export function ViewRecordsTab({
         if (phoneNumber.startsWith("3")) {
           phoneNumber = "92" + phoneNumber;
         } else {
-          toast.error(
-            `Invalid phone number format for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`,
-          );
+          toast.error(`Invalid phone number format`);
           return;
         }
       }
 
       if (phoneNumber.length < 12 || phoneNumber.length > 13) {
-        toast.error(
-          `Invalid phone number length for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`,
-        );
+        toast.error(`Invalid phone number length`);
         return;
       }
 
-      let dueDate = challan.dueDate;
-      if (!dueDate) {
-        const today = new Date();
-        const currentMonth = today.getMonth();
-        const currentYear = today.getFullYear();
-
-        if (challan.month && challan.year) {
-          try {
-            const challanDate = new Date(`${challan.month} 1, ${challan.year}`);
-            if (
-              challanDate.getMonth() === currentMonth &&
-              Number(challan.year) === currentYear
-            ) {
-              dueDate = `${currentYear}-${String(currentMonth + 1).padStart(
-                2,
-                "0",
-              )}-10`;
-            } else {
-              const tomorrow = new Date(today);
-              tomorrow.setDate(today.getDate() + 1);
-              dueDate = tomorrow.toISOString().split("T")[0];
-            }
-          } catch (error) {
-            console.error("Error parsing date:", error);
-            dueDate = new Date().toISOString().split("T")[0];
-          }
-        } else {
-          dueDate = new Date().toISOString().split("T")[0];
-        }
-      }
-
-      let formattedDueDate = dueDate;
-      try {
-        if (dueDate) {
-          const dateObj = new Date(dueDate);
-          formattedDueDate = dateObj.toLocaleDateString("en-GB");
-        }
-      } catch (error) {
-        console.error("Error formatting due date:", error);
-      }
+      let dueDate = challan.dueDate || new Date().toISOString().split("T")[0];
+      let formattedDueDate = new Date(dueDate).toLocaleDateString("en-GB");
 
       const message =
         whatsappMessage ||
-        `
-*Fee Reminder - Falcon House School*
+        `*Fee Reminder - Falcon House School*
 
 Dear ${challan.studentId.fatherName || "Parent"},
 
@@ -197,20 +286,17 @@ ${
   challan.status === "paid"
     ? "Thank you for your payment!"
     : challan.status === "overdue"
-      ? "This payment is overdue. Please pay as soon as possible to avoid additional charges."
+      ? "This payment is overdue. Please pay as soon as possible."
       : "Please pay before the due date to avoid late fees."
 }
 
 Best regards,
-Falcon House School Administration
-    `.trim();
+Falcon House School Administration`.trim();
 
-      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
-        message,
-      )}`;
-
+      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, "_blank");
 
+      // Update WhatsApp status
       try {
         await axios.patch(
           `${BACKEND}/api/fees/${challan.id}/whatsapp`,
@@ -218,16 +304,18 @@ Falcon House School Administration
           { withCredentials: true },
         );
 
-        setChallans(((prevChallans: FeeChallan[]) =>
-          prevChallans.map((c) =>
+        // Update local state
+        setChallans((prev) =>
+          prev.map((c) =>
             c.id === challan.id ? { ...c, sentToWhatsApp: true } : c,
-          )) as unknown as FeeChallan[]);
+          ),
+        );
       } catch (error) {
         console.error("Error updating WhatsApp status:", error);
       }
     } catch (error) {
-      console.error("Error in sendFeeReminder:", error);
-      toast.error("Error sending WhatsApp reminder. Please try again.");
+      console.error("Error sending WhatsApp reminder:", error);
+      toast.error("Error sending WhatsApp reminder");
     }
   };
 
@@ -553,22 +641,12 @@ Falcon House School Administration
       printWindow.document.write(getChallanHTML(challan));
       printWindow.document.close();
       printWindow.focus();
-
-      // Wait for content to load before printing
-      printWindow.onload = () => {
-        printWindow.print();
-      };
-
-      // Fallback for browsers that don't trigger onload properly
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
+      setTimeout(() => printWindow.print(), 500);
     }
   };
 
   const downloadFeeChallanPDF = (challan: FeeChallan) => {
     const pdfContent = getChallanHTML(challan);
-
     const blob = new Blob([pdfContent], { type: "text/html" });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -577,58 +655,6 @@ Falcon House School Administration
     link.click();
     window.URL.revokeObjectURL(url);
   };
-
-  // Enhanced filtering logic
-  const filteredChallans = challans.filter((challan) => {
-    const matchesSearch =
-      challan.studentId.studentName
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      challan.studentId.fatherName
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      challan.month.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      challan.studentId.rollNumber
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      challan.studentId.class?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === "all" || challan.status === statusFilter;
-    const matchesMonth = monthFilter === "all" || challan.month === monthFilter;
-    const matchesYear = yearFilter === "all" || challan.year === yearFilter;
-    const matchesWhatsApp =
-      whatsappFilter === "all" ||
-      (whatsappFilter === "sent" && challan.sentToWhatsApp) ||
-      (whatsappFilter === "not_sent" && !challan.sentToWhatsApp);
-
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesMonth &&
-      matchesYear &&
-      matchesWhatsApp
-    );
-  });
-
-  const uniqueMonths = Array.from(new Set(challans.map((c) => c.month)));
-  const uniqueYears = Array.from(new Set(challans.map((c) => c.year)));
-
-  const clearAllFilters = () => {
-    setStatusFilter("all");
-    setMonthFilter("all");
-    setYearFilter("all");
-    setWhatsappFilter("all");
-    setSearchTerm("");
-  };
-
-  const activeFiltersCount = [
-    statusFilter !== "all",
-    monthFilter !== "all",
-    yearFilter !== "all",
-    whatsappFilter !== "all",
-    searchTerm.length > 0,
-  ].filter(Boolean).length;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -641,38 +667,15 @@ Falcon House School Administration
     }
   };
 
-  // Add inside your component
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50; // change as needed
-
-  // Calculate paginated challans
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentChallans = filteredChallans.slice(
-    indexOfFirstItem,
-    indexOfLastItem,
-  );
-
-  const totalPages = Math.ceil(filteredChallans.length / itemsPerPage);
-
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>
-          Fee Records ({indexOfFirstItem + 1} -{" "}
-          {indexOfLastItem > filteredChallans.length
-            ? filteredChallans.length
-            : indexOfLastItem}{" "}
-          of {filteredChallans.length})
+          Fee Records ({pagination.startRecord} - {pagination.endRecord} of{" "}
+          {pagination.totalRecords})
         </CardTitle>
         <CardDescription>
-          View and manage all fee payment records with discounts and arrears
+          View and manage all fee payment records with pagination
         </CardDescription>
 
         <div className="flex items-center justify-between">
@@ -736,7 +739,7 @@ Falcon House School Administration
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Months</SelectItem>
-                  {uniqueMonths.sort().map((month) => (
+                  {filterOptions.months.map((month) => (
                     <SelectItem key={month} value={month}>
                       {month}
                     </SelectItem>
@@ -753,14 +756,11 @@ Falcon House School Administration
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Years</SelectItem>
-                  {uniqueYears
-                    .sort()
-                    .reverse()
-                    .map((year) => (
-                      <SelectItem key={year} value={year}>
-                        {year}
-                      </SelectItem>
-                    ))}
+                  {filterOptions.years.map((year) => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -783,161 +783,195 @@ Falcon House School Administration
       </CardHeader>
 
       <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Father</TableHead>
-                <TableHead>Roll Number</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead>Month/Year</TableHead>
-                <TableHead>Base Amount</TableHead>
-                <TableHead>Arrears</TableHead>
-                <TableHead>Discount</TableHead>
-                <TableHead>Total Amount</TableHead>
-                <TableHead>Remaining Amount</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>WhatsApp</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredChallans.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={12}
-                    className="text-center text-muted-foreground py-8"
-                  >
-                    {activeFiltersCount > 0 || searchTerm ? (
-                      <div className="space-y-2">
-                        <p>No fee records match your current filters</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={clearAllFilters}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          Clear filters to see all records
-                        </Button>
-                      </div>
-                    ) : (
-                      "No fee records found"
-                    )}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                currentChallans.map((challan) => (
-                  <TableRow key={challan.id}>
-                    <TableCell className="font-medium">
-                      {challan.studentId.studentName}
-                    </TableCell>
-                    <TableCell>{challan.studentId.fatherName}</TableCell>
-                    <TableCell>{challan.studentId.rollNumber}</TableCell>
-                    <TableCell>{challan.studentId.class}</TableCell>
-                    <TableCell>
-                      {challan.month} {challan.year}
-                    </TableCell>
-                    <TableCell>
-                      Rs.{" "}
-                      {(Number(challan.tutionFee) || 0) +
-                        (Number(challan.examFee) || 0) +
-                        (Number(challan.miscFee) || 0)}
-                    </TableCell>
-                    <TableCell>
-                      {challan.arrears > 0 ? (
-                        <span className="text-red-600 font-semibold">
-                          +Rs. {challan.arrears}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {challan.discount > 0 ? (
-                        <span className="text-green-600 font-semibold">
-                          -Rs. {challan.discount}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-semibold">
-                      Rs. {challan.totalAmount + challan.arrears}
-                    </TableCell>
-                    <TableCell>{challan.remainingBalance}</TableCell>
-                    <TableCell>{challan.dueDate}</TableCell>
-                    <TableCell>{getStatusBadge(challan.status)}</TableCell>
-                    <TableCell>
-                      {challan.sentToWhatsApp ? (
-                        <Badge className="bg-green-100 text-green-800">
-                          Sent
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-gray-100 text-gray-800">
-                          Not Sent
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          size="sm"
-                          onClick={() => sendFeeReminder(challan)}
-                          className="bg-green-600 hover:bg-green-700"
-                          title="Send WhatsApp Reminder"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => printFeeChallan(challan)}
-                          title="Print Challan"
-                        >
-                          <Printer className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => downloadFeeChallanPDF(challan)}
-                          title="Download Challan"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Father</TableHead>
+                    <TableHead>Roll Number</TableHead>
+                    <TableHead>Class</TableHead>
+                    <TableHead>Month/Year</TableHead>
+                    <TableHead>Total Amount</TableHead>
+                    <TableHead>Remaining</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>WhatsApp</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-          {filteredChallans.length > 0 && (
-            <div className="flex justify-center items-center space-x-2 mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === 1}
-                onClick={() => handlePageChange(currentPage - 1)}
-              >
-                Previous
-              </Button>
-
-              <span className="text-sm">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === totalPages}
-                onClick={() => handlePageChange(currentPage + 1)}
-              >
-                Next
-              </Button>
+                </TableHeader>
+                <TableBody>
+                  {challans.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={11}
+                        className="text-center text-muted-foreground py-8"
+                      >
+                        {activeFiltersCount > 0 || searchTerm ? (
+                          <div className="space-y-2">
+                            <p>No fee records match your current filters</p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={clearAllFilters}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              Clear filters to see all records
+                            </Button>
+                          </div>
+                        ) : (
+                          "No fee records found"
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    challans.map((challan) => (
+                      <TableRow key={challan.id}>
+                        <TableCell className="font-medium">
+                          {challan.studentId.studentName}
+                        </TableCell>
+                        <TableCell>{challan.studentId.fatherName}</TableCell>
+                        <TableCell>{challan.studentId.rollNumber}</TableCell>
+                        <TableCell>{challan.studentId.class}</TableCell>
+                        <TableCell>
+                          {challan.month} {challan.year}
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          Rs. {challan.totalAmount}
+                        </TableCell>
+                        <TableCell>
+                          {challan.remainingBalance > 0 ? (
+                            <span className="text-orange-600 font-medium">
+                              Rs. {challan.remainingBalance}
+                            </span>
+                          ) : (
+                            <span className="text-green-600">Paid</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{challan.dueDate}</TableCell>
+                        <TableCell>{getStatusBadge(challan.status)}</TableCell>
+                        <TableCell>
+                          {challan.sentToWhatsApp ? (
+                            <Badge className="bg-green-100 text-green-800">
+                              Sent
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-gray-100 text-gray-800">
+                              Not Sent
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              onClick={() => sendFeeReminder(challan)}
+                              className="bg-green-600 hover:bg-green-700"
+                              title="Send WhatsApp Reminder"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => printFeeChallan(challan)}
+                              title="Print Challan"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => downloadFeeChallanPDF(challan)}
+                              title="Download Challan"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          )}
-        </div>
+
+            {/* Pagination Controls */}
+            {challans.length > 0 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Showing {pagination.startRecord} to {pagination.endRecord} of{" "}
+                  {pagination.totalRecords} records
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!pagination.hasPrevPage || isLoading}
+                    onClick={() => handlePageChange(pagination.currentPage - 1)}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+
+                  <div className="flex items-center gap-1">
+                    {/* Show page numbers */}
+                    {Array.from(
+                      {
+                        length: Math.min(5, pagination.totalPages),
+                      },
+                      (_, i) => {
+                        const pageNum =
+                          Math.max(
+                            1,
+                            Math.min(
+                              pagination.currentPage - 2,
+                              pagination.totalPages - 4,
+                            ),
+                          ) + i;
+
+                        if (pageNum > pagination.totalPages) return null;
+
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={
+                              pageNum === pagination.currentPage
+                                ? "default"
+                                : "outline"
+                            }
+                            size="sm"
+                            onClick={() => handlePageChange(pageNum)}
+                            disabled={isLoading}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      },
+                    )}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!pagination.hasNextPage || isLoading}
+                    onClick={() => handlePageChange(pagination.currentPage + 1)}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </CardContent>
     </Card>
   );
