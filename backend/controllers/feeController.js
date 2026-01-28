@@ -1,33 +1,146 @@
 import { Fee } from "../models/fee.js";
 import mongoose from "mongoose";
+import NodeCache from "node-cache";
 
-// Create Fee Record
-export const createFee = async (req, res) => {
-  try {
-    const fee = await Fee.create(req.body);
-    const populatedFee = await Fee.findById(fee._id).populate(
-      "studentId",
-      "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
-    );
-    res.status(201).json({ success: true, data: populatedFee });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
+// Initialize cache with 5-minute TTL
+const cache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
-// Get All Fee Records - OPTIMIZED
+// ============ OPTIMIZED PAGINATION ============
 export const getFees = async (req, res) => {
   try {
-    const fees = await Fee.find({})
-      .populate(
-        "studentId",
-        "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
-      )
-      .sort({ createdAt: -1 })
-      .lean() // Add .lean() for better performance
-      .exec();
+    const {
+      page = 1,
+      limit = 50,
+      status,
+      month,
+      year,
+      search,
+      whatsapp,
+      studentClass,
+      section,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
 
-    // Transform data to match frontend expectations
+    // Build match conditions
+    const matchConditions = {};
+
+    if (status && status !== "all") {
+      matchConditions.status = status;
+    }
+
+    if (month && month !== "all") {
+      matchConditions.month = month;
+    }
+
+    if (year && year !== "all") {
+      matchConditions.year = year.toString();
+    }
+
+    if (whatsapp === "sent") {
+      matchConditions.sentToWhatsApp = true;
+    } else if (whatsapp === "not_sent") {
+      matchConditions.sentToWhatsApp = false;
+    }
+
+    // Build aggregation pipeline for search and filters
+    const pipeline = [];
+
+    // Lookup student data first
+    pipeline.push({
+      $lookup: {
+        from: "students",
+        localField: "studentId",
+        foreignField: "_id",
+        as: "student",
+      },
+    });
+
+    pipeline.push({ $unwind: "$student" });
+
+    // Apply class/section filters
+    if (studentClass && studentClass !== "all") {
+      matchConditions["student.class"] = studentClass;
+    }
+
+    if (section && section !== "all") {
+      matchConditions["student.section"] = section;
+    }
+
+    // Search functionality
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), "i");
+      pipeline.push({
+        $match: {
+          $or: [
+            { "student.studentName": searchRegex },
+            { "student.fatherName": searchRegex },
+            { "student.rollNumber": searchRegex },
+          ],
+        },
+      });
+    }
+
+    // Add match conditions
+    if (Object.keys(matchConditions).length > 0) {
+      pipeline.push({ $match: matchConditions });
+    }
+
+    // Count total documents (before pagination)
+    const countPipeline = [...pipeline, { $count: "total" }];
+    const countResult = await Fee.aggregate(countPipeline);
+    const totalRecords = countResult[0]?.total || 0;
+
+    // Sort
+    const sortOptions = {};
+    if (sortBy === "studentName") {
+      sortOptions["student.studentName"] = sortOrder === "asc" ? 1 : -1;
+    } else {
+      sortOptions[sortBy] = sortOrder === "asc" ? 1 : -1;
+    }
+    pipeline.push({ $sort: sortOptions });
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: parseInt(limit) });
+
+    // Project only necessary fields (exclude heavy img data)
+    pipeline.push({
+      $project: {
+        _id: 1,
+        studentId: {
+          _id: "$student._id",
+          studentName: "$student.studentName",
+          fatherName: "$student.fatherName",
+          mPhoneNumber: "$student.mPhoneNumber",
+          rollNumber: "$student.rollNumber",
+          class: "$student.class",
+          section: "$student.section",
+          discountCode: "$student.discountCode",
+          // Exclude img to reduce payload size
+        },
+        month: 1,
+        year: 1,
+        tutionFee: 1,
+        remainingBalance: 1,
+        examFee: 1,
+        miscFee: 1,
+        arrears: 1,
+        discount: 1,
+        totalAmount: 1,
+        dueDate: 1,
+        status: 1,
+        generatedDate: 1,
+        paidDate: 1,
+        sentToWhatsApp: 1,
+      },
+    });
+
+    // Execute aggregation
+    const fees = await Fee.aggregate(pipeline);
+
+    // Transform data
     const transformedFees = fees.map((fee) => ({
       id: fee._id.toString(),
       studentId: {
@@ -39,7 +152,6 @@ export const getFees = async (req, res) => {
         class: fee.studentId.class,
         section: fee.studentId.section,
         discountCode: fee.studentId.discountCode,
-        img: fee.studentId.img || null,
       },
       month: fee.month,
       year: fee.year,
@@ -57,13 +169,318 @@ export const getFees = async (req, res) => {
       sentToWhatsApp: fee.sentToWhatsApp,
     }));
 
-    res.status(200).json({ success: true, data: transformedFees });
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalRecords / parseInt(limit));
+    const currentPage = parseInt(page);
+
+    res.status(200).json({
+      success: true,
+      data: transformedFees,
+      pagination: {
+        currentPage,
+        totalPages,
+        totalRecords,
+        limit: parseInt(limit),
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1,
+        startRecord: skip + 1,
+        endRecord: Math.min(skip + parseInt(limit), totalRecords),
+      },
+    });
   } catch (error) {
+    console.error("Error in getFees:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Generate Bulk Fee Challans with Discounts and Arrears
+// ============ OPTIMIZED FILTERS ============
+export const getFilterOptions = async (req, res) => {
+  try {
+    const cacheKey = "fee_filter_options";
+    const cached = cache.get(cacheKey);
+
+    if (cached) {
+      return res.status(200).json({ success: true, data: cached });
+    }
+
+    const [months, years, statuses] = await Promise.all([
+      Fee.distinct("month"),
+      Fee.distinct("year"),
+      Fee.distinct("status"),
+    ]);
+
+    const filterOptions = {
+      months: months.filter(Boolean).sort(),
+      years: years
+        .filter(Boolean)
+        .map((y) => y.toString())
+        .sort((a, b) => Number(b) - Number(a)),
+      statuses: statuses.filter(Boolean),
+    };
+
+    cache.set(cacheKey, filterOptions);
+
+    res.status(200).json({ success: true, data: filterOptions });
+  } catch (error) {
+    console.error("Error getting filter options:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============ OPTIMIZED STATS ============
+export const getChallanStats = async (req, res) => {
+  try {
+    const cacheKey = "challan_stats";
+    const cached = cache.get(cacheKey);
+
+    if (cached) {
+      return res.status(200).json({ success: true, data: cached });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [overallStats, todayStats, monthStats] = await Promise.all([
+      // Overall stats
+      Fee.aggregate([
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+            totalAmount: { $sum: "$totalAmount" },
+          },
+        },
+      ]),
+
+      // Today's generated fees
+      Fee.countDocuments({
+        generatedDate: {
+          $gte: today,
+          $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+        },
+      }),
+
+      // Current month stats
+      Fee.aggregate([
+        {
+          $match: {
+            month: today.toLocaleString("default", { month: "long" }),
+            year: today.getFullYear().toString(),
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalGenerated: { $sum: 1 },
+            totalAmount: { $sum: "$totalAmount" },
+            collected: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "paid"] }, "$totalAmount", 0],
+              },
+            },
+            pending: {
+              $sum: {
+                $cond: [{ $ne: ["$status", "paid"] }, "$totalAmount", 0],
+              },
+            },
+          },
+        },
+      ]),
+    ]);
+
+    // Process overall stats
+    const overall = {
+      pending: 0,
+      paid: 0,
+      overdue: 0,
+      totalPendingAmount: 0,
+      totalPaidAmount: 0,
+      totalOverdueAmount: 0,
+    };
+
+    overallStats.forEach((stat) => {
+      const status = stat._id;
+      overall[status] = stat.count;
+      overall[
+        `total${status.charAt(0).toUpperCase() + status.slice(1)}Amount`
+      ] = stat.totalAmount;
+    });
+
+    const stats = {
+      overall,
+      today: {
+        generated: todayStats,
+      },
+      currentMonth: monthStats[0] || {
+        totalGenerated: 0,
+        totalAmount: 0,
+        collected: 0,
+        pending: 0,
+      },
+    };
+
+    cache.set(cacheKey, stats, 60); // Cache for 1 minute
+
+    res.status(200).json({ success: true, data: stats });
+  } catch (error) {
+    console.error("Error getting challan stats:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============ OPTIMIZED BULK PRINT ============
+export const getFeesForPrint = async (req, res) => {
+  try {
+    const { generatedDate, studentClass, section, feeIds } = req.query;
+
+    const matchConditions = {};
+
+    if (generatedDate) {
+      matchConditions.generatedDate = new Date(generatedDate);
+    }
+
+    if (feeIds) {
+      const ids = feeIds
+        .split(",")
+        .map((id) => new mongoose.Types.ObjectId(id));
+      matchConditions._id = { $in: ids };
+    }
+
+    const pipeline = [
+      {
+        $lookup: {
+          from: "students",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "student",
+        },
+      },
+      { $unwind: "$student" },
+    ];
+
+    if (studentClass) {
+      matchConditions["student.class"] = studentClass;
+    }
+
+    if (section) {
+      matchConditions["student.section"] = section;
+    }
+
+    if (Object.keys(matchConditions).length > 0) {
+      pipeline.push({ $match: matchConditions });
+    }
+
+    // Include img for printing
+    pipeline.push({
+      $project: {
+        _id: 1,
+        studentId: {
+          _id: "$student._id",
+          studentName: "$student.studentName",
+          fatherName: "$student.fatherName",
+          mPhoneNumber: "$student.mPhoneNumber",
+          rollNumber: "$student.rollNumber",
+          class: "$student.class",
+          section: "$student.section",
+          discountCode: "$student.discountCode",
+          img: "$student.img",
+        },
+        month: 1,
+        year: 1,
+        tutionFee: 1,
+        examFee: 1,
+        miscFee: 1,
+        arrears: 1,
+        discount: 1,
+        totalAmount: 1,
+        dueDate: 1,
+        status: 1,
+        generatedDate: 1,
+      },
+    });
+
+    pipeline.push({ $limit: 1000 }); // Safety limit
+
+    const fees = await Fee.aggregate(pipeline);
+
+    const transformedFees = fees.map((fee) => ({
+      id: fee._id.toString(),
+      studentId: fee.studentId,
+      month: fee.month,
+      year: fee.year,
+      tutionFee: fee.tutionFee,
+      examFee: fee.examFee,
+      miscFee: fee.miscFee,
+      arrears: fee.arrears,
+      discount: fee.discount,
+      totalAmount: fee.totalAmount,
+      dueDate: fee.dueDate?.toISOString().split("T")[0] || "",
+      status: fee.status,
+      generatedDate: fee.generatedDate?.toISOString().split("T")[0] || "",
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: transformedFees,
+      count: transformedFees.length,
+    });
+  } catch (error) {
+    console.error("Error getting fees for print:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============ OPTIMIZED PENDING FEES ============
+export const getPendingFees = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    const fees = await Fee.find({
+      studentId,
+      status: { $in: ["pending", "overdue"] },
+    })
+      .select(
+        "month year tutionFee examFee miscFee totalAmount remainingBalance arrears discount dueDate status",
+      )
+      .sort({ year: 1, month: 1 })
+      .lean();
+
+    const totalOutstanding = fees.reduce(
+      (sum, fee) => sum + (fee.remainingBalance || fee.totalAmount),
+      0,
+    );
+
+    res.status(200).json({
+      success: true,
+      data: fees,
+      totalOutstanding,
+    });
+  } catch (error) {
+    console.error("Error getting pending fees:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============ KEEP EXISTING FUNCTIONS ============
+// These can stay as-is or be similarly optimized
+
+export const createFee = async (req, res) => {
+  try {
+    const fee = await Fee.create(req.body);
+    const populatedFee = await Fee.findById(fee._id).populate(
+      "studentId",
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
+    );
+
+    // Invalidate cache
+    cache.flushAll();
+
+    res.status(201).json({ success: true, data: populatedFee });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 export const generateBulkFees = async (req, res) => {
   try {
     const { challans } = req.body;
@@ -78,58 +495,72 @@ export const generateBulkFees = async (req, res) => {
     const createdChallans = [];
     const errors = [];
 
-    for (const challanData of challans) {
-      try {
-        // Check if challan already exists
-        const existingChallan = await Fee.findOne({
-          studentId: challanData.studentId._id,
-          month: challanData.month,
-          year: challanData.year,
-        });
+    // Process in batches of 50
+    const batchSize = 50;
+    for (let i = 0; i < challans.length; i += batchSize) {
+      const batch = challans.slice(i, i + batchSize);
 
-        if (existingChallan) {
-          errors.push({
+      const batchPromises = batch.map(async (challanData) => {
+        try {
+          const existingChallan = await Fee.findOne({
             studentId: challanData.studentId._id,
-            message: `Fee challan already exists for ${challanData.month} ${challanData.year}`,
+            month: challanData.month,
+            year: challanData.year,
           });
-          continue;
+
+          if (existingChallan) {
+            errors.push({
+              studentId: challanData.studentId._id,
+              message: `Fee challan already exists for ${challanData.month} ${challanData.year}`,
+            });
+            return null;
+          }
+
+          const feeData = {
+            studentId: challanData.studentId._id,
+            month: challanData.month,
+            year: challanData.year,
+            tutionFee: challanData.tutionFee || 0,
+            examFee: challanData.examFee || 0,
+            miscFee: challanData.miscFee || 0,
+            arrears: challanData.arrears || 0,
+            discount: challanData.discount || 0,
+            dueDate: new Date(challanData.dueDate),
+            status: challanData.status || "pending",
+            generatedDate: new Date(challanData.generatedDate || new Date()),
+            sentToWhatsApp: challanData.sentToWhatsApp || false,
+          };
+
+          const newFee = await Fee.create(feeData);
+          return newFee;
+        } catch (error) {
+          errors.push({
+            studentId: challanData.studentId?._id || "unknown",
+            message: error.message,
+          });
+          return null;
         }
+      });
 
-        // Create new fee challan with arrears and discount
-        const feeData = {
-          studentId: challanData.studentId._id,
-          month: challanData.month,
-          year: challanData.year,
-          tutionFee: challanData.tutionFee || 0,
-          examFee: challanData.examFee || 0,
-          miscFee: challanData.miscFee || 0,
-          arrears: challanData.arrears || 0,
-          discount: challanData.discount || 0,
-          dueDate: new Date(challanData.dueDate),
-          status: challanData.status || "pending",
-          generatedDate: new Date(challanData.generatedDate || new Date()),
-          sentToWhatsApp: challanData.sentToWhatsApp || false,
-        };
-
-        const newFee = await Fee.create(feeData);
-        const populatedFee = await Fee.findById(newFee._id).populate(
-          "studentId",
-          "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
-        );
-
-        createdChallans.push(populatedFee);
-      } catch (error) {
-        errors.push({
-          studentId: challanData.studentId?._id || "unknown",
-          message: error.message,
-        });
-      }
+      const batchResults = await Promise.all(batchPromises);
+      createdChallans.push(...batchResults.filter(Boolean));
     }
+
+    // Populate all at once
+    const populated = await Fee.find({
+      _id: { $in: createdChallans.map((c) => c._id) },
+    }).populate(
+      "studentId",
+      "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
+    );
+
+    // Invalidate cache
+    cache.flushAll();
 
     res.status(201).json({
       success: true,
       message: `Generated ${createdChallans.length} fee challans`,
-      data: createdChallans,
+      data: populated,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
@@ -137,7 +568,6 @@ export const generateBulkFees = async (req, res) => {
   }
 };
 
-// Get Fee by ID
 export const getFeeById = async (req, res) => {
   try {
     const fee = await Fee.findById(req.params.id).populate(
@@ -154,7 +584,6 @@ export const getFeeById = async (req, res) => {
   }
 };
 
-// Update Fee
 export const updateFee = async (req, res) => {
   try {
     const fee = await Fee.findByIdAndUpdate(req.params.id, req.body, {
@@ -169,13 +598,16 @@ export const updateFee = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Fee record not found" });
+
+    // Invalidate cache
+    cache.flushAll();
+
     res.status(200).json({ success: true, data: fee });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
 };
 
-// Delete Fee Record
 export const deleteFee = async (req, res) => {
   try {
     const fee = await Fee.findByIdAndDelete(req.params.id);
@@ -183,6 +615,10 @@ export const deleteFee = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Fee record not found" });
+
+    // Invalidate cache
+    cache.flushAll();
+
     res
       .status(200)
       .json({ success: true, message: "Fee record deleted successfully" });
@@ -191,15 +627,16 @@ export const deleteFee = async (req, res) => {
   }
 };
 
-// Get fee record by studentId
 export const getFeeByStudentId = async (req, res) => {
   try {
     const { studentId } = req.params;
 
-    const fees = await Fee.find({ studentId }).populate(
-      "studentId",
-      "img studentName fatherName mPhoneNumber rollNumber class section",
-    );
+    const fees = await Fee.find({ studentId })
+      .populate(
+        "studentId",
+        "img studentName fatherName mPhoneNumber rollNumber class section",
+      )
+      .sort({ year: -1, month: -1 });
 
     if (!fees || fees.length === 0) {
       return res
@@ -213,7 +650,6 @@ export const getFeeByStudentId = async (req, res) => {
   }
 };
 
-// Bulk Update Fee Status
 export const bulkUpdateFeeStatus = async (req, res) => {
   try {
     const { feeIds, status } = req.body;
@@ -232,7 +668,6 @@ export const bulkUpdateFeeStatus = async (req, res) => {
       });
     }
 
-    // Convert string IDs to ObjectIds, filtering out invalid ones
     const validObjectIds = [];
     const invalidIds = [];
 
@@ -259,15 +694,12 @@ export const bulkUpdateFeeStatus = async (req, res) => {
 
     const updateData = { status: status };
 
-    // If marking as paid, also update the payment date
     if (status === "paid") {
       updateData.paidDate = new Date();
     } else if (status === "pending") {
-      // If marking as pending, clear the payment date
       updateData.paidDate = null;
     }
 
-    // Update the fees
     const result = await Fee.updateMany(
       { _id: { $in: validObjectIds } },
       { $set: updateData },
@@ -280,13 +712,15 @@ export const bulkUpdateFeeStatus = async (req, res) => {
       });
     }
 
-    // Get the updated fees to return
     const updatedFees = await Fee.find({
       _id: { $in: validObjectIds },
     }).populate(
       "studentId",
       "img studentName fatherName mPhoneNumber rollNumber class section discountCode",
     );
+
+    // Invalidate cache
+    cache.flushAll();
 
     res.status(200).json({
       success: true,
@@ -306,7 +740,6 @@ export const bulkUpdateFeeStatus = async (req, res) => {
   }
 };
 
-// Update fee sent to WhatsApp status
 export const updateWhatsAppStatus = async (req, res) => {
   try {
     const { feeId } = req.params;
