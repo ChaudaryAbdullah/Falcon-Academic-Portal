@@ -1,6 +1,6 @@
 "use client";
 import axios from "axios";
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -149,6 +149,82 @@ export function GenerateFeeTab({
       student.rollNumber.toLowerCase().includes(studentSearch.toLowerCase()) ||
       student.fatherName.toLowerCase().includes(studentSearch.toLowerCase())
   );
+
+  const [todaysChallansCount, setTodaysChallansCount] = useState(0);
+  const [specificDateChallansCount, setSpecificDateChallansCount] = useState(0);
+  const [classChallansCount, setClassChallansCount] = useState(0);
+  const [sectionChallansCount, setSectionChallansCount] = useState(0);
+
+  // Fetch today's challans count
+  useEffect(() => {
+    const fetchTodaysCount = async () => {
+      try {
+        const today = new Date().toISOString().split("T")[0];
+        const response = await axios.get(
+          `${BACKEND}/api/fees/print?generatedDate=${today}&countOnly=true`,
+          { withCredentials: true }
+        );
+        setTodaysChallansCount(response.data.count || 0);
+      } catch (error) {
+        console.error("Error fetching today's count:", error);
+      }
+    };
+    fetchTodaysCount();
+  }, []);
+
+  // Fetch specific date challans count
+  useEffect(() => {
+    if (printDate) {
+      const fetchDateCount = async () => {
+        try {
+          const response = await axios.get(
+            `${BACKEND}/api/fees/print?generatedDate=${printDate}&countOnly=true`,
+            { withCredentials: true }
+          );
+          setSpecificDateChallansCount(response.data.count || 0);
+        } catch (error) {
+          console.error("Error fetching date count:", error);
+        }
+      };
+      fetchDateCount();
+    }
+  }, [printDate]);
+
+  // Fetch class challans count
+  useEffect(() => {
+    if (printClass && printClassDate) {
+      const fetchClassCount = async () => {
+        try {
+          const response = await axios.get(
+            `${BACKEND}/api/fees/print?generatedDate=${printClassDate}&studentClass=${printClass}&countOnly=true`,
+            { withCredentials: true }
+          );
+          setClassChallansCount(response.data.count || 0);
+        } catch (error) {
+          console.error("Error fetching class count:", error);
+        }
+      };
+      fetchClassCount();
+    }
+  }, [printClass, printClassDate]);
+
+  // Fetch section challans count
+  useEffect(() => {
+    if (printClass && printSection && printClassDate) {
+      const fetchSectionCount = async () => {
+        try {
+          const response = await axios.get(
+            `${BACKEND}/api/fees/print?generatedDate=${printClassDate}&studentClass=${printClass}&section=${printSection}&countOnly=true`,
+            { withCredentials: true }
+          );
+          setSectionChallansCount(response.data.count || 0);
+        } catch (error) {
+          console.error("Error fetching section count:", error);
+        }
+      };
+      fetchSectionCount();
+    }
+  }, [printClass, printSection, printClassDate]);
 
   // Calculate arrears for a student
   const calculateArrears = (
@@ -614,101 +690,114 @@ export function GenerateFeeTab({
   };
 
   // Print challans generated today
-  const printTodaysChallans = () => {
-    const today = new Date().toISOString().split("T")[0];
-    const todaysChallans = challans.filter(
-      (challan) => challan.generatedDate === today
+ const printTodaysChallans = async () => {
+  const today = new Date().toISOString().split("T")[0];
+  
+  try {
+    const response = await axios.get(
+      `${BACKEND}/api/fees/print?generatedDate=${today}`,
+      { withCredentials: true }
     );
 
-    if (todaysChallans.length === 0) {
+    if (response.data.success && response.data.data.length > 0) {
+      const printContent = generateBulkChallansHTML(response.data.data);
+      openPrintWindow(
+        printContent,
+        `Today's Challans (${response.data.count})`
+      );
+    } else {
       toast.error("No challans were generated today.");
-      return;
     }
+  } catch (error) {
+    console.error("Error loading challans for print:", error);
+    toast.error("Failed to load challans for printing");
+  }
+};
 
-    const printContent = generateBulkChallansHTML(todaysChallans);
-    openPrintWindow(
-      printContent,
-      `Today's Challans (${todaysChallans.length})`
-    );
-  };
+const printSpecificDateChallans = async () => {
+  if (!printDate) {
+    toast.error("Please select a date.");
+    return;
+  }
 
-  // Print challans generated on specific date
-  const printSpecificDateChallans = () => {
-    if (!printDate) {
-      toast.error("Please select a date.");
-      return;
-    }
-
-    const dateChallans = challans.filter(
-      (challan) => challan.generatedDate === printDate
+  try {
+    const response = await axios.get(
+      `${BACKEND}/api/fees/print?generatedDate=${printDate}`,
+      { withCredentials: true }
     );
 
-    if (dateChallans.length === 0) {
+    if (response.data.success && response.data.data.length > 0) {
+      const printContent = generateBulkChallansHTML(response.data.data);
+      openPrintWindow(
+        printContent,
+        `Challans for ${printDate} (${response.data.count})`
+      );
+    } else {
       toast.error(`No challans were generated on ${printDate}.`);
-      return;
     }
+  } catch (error) {
+    console.error("Error loading challans for print:", error);
+    toast.error("Failed to load challans for printing");
+  }
+};
 
-    const printContent = generateBulkChallansHTML(dateChallans);
-    openPrintWindow(
-      printContent,
-      `Challans for ${printDate} (${dateChallans.length})`
-    );
-  };
+const printClassChallans = async () => {
+  if (!printClass || !printClassDate) {
+    toast.error("Please select a class and date.");
+    return;
+  }
 
-  // Print challans for specific class (all sections)
-  const printClassChallans = () => {
-    if (!printClass || !printClassDate) {
-      toast.error("Please select a class and date.");
-      return;
-    }
-
-    const classChallans = challans.filter(
-      (challan) =>
-        challan.studentId.class === printClass &&
-        challan.generatedDate === printClassDate
+  try {
+    const response = await axios.get(
+      `${BACKEND}/api/fees/print?generatedDate=${printClassDate}&studentClass=${printClass}`,
+      { withCredentials: true }
     );
 
-    if (classChallans.length === 0) {
+    if (response.data.success && response.data.data.length > 0) {
+      const printContent = generateBulkChallansHTML(response.data.data);
+      openPrintWindow(
+        printContent,
+        `Class ${printClass} Challans - ${printClassDate} (${response.data.count})`
+      );
+    } else {
       toast.error(
         `No challans were generated on ${printClassDate} for class ${printClass}.`
       );
-      return;
     }
+  } catch (error) {
+    console.error("Error loading challans for print:", error);
+    toast.error("Failed to load challans for printing");
+  }
+};
 
-    const printContent = generateBulkChallansHTML(classChallans);
-    openPrintWindow(
-      printContent,
-      `Class ${printClass} Challans - ${printClassDate} (${classChallans.length})`
-    );
-  };
+const printSectionChallans = async () => {
+  if (!printClass || !printSection || !printClassDate) {
+    toast.error("Please select class, section, and date.");
+    return;
+  }
 
-  // Print challans for specific class and section
-  const printSectionChallans = () => {
-    if (!printClass || !printSection || !printClassDate) {
-      toast.error("Please select class, section, and date.");
-      return;
-    }
-
-    const sectionChallans = challans.filter(
-      (challan) =>
-        challan.studentId.class === printClass &&
-        challan.studentId.section === printSection &&
-        challan.generatedDate === printClassDate
+  try {
+    const response = await axios.get(
+      `${BACKEND}/api/fees/print?generatedDate=${printClassDate}&studentClass=${printClass}&section=${printSection}`,
+      { withCredentials: true }
     );
 
-    if (sectionChallans.length === 0) {
+    if (response.data.success && response.data.data.length > 0) {
+      const printContent = generateBulkChallansHTML(response.data.data);
+      openPrintWindow(
+        printContent,
+        `Class ${printClass}-${printSection} Challans - ${printClassDate} (${response.data.count})`
+      );
+    } else {
       toast.error(
         `No challans were generated on ${printClassDate} for class ${printClass} section ${printSection}.`
       );
-      return;
     }
-
-    const printContent = generateBulkChallansHTML(sectionChallans);
-    openPrintWindow(
-      printContent,
-      `Class ${printClass}-${printSection} Challans - ${printClassDate} (${sectionChallans.length})`
-    );
-  };
+  } catch (error) {
+    console.error("Error loading challans for print:", error);
+    toast.error("Failed to load challans for printing");
+  }
+};
 
   // Helper function to open print window
   const openPrintWindow = (content: string, title: string) => {
@@ -884,32 +973,6 @@ export function GenerateFeeTab({
         .filter(Boolean)
     )
   );
-
-  // Get today's challans count
-  const todaysChallansCount = challans.filter(
-    (challan) =>
-      challan.generatedDate === new Date().toISOString().split("T")[0]
-  ).length;
-
-  // Get specific date challans count
-  const specificDateChallansCount = challans.filter(
-    (challan) => challan.generatedDate === printDate
-  ).length;
-
-  // Get class challans count (today only)
-  const classChallansCount = challans.filter(
-    (challan) =>
-      challan.studentId.class === printClass &&
-      challan.generatedDate === printClassDate
-  ).length;
-
-  // Get section challans count (today only)
-  const sectionChallansCount = challans.filter(
-    (challan) =>
-      challan.studentId.class === printClass &&
-      challan.studentId.section === printSection &&
-      challan.generatedDate === printClassDate
-  ).length;
 
   return (
     <Card>
