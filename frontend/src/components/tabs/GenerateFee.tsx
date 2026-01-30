@@ -155,6 +155,8 @@ export function GenerateFeeTab({
   const [classChallansCount, setClassChallansCount] = useState(0);
   const [sectionChallansCount, setSectionChallansCount] = useState(0);
 
+  const [isGenerating, setIsGenerating] = useState(false);
+const [isPrinting, setIsPrinting] = useState(false);
   // Fetch today's challans count
   useEffect(() => {
     const fetchTodaysCount = async () => {
@@ -459,8 +461,17 @@ export function GenerateFeeTab({
     </table>
 
     <div class="footer">
-        <p>Please pay before the due date to avoid late fees.</p>
-        <p>For queries, contact school administration.</p>
+        <div className="instruction-wrapper">
+            <div className="instruction-box">
+              <h2>Instructions</h2>
+              <ol>
+                <li>A Fine of Rs 100/- will charged after due date.</li>
+                <li>Tution fee plus other charges must be paid by the 10th of every month.</li>
+                <li>Mezan Bank Acc # 04120105752122 Faiq Ahmed // Jazzcash & Easypaisa Acc # 03009663780 Amir Bashir.</li>
+                <li>For Online Submission Please Whatsapp Screeenshot of Bank or Jazzcash Slip @ 03008836853 With Student Name & Class</li>
+              </ol>
+            </div>
+        </div>
     </div>
 </div>
         `;
@@ -636,16 +647,29 @@ export function GenerateFeeTab({
             background-color: #f8f9fa;
         }
         
-        .footer { 
-            margin-top: 6px; 
-            text-align: center; 
-            font-size: 7px; 
-            line-height: 1;
-        }
         
-        .footer p {
-            margin: 1px 0;
+        .instruction-wrapper {
+          display: flex;
+          justify-content: center;
+          margin-top: 2rem;
+          text-align: center;
         }
+
+        .instruction-box {
+          max-width: 600px;
+          width: 100%;
+          text-align: center;
+        }
+
+        .instruction-box ol {
+          text-align: left;
+          padding-left: 1.5rem;
+        }
+
+        .instruction-box li {
+          margin-bottom: 0.5rem;
+        }
+
         
         .arrears { 
             color: #e74c3c; 
@@ -692,8 +716,9 @@ export function GenerateFeeTab({
   // Print challans generated today
  const printTodaysChallans = async () => {
   const today = new Date().toISOString().split("T")[0];
-  
+  if (isPrinting) return;
   try {
+    setIsPrinting(true);
     const response = await axios.get(
       `${BACKEND}/api/fees/print?generatedDate=${today}`,
       { withCredentials: true }
@@ -711,6 +736,8 @@ export function GenerateFeeTab({
   } catch (error) {
     console.error("Error loading challans for print:", error);
     toast.error("Failed to load challans for printing");
+  }finally {
+    setIsPrinting(false);
   }
 };
 
@@ -719,8 +746,10 @@ const printSpecificDateChallans = async () => {
     toast.error("Please select a date.");
     return;
   }
+if (isPrinting) return;
 
   try {
+     setIsPrinting(true);
     const response = await axios.get(
       `${BACKEND}/api/fees/print?generatedDate=${printDate}`,
       { withCredentials: true }
@@ -738,6 +767,8 @@ const printSpecificDateChallans = async () => {
   } catch (error) {
     console.error("Error loading challans for print:", error);
     toast.error("Failed to load challans for printing");
+  }finally {
+    setIsPrinting(false);
   }
 };
 
@@ -747,7 +778,9 @@ const printClassChallans = async () => {
     return;
   }
 
+if (isPrinting) return;
   try {
+    setIsPrinting(true);
     const response = await axios.get(
       `${BACKEND}/api/fees/print?generatedDate=${printClassDate}&studentClass=${printClass}`,
       { withCredentials: true }
@@ -767,6 +800,8 @@ const printClassChallans = async () => {
   } catch (error) {
     console.error("Error loading challans for print:", error);
     toast.error("Failed to load challans for printing");
+  }finally {
+    setIsPrinting(false);
   }
 };
 
@@ -775,8 +810,9 @@ const printSectionChallans = async () => {
     toast.error("Please select class, section, and date.");
     return;
   }
-
+if (isPrinting) return;
   try {
+    setIsPrinting(true);
     const response = await axios.get(
       `${BACKEND}/api/fees/print?generatedDate=${printClassDate}&studentClass=${printClass}&section=${printSection}`,
       { withCredentials: true }
@@ -796,6 +832,8 @@ const printSectionChallans = async () => {
   } catch (error) {
     console.error("Error loading challans for print:", error);
     toast.error("Failed to load challans for printing");
+  }finally {
+    setIsPrinting(false);
   }
 };
 
@@ -935,7 +973,8 @@ const printSectionChallans = async () => {
 
   const handleGenerateFees = async () => {
     if (!selectedMonth || !selectedYear) return;
-
+if (isGenerating) return; 
+try {
     let studentIds: string[] = [];
 
     if (generatingFor === "all") {
@@ -958,6 +997,12 @@ const printSectionChallans = async () => {
     setStudentSearch("");
     setSelectedMonth("");
     setGeneratingFor("class");
+  } catch (error) {
+    console.error("Error in handleGenerateFees:", error);
+    toast.error("An unexpected error occurred. Please try again.");}
+  finally { 
+    setIsGenerating(false);
+  }
   };
 
   const uniqueClasses = Array.from(
