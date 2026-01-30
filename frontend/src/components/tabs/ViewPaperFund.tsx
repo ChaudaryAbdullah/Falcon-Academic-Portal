@@ -1,6 +1,6 @@
 "use client";
 import axios from "axios";
-import { useState } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import {
   Card,
   CardContent,
@@ -65,6 +65,111 @@ interface ViewPaperFundRecordsTabProps {
   whatsappMessage: string;
 }
 
+// 🚀 OPTIMIZATION 1: Memoized Badge component to prevent re-renders
+const StatusBadge = memo(({ status }: { status: string }) => {
+  switch (status) {
+    case "paid":
+      return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
+    case "overdue":
+      return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
+    default:
+      return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+  }
+});
+StatusBadge.displayName = "StatusBadge";
+
+// 🚀 OPTIMIZATION 2: Memoized WhatsApp Badge
+const WhatsAppBadge = memo(({ sent }: { sent: boolean }) => {
+  return sent ? (
+    <Badge className="bg-green-100 text-green-800">Sent</Badge>
+  ) : (
+    <Badge className="bg-gray-100 text-gray-800">Not Sent</Badge>
+  );
+});
+WhatsAppBadge.displayName = "WhatsAppBadge";
+
+// 🚀 OPTIMIZATION 3: Memoized Table Row component
+const ChallanRow = memo(
+  ({
+    challan,
+    onSendReminder,
+    onPrint,
+    onDownload,
+  }: {
+    challan: PaperFundChallan;
+    onSendReminder: (challan: PaperFundChallan) => void;
+    onPrint: (challan: PaperFundChallan) => void;
+    onDownload: (challan: PaperFundChallan) => void;
+  }) => {
+    return (
+      <TableRow>
+        <TableCell className="font-medium">
+          {challan.studentId.studentName}
+        </TableCell>
+        <TableCell>{challan.studentId.fatherName}</TableCell>
+        <TableCell>{challan.studentId.rollNumber || "N/A"}</TableCell>
+        <TableCell>{challan.studentId.class || "N/A"}</TableCell>
+        <TableCell>{challan.year}</TableCell>
+        <TableCell className="font-semibold">
+          Rs. {challan.paperFund.toLocaleString()}
+        </TableCell>
+        <TableCell>{challan.dueDate || "N/A"}</TableCell>
+        <TableCell>{challan.generatedDate || "N/A"}</TableCell>
+        <TableCell>
+          {challan.paidDate ? (
+            challan.paidDate
+          ) : (
+            <span className="text-gray-400">Not paid</span>
+          )}
+        </TableCell>
+        <TableCell>
+          <StatusBadge status={challan.status} />
+        </TableCell>
+        <TableCell>
+          <WhatsAppBadge sent={challan.sentToWhatsApp} />
+        </TableCell>
+        <TableCell>
+          <div className="flex space-x-2">
+            <Button
+              size="sm"
+              onClick={() => onSendReminder(challan)}
+              className="bg-green-600 hover:bg-green-700"
+              title="Send WhatsApp Reminder"
+            >
+              <MessageCircle className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onPrint(challan)}
+              title="Print Challan"
+            >
+              <Printer className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onDownload(challan)}
+              title="Download Challan"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  },
+  // Custom comparison function for better memoization
+  (prevProps, nextProps) => {
+    return (
+      prevProps.challan.id === nextProps.challan.id &&
+      prevProps.challan.status === nextProps.challan.status &&
+      prevProps.challan.sentToWhatsApp === nextProps.challan.sentToWhatsApp
+    );
+  }
+);
+ChallanRow.displayName = "ChallanRow";
+
 export function ViewPaperFundRecordsTab({
   challans,
   setChallans,
@@ -79,57 +184,287 @@ export function ViewPaperFundRecordsTab({
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [whatsappFilter, setWhatsappFilter] = useState<string>("all");
 
-  const sendPaperFundReminder = async (challan: PaperFundChallan) => {
-    try {
-      if (!challan.studentId.mPhoneNumber) {
-        toast.error(
-          `Phone number not available for ${challan.studentId.studentName}. Please update the student's phone number first.`
-        );
-        return;
+  // 🚀 OPTIMIZATION 4: Memoize unique years to prevent recalculation
+  const uniqueYears = useMemo(
+    () => Array.from(new Set(challans.map((c) => c.year))).sort(),
+    [challans]
+  );
+
+  // 🚀 OPTIMIZATION 5: Memoize filtered challans
+  const filteredChallans = useMemo(() => {
+    return challans.filter((challan) => {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch =
+        challan.studentId.studentName.toLowerCase().includes(searchLower) ||
+        challan.studentId.fatherName.toLowerCase().includes(searchLower) ||
+        challan.year.toLowerCase().includes(searchLower) ||
+        challan.studentId.rollNumber?.toLowerCase().includes(searchLower) ||
+        challan.studentId.class?.toLowerCase().includes(searchLower);
+
+      const matchesStatus =
+        statusFilter === "all" || challan.status === statusFilter;
+      const matchesYear = yearFilter === "all" || challan.year === yearFilter;
+      const matchesWhatsApp =
+        whatsappFilter === "all" ||
+        (whatsappFilter === "sent" && challan.sentToWhatsApp) ||
+        (whatsappFilter === "not_sent" && !challan.sentToWhatsApp);
+
+      return matchesSearch && matchesStatus && matchesYear && matchesWhatsApp;
+    });
+  }, [challans, searchTerm, statusFilter, yearFilter, whatsappFilter]);
+
+  // 🚀 OPTIMIZATION 6: Memoize pagination calculations
+  const paginationInfo = useMemo(() => {
+    const totalPages = Math.ceil(filteredChallans.length / itemsPerPage);
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentChallans = filteredChallans.slice(
+      indexOfFirstItem,
+      indexOfLastItem
+    );
+
+    return {
+      totalPages,
+      indexOfFirstItem,
+      indexOfLastItem,
+      currentChallans,
+    };
+  }, [filteredChallans, currentPage, itemsPerPage]);
+
+  // 🚀 OPTIMIZATION 7: Memoize statistics
+  const stats = useMemo(() => {
+    const total = filteredChallans.length;
+    const paid = filteredChallans.filter((c) => c.status === "paid").length;
+    const pending = filteredChallans.filter((c) => c.status === "pending")
+      .length;
+    const overdue = filteredChallans.filter((c) => c.status === "overdue")
+      .length;
+    const totalAmount = filteredChallans.reduce(
+      (sum, c) => sum + c.paperFund,
+      0
+    );
+    const paidAmount = filteredChallans
+      .filter((c) => c.status === "paid")
+      .reduce((sum, c) => sum + c.paperFund, 0);
+    const pendingAmount = filteredChallans
+      .filter((c) => c.status !== "paid")
+      .reduce((sum, c) => sum + c.paperFund, 0);
+
+    return {
+      total,
+      paid,
+      pending,
+      overdue,
+      totalAmount,
+      paidAmount,
+      pendingAmount,
+    };
+  }, [filteredChallans]);
+
+  // 🚀 OPTIMIZATION 8: Memoize active filters count
+  const activeFiltersCount = useMemo(() => {
+    return [
+      statusFilter !== "all",
+      yearFilter !== "all",
+      whatsappFilter !== "all",
+      searchTerm.length > 0,
+    ].filter(Boolean).length;
+  }, [statusFilter, yearFilter, whatsappFilter, searchTerm]);
+
+  // 🚀 OPTIMIZATION 9: Stable callback functions
+  const clearAllFilters = useCallback(() => {
+    setStatusFilter("all");
+    setYearFilter("all");
+    setWhatsappFilter("all");
+    setSearchTerm("");
+    setCurrentPage(1);
+  }, []);
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      if (page >= 1 && page <= paginationInfo.totalPages) {
+        setCurrentPage(page);
+        // Scroll to top of table
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
+    },
+    [paginationInfo.totalPages]
+  );
 
-      let phoneNumber = challan.studentId.mPhoneNumber
-        .toString()
-        .replace(/[\s-]/g, "");
+  const getChallanHTML = useCallback((challan: PaperFundChallan) => {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Paper Fund Challan - ${challan.studentId.studentName}</title>
+    <style>
+        @page {
+            size: 210mm 148.5mm;
+            margin: 10mm; 
+        }
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0;
+            width: 190mm;
+            font-size: 12px; 
+        }
+        @media print {
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+        .header { 
+            text-align: center; 
+            margin-bottom: 15px; 
+        }
+        .header h1 {
+            font-size: 20px;
+            margin: 0 0 3px 0;
+        }
+        .header h2 {
+            font-size: 18px;
+            margin: 0;
+        }
+        .challan-info { 
+            margin: 15px 0; 
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-gap: 15px 30px;
+            font-size: 13px;
+        }
+        .challan-info p {
+            margin: 1px 0;
+        }
+        .fee-details { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin: 15px 0; 
+            font-size: 13px;
+        }
+        .fee-details th, .fee-details td { 
+            border: 1px solid #ddd; 
+            padding: 8px; 
+            text-align: left; 
+        }
+        .fee-details th { 
+            background-color: #f2f2f2; 
+            font-weight: bold;
+        }
+        .total { 
+            font-weight: bold; 
+            font-size: 12px; 
+        }
+        .footer { 
+            margin-top: 15px; 
+            text-align: center; 
+            font-size: 10px; 
+            line-height: 1;
+        }
+        .footer p {
+            margin: 3px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FALCON House School</h1>
+        <h2>Paper Fund Challan</h2>
+    </div>
+    <div class="challan-info">
+        <p><strong>Student Name:</strong> ${challan.studentId.studentName}</p>
+        <p><strong>Father Name:</strong> ${challan.studentId.fatherName}</p>
+        <p><strong>Roll Number:</strong> ${challan.studentId.rollNumber}</p>
+        <p><strong>Class:</strong> ${challan.studentId.class} ${
+      challan.studentId.section
+    }</p>
+        <p><strong>Academic Year:</strong> ${challan.year}</p>
+        <p><strong>Due Date:</strong> ${challan.dueDate}</p>
+        ${
+          challan.paidDate
+            ? `<p><strong>Paid Date:</strong> ${challan.paidDate}</p>`
+            : ""
+        }
+    </div>
+    <table class="fee-details">
+        <tr>
+            <th>Fee Type</th>
+            <th>Amount (Rs.)</th>
+        </tr>
+        <tr>
+            <td>Paper Fund</td>
+            <td>${challan.paperFund}</td>
+        </tr>
+        <tr class="total">
+            <td>Total Amount</td>
+            <td>Rs. ${challan.paperFund}</td>
+        </tr>
+    </table>
+    <div class="footer">
+        <p>Please pay before the due date to avoid late fees.</p>
+        <p>For queries, contact school administration.</p>
+    </div>
+</body>
+</html>
+    `;
+  }, []);
 
-      phoneNumber = phoneNumber.replace(/[^\d+]/g, "");
-
-      if (phoneNumber.startsWith("+92")) {
-        phoneNumber = phoneNumber.substring(1);
-      } else if (phoneNumber.startsWith("0")) {
-        phoneNumber = "92" + phoneNumber.substring(1);
-      } else if (!phoneNumber.startsWith("92")) {
-        if (phoneNumber.startsWith("3")) {
-          phoneNumber = "92" + phoneNumber;
-        } else {
+  const sendPaperFundReminder = useCallback(
+    async (challan: PaperFundChallan) => {
+      try {
+        if (!challan.studentId.mPhoneNumber) {
           toast.error(
-            `Invalid phone number format for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`
+            `Phone number not available for ${challan.studentId.studentName}. Please update the student's phone number first.`
           );
           return;
         }
-      }
 
-      if (phoneNumber.length < 12 || phoneNumber.length > 13) {
-        toast.error(
-          `Invalid phone number length for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`
-        );
-        return;
-      }
+        let phoneNumber = challan.studentId.mPhoneNumber
+          .toString()
+          .replace(/[\s-]/g, "");
+        phoneNumber = phoneNumber.replace(/[^\d+]/g, "");
 
-      let dueDate = challan.dueDate;
-      let formattedDueDate = dueDate;
-      try {
-        if (dueDate) {
-          const dateObj = new Date(dueDate);
-          formattedDueDate = dateObj.toLocaleDateString("en-GB");
+        if (phoneNumber.startsWith("+92")) {
+          phoneNumber = phoneNumber.substring(1);
+        } else if (phoneNumber.startsWith("0")) {
+          phoneNumber = "92" + phoneNumber.substring(1);
+        } else if (!phoneNumber.startsWith("92")) {
+          if (phoneNumber.startsWith("3")) {
+            phoneNumber = "92" + phoneNumber;
+          } else {
+            toast.error(
+              `Invalid phone number format for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`
+            );
+            return;
+          }
         }
-      } catch (error) {
-        console.error("Error formatting due date:", error);
-      }
 
-      const message =
-        whatsappMessage ||
-        `
+        if (phoneNumber.length < 12 || phoneNumber.length > 13) {
+          toast.error(
+            `Invalid phone number length for ${challan.studentId.studentName}: ${challan.studentId.mPhoneNumber}`
+          );
+          return;
+        }
+
+        let dueDate = challan.dueDate;
+        let formattedDueDate = dueDate;
+        try {
+          if (dueDate) {
+            const dateObj = new Date(dueDate);
+            formattedDueDate = dateObj.toLocaleDateString("en-GB");
+          }
+        } catch (error) {
+          console.error("Error formatting due date:", error);
+        }
+
+        const message =
+          whatsappMessage ||
+          `
 *Paper Fund Reminder - Falcon House School*
 
 Dear ${challan.studentId.fatherName || "Parent"},
@@ -147,314 +482,88 @@ Paper Fund Details:
 • Amount: Rs. ${challan.paperFund}
 
 ${
-  challan.status === "paid"
-    ? "Thank you for your payment!"
-    : challan.status === "overdue"
-    ? "This payment is overdue. Please pay as soon as possible to avoid additional charges."
-    : "Please pay before the due date to avoid late fees."
-}
+            challan.status === "paid"
+              ? "Thank you for your payment!"
+              : challan.status === "overdue"
+              ? "This payment is overdue. Please pay as soon as possible to avoid additional charges."
+              : "Please pay before the due date to avoid late fees."
+          }
 
 Best regards,
 Falcon House School Administration
     `.trim();
 
-      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
-        message
-      )}`;
+        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
+          message
+        )}`;
 
-      window.open(whatsappUrl, "_blank");
+        window.open(whatsappUrl, "_blank");
 
-      try {
-        // Update the WhatsApp sent status (assuming similar endpoint exists)
-        await axios.patch(
-          `${BACKEND}/api/paperFund/${challan.id}/whatsapp`,
-          { sentToWhatsApp: true },
-          { withCredentials: true }
-        );
+        try {
+          await axios.patch(
+            `${BACKEND}/api/paperFund/${challan.id}/whatsapp`,
+            { sentToWhatsApp: true },
+            { withCredentials: true }
+          );
 
-        setChallans(((prevChallans: PaperFundChallan[]) =>
-          prevChallans.map((c) =>
-            c.id === challan.id ? { ...c, sentToWhatsApp: true } : c
-          )) as unknown as PaperFundChallan[]);
+          setChallans(
+            challans.map((c) =>
+              c.id === challan.id ? { ...c, sentToWhatsApp: true } : c
+            )
+          );
+        } catch (error) {
+          console.error("Error updating WhatsApp status:", error);
+        }
       } catch (error) {
-        console.error("Error updating WhatsApp status:", error);
-        // Continue without blocking the process
+        console.error("Error in sendPaperFundReminder:", error);
+        toast.error("Error sending WhatsApp reminder. Please try again.");
       }
-    } catch (error) {
-      console.error("Error in sendPaperFundReminder:", error);
-      toast.error("Error sending WhatsApp reminder. Please try again.");
-    }
-  };
-
-  const getChallanHTML = (challan: PaperFundChallan) => {
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Paper Fund Challan - ${challan.studentId.studentName}</title>
-    <style>
-        @page {
-            size: 210mm 148.5mm; /* Half height of A4 (210mm x 148.5mm) */
-            margin: 10mm; 
-        }
-        
-        body { 
-            font-family: Arial, sans-serif; 
-            margin: 0; 
-            padding: 0;
-            width: 190mm; /* Content width allowing for margins */
-            font-size: 12px; 
-        }
-        
-        /* Force left alignment for print */
-        @media print {
-            html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            
-            body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-        }
-        
-        .header { 
-            text-align: center; 
-            margin-bottom: 15px; 
-        }
-        
-        .header h1 {
-            font-size: 20px;
-            margin: 0 0 3px 0;
-        }
-        
-        .header h2 {
-            font-size: 18px;
-            margin: 0;
-        }
-        
-        .challan-info { 
-            margin: 15px 0; 
-            display: grid;
-            grid-template-columns: 1fr 1fr; /* Two columns */
-            grid-gap: 15px 30px; /* vertical and horizontal gap */
-            font-size: 13px;
-        }
-        
-        .challan-info p {
-            margin: 1px 0;
-        }
-        
-        .fee-details { 
-            border-collapse: collapse; 
-            width: 100%; 
-            margin: 15px 0; 
-            font-size: 13px;
-        }
-        
-        .fee-details th, .fee-details td { 
-            border: 1px solid #ddd; 
-            padding: 8px; 
-            text-align: left; 
-        }
-        
-        .fee-details th { 
-            background-color: #f2f2f2; 
-            font-weight: bold;
-        }
-        
-        .total { 
-            font-weight: bold; 
-            font-size: 12px; 
-        }
-        
-        .footer { 
-            margin-top: 15px; 
-            text-align: center; 
-            font-size: 10px; 
-            line-height: 1;
-        }
-        
-        .footer p {
-            margin: 3px 0;
-        }
-        
-
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>FALCON House School</h1>
-        <h2>Paper Fund Challan</h2>
-    </div>
-    
-    <div class="challan-info">
-        <p><strong>Student Name:</strong> ${challan.studentId.studentName}</p>
-        <p><strong>Father Name:</strong> ${challan.studentId.fatherName}</p>
-        <p><strong>Roll Number:</strong> ${challan.studentId.rollNumber}</p>
-        <p><strong>Class:</strong> ${challan.studentId.class} ${
-      challan.studentId.section
-    }</p>
-        <p><strong>Academic Year:</strong> ${challan.year}</p>
-        <p><strong>Due Date:</strong> ${challan.dueDate}</p>
-        ${
-          challan.paidDate
-            ? `<p><strong>Paid Date:</strong> ${challan.paidDate}</p>`
-            : ""
-        }
-    </div>
-
-    <table class="fee-details">
-        <tr>
-            <th>Fee Type</th>
-            <th>Amount (Rs.)</th>
-        </tr>
-        <tr>
-            <td>Paper Fund</td>
-            <td>${challan.paperFund}</td>
-        </tr>
-        <tr class="total">
-            <td>Total Amount</td>
-            <td>Rs. ${challan.paperFund}</td>
-        </tr>
-    </table>
-
-    <div class="footer">
-        <p>Please pay before the due date to avoid late fees.</p>
-        <p>For queries, contact school administration.</p>
-    </div>
-</body>
-</html>
-    `;
-  };
-
-  const printPaperFundChallan = (challan: PaperFundChallan) => {
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(getChallanHTML(challan));
-      printWindow.document.close();
-      printWindow.focus();
-
-      // Wait for content to load before printing
-      printWindow.onload = () => {
-        printWindow.print();
-        // Optionally close the window after printing
-        // printWindow.close();
-      };
-
-      // Fallback for browsers that don't trigger onload properly
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
-    }
-  };
-
-  const downloadPaperFundChallanPDF = (challan: PaperFundChallan) => {
-    const pdfContent = getChallanHTML(challan);
-
-    const blob = new Blob([pdfContent], { type: "text/html" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `paper-fund-challan-${challan.studentId.studentName}-${challan.year}.html`;
-    link.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  // Enhanced filtering logic
-  const filteredChallans = challans.filter((challan) => {
-    const matchesSearch =
-      challan.studentId.studentName
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      challan.studentId.fatherName
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      challan.year.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      challan.studentId.rollNumber
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      challan.studentId.class?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === "all" || challan.status === statusFilter;
-    const matchesYear = yearFilter === "all" || challan.year === yearFilter;
-    const matchesWhatsApp =
-      whatsappFilter === "all" ||
-      (whatsappFilter === "sent" && challan.sentToWhatsApp) ||
-      (whatsappFilter === "not_sent" && !challan.sentToWhatsApp);
-
-    return matchesSearch && matchesStatus && matchesYear && matchesWhatsApp;
-  });
-
-  const uniqueYears = Array.from(new Set(challans.map((c) => c.year))).sort();
-
-  const clearAllFilters = () => {
-    setStatusFilter("all");
-    setYearFilter("all");
-    setWhatsappFilter("all");
-    setSearchTerm("");
-    setCurrentPage(1);
-  };
-
-  const activeFiltersCount = [
-    statusFilter !== "all",
-    yearFilter !== "all",
-    whatsappFilter !== "all",
-    searchTerm.length > 0,
-  ].filter(Boolean).length;
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "paid":
-        return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
-      case "overdue":
-        return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
-      default:
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-    }
-  };
-
-  // Calculate paginated challans
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentChallans = filteredChallans.slice(
-    indexOfFirstItem,
-    indexOfLastItem
+    },
+    [challans, setChallans, whatsappMessage]
   );
 
-  const totalPages = Math.ceil(filteredChallans.length / itemsPerPage);
+  const printPaperFundChallan = useCallback(
+    (challan: PaperFundChallan) => {
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(getChallanHTML(challan));
+        printWindow.document.close();
+        printWindow.focus();
 
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
+        printWindow.onload = () => {
+          printWindow.print();
+        };
 
-  // Summary statistics - now based on filtered data
-  const stats = {
-    total: filteredChallans.length,
-    paid: filteredChallans.filter((c) => c.status === "paid").length,
-    pending: filteredChallans.filter((c) => c.status === "pending").length,
-    overdue: filteredChallans.filter((c) => c.status === "overdue").length,
-    totalAmount: filteredChallans.reduce((sum, c) => sum + c.paperFund, 0),
-    paidAmount: filteredChallans
-      .filter((c) => c.status === "paid")
-      .reduce((sum, c) => sum + c.paperFund, 0),
-    pendingAmount: filteredChallans
-      .filter((c) => c.status !== "paid")
-      .reduce((sum, c) => sum + c.paperFund, 0),
-  };
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      }
+    },
+    [getChallanHTML]
+  );
+
+  const downloadPaperFundChallanPDF = useCallback(
+    (challan: PaperFundChallan) => {
+      const pdfContent = getChallanHTML(challan);
+      const blob = new Blob([pdfContent], { type: "text/html" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `paper-fund-challan-${challan.studentId.studentName}-${challan.year}.html`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    },
+    [getChallanHTML]
+  );
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>
-          Paper Fund Records ({indexOfFirstItem + 1} -{" "}
-          {indexOfLastItem > filteredChallans.length
+          Paper Fund Records ({paginationInfo.indexOfFirstItem + 1} -{" "}
+          {paginationInfo.indexOfLastItem > filteredChallans.length
             ? filteredChallans.length
-            : indexOfLastItem}{" "}
+            : paginationInfo.indexOfLastItem}{" "}
           of {filteredChallans.length})
         </CardTitle>
         <CardDescription>
@@ -655,100 +764,45 @@ Falcon House School Administration
                   </TableCell>
                 </TableRow>
               ) : (
-                currentChallans.map((challan) => (
-                  <TableRow key={challan.id}>
-                    <TableCell className="font-medium">
-                      {challan.studentId.studentName}
-                    </TableCell>
-                    <TableCell>{challan.studentId.fatherName}</TableCell>
-                    <TableCell>
-                      {challan.studentId.rollNumber || "N/A"}
-                    </TableCell>
-                    <TableCell>{challan.studentId.class || "N/A"}</TableCell>
-                    <TableCell>{challan.year}</TableCell>
-                    <TableCell className="font-semibold">
-                      Rs. {challan.paperFund.toLocaleString()}
-                    </TableCell>
-                    <TableCell>{challan.dueDate || "N/A"}</TableCell>
-                    <TableCell>{challan.generatedDate || "N/A"}</TableCell>
-                    <TableCell>
-                      {challan.paidDate ? (
-                        challan.paidDate
-                      ) : (
-                        <span className="text-gray-400">Not paid</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(challan.status)}</TableCell>
-                    <TableCell>
-                      {challan.sentToWhatsApp ? (
-                        <Badge className="bg-green-100 text-green-800">
-                          Sent
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-gray-100 text-gray-800">
-                          Not Sent
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          size="sm"
-                          onClick={() => sendPaperFundReminder(challan)}
-                          className="bg-green-600 hover:bg-green-700"
-                          title="Send WhatsApp Reminder"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => printPaperFundChallan(challan)}
-                          title="Print Challan"
-                        >
-                          <Printer className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => downloadPaperFundChallanPDF(challan)}
-                          title="Download Challan"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                paginationInfo.currentChallans.map((challan) => (
+                  <ChallanRow
+                    key={challan.id}
+                    challan={challan}
+                    onSendReminder={sendPaperFundReminder}
+                    onPrint={printPaperFundChallan}
+                    onDownload={downloadPaperFundChallanPDF}
+                  />
                 ))
               )}
             </TableBody>
           </Table>
 
-          {filteredChallans.length > 0 && totalPages > 1 && (
-            <div className="flex justify-center items-center space-x-2 mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === 1}
-                onClick={() => handlePageChange(currentPage - 1)}
-              >
-                Previous
-              </Button>
+          {filteredChallans.length > 0 &&
+            paginationInfo.totalPages > 1 && (
+              <div className="flex justify-center items-center space-x-2 mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                >
+                  Previous
+                </Button>
 
-              <span className="text-sm">
-                Page {currentPage} of {totalPages}
-              </span>
+                <span className="text-sm">
+                  Page {currentPage} of {paginationInfo.totalPages}
+                </span>
 
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === totalPages}
-                onClick={() => handlePageChange(currentPage + 1)}
-              >
-                Next
-              </Button>
-            </div>
-          )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === paginationInfo.totalPages}
+                  onClick={() => handlePageChange(currentPage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
         </div>
       </CardContent>
     </Card>

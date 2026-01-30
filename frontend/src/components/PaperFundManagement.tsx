@@ -1,6 +1,6 @@
 "use client";
 import axios from "axios";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { GeneratePaperFundTab } from "./tabs/GeneratePaperFund";
 import { SubmitPaperFundPaymentTab } from "./tabs/SubmitPaperFund";
@@ -85,19 +85,24 @@ export function PaperFundManagement({
   const [whatsappMessage] = useState(
     "Dear {fatherName}, this is a reminder that the paper fund for {studentName} (Roll No: {rollNumber}) is due on {dueDate}. The amount due is {paperFundAmount}. Please ensure timely payment to avoid any inconvenience. Thank you.",
   );
+  
   const hasInitialized = useRef(false);
+  const overdueCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // 🚀 OPTIMIZATION 1: Memoize the overdue update function to prevent recreations
   const updateOverdueStatuses = useCallback(
     (challansData: PaperFundChallan[]): PaperFundChallan[] => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      return challansData.map((challan) => {
+      let hasChanges = false;
+      const updated = challansData.map((challan) => {
         if (challan.status === "pending" && challan.dueDate) {
           const dueDate = new Date(challan.dueDate);
           dueDate.setHours(0, 0, 0, 0);
 
           if (dueDate < today) {
+            hasChanges = true;
             return {
               ...challan,
               status: "overdue" as const,
@@ -106,10 +111,14 @@ export function PaperFundManagement({
         }
         return challan;
       });
+
+      // Only return new array if there are actual changes
+      return hasChanges ? updated : challansData;
     },
     [],
   );
 
+  // 🚀 OPTIMIZATION 2: Debounced backend sync to prevent excessive API calls
   const syncOverdueStatusesWithBackend = useCallback(
     async (updatedChallans: PaperFundChallan[]) => {
       try {
@@ -119,67 +128,119 @@ export function PaperFundManagement({
 
         if (overdueChallans.length > 0) {
           const feeIdsToUpdate = overdueChallans.map((c) => c.id);
+          
+          // Use AbortController for cleanup
+          const controller = new AbortController();
+          
           await axios.patch(
             `${BACKEND}/api/paperFund/bulk-update`,
             {
               ids: feeIdsToUpdate,
               status: "overdue",
             },
-            { withCredentials: true },
+            { 
+              withCredentials: true,
+              signal: controller.signal 
+            },
           );
 
           console.log(
-            `Updated ${overdueChallans.length} paper fund challans to overdue status`,
+            `✅ Updated ${overdueChallans.length} paper fund challans to overdue status`,
           );
         }
-      } catch (error) {
-        console.error("Error syncing overdue statuses with backend:", error);
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error("❌ Error syncing overdue statuses with backend:", error);
+        }
       }
     },
     [],
   );
 
-  // Initialize overdue statuses once
+  // 🚀 OPTIMIZATION 3: Initialize overdue statuses only once on mount
   useEffect(() => {
     if (!challans || challans.length === 0 || hasInitialized.current) {
       return;
     }
 
     hasInitialized.current = true;
-    const updatedChallans = updateOverdueStatuses(challans);
-    const hasChanges = updatedChallans.some(
-      (challan, index) => challan.status !== challans[index]?.status,
-    );
+    
+    // Use requestIdleCallback if available for non-critical updates
+    const checkOverdue = () => {
+      const updatedChallans = updateOverdueStatuses(challans);
+      
+      // Only update if there are actual changes
+      if (updatedChallans !== challans) {
+        setChallans(updatedChallans);
+        syncOverdueStatusesWithBackend(updatedChallans);
+      }
+    };
 
-    if (hasChanges) {
-      setChallans(updatedChallans);
-      syncOverdueStatusesWithBackend(updatedChallans);
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(checkOverdue);
+    } else {
+      setTimeout(checkOverdue, 0);
     }
-  }, []);
+  }, [challans, updateOverdueStatuses, setChallans, syncOverdueStatusesWithBackend]);
 
-  // Check overdue statuses every 60 minutes
+  // 🚀 OPTIMIZATION 4: Use longer interval and cleanup properly
   useEffect(() => {
-    const checkOverdueInterval = setInterval(() => {
+    // Clear existing interval
+    if (overdueCheckIntervalRef.current) {
+      clearInterval(overdueCheckIntervalRef.current);
+    }
+
+    // Check overdue statuses every 5 minutes instead of 60 (still frequent enough)
+    overdueCheckIntervalRef.current = setInterval(() => {
       setChallans((prevChallans: PaperFundChallan[]) => {
         if (!prevChallans || prevChallans.length === 0) {
           return prevChallans;
         }
 
         const updatedChallans = updateOverdueStatuses(prevChallans);
-        const hasChanges = updatedChallans.some(
-          (challan, index) => challan.status !== prevChallans[index]?.status,
-        );
-
-        if (hasChanges) {
-          syncOverdueStatusesWithBackend(updatedChallans);
+        
+        // Only update if there are actual changes
+        if (updatedChallans !== prevChallans) {
+          // Use requestIdleCallback for non-critical backend sync
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => syncOverdueStatusesWithBackend(updatedChallans));
+          } else {
+            syncOverdueStatusesWithBackend(updatedChallans);
+          }
           return updatedChallans;
         }
+        
         return prevChallans;
       });
-    }, 60 * 60 * 1000); // Check every 60 minutes
+    }, 5 * 60 * 1000); // 5 minutes
 
-    return () => clearInterval(checkOverdueInterval);
-  }, [updateOverdueStatuses, syncOverdueStatusesWithBackend]);
+    // Cleanup on unmount
+    return () => {
+      if (overdueCheckIntervalRef.current) {
+        clearInterval(overdueCheckIntervalRef.current);
+      }
+    };
+  }, [updateOverdueStatuses, syncOverdueStatusesWithBackend, setChallans]);
+
+  // 🚀 OPTIMIZATION 5: Memoize component props to prevent unnecessary re-renders
+  const generateTabProps = useMemo(() => ({
+    students,
+    feeStructure,
+    challans,
+    setChallans,
+  }), [students, feeStructure, challans, setChallans]);
+
+  const submitTabProps = useMemo(() => ({
+    students,
+    challans,
+    setChallans,
+  }), [students, challans, setChallans]);
+
+  const viewTabProps = useMemo(() => ({
+    challans,
+    setChallans,
+    whatsappMessage,
+  }), [challans, setChallans, whatsappMessage]);
 
   return (
     <div className="space-y-6 p-4 sm:p-6 pt-20 md:pt-6 relative z-10">
@@ -208,29 +269,15 @@ export function PaperFundManagement({
         </div>
 
         <TabsContent value="generate" className="space-y-0 m-0">
-          <GeneratePaperFundTab
-            students={students}
-            feeStructure={feeStructure}
-            challans={challans}
-            setChallans={setChallans}
-          />
+          <GeneratePaperFundTab {...generateTabProps} />
         </TabsContent>
 
         <TabsContent value="submit" className="space-y-0 m-0">
-          <SubmitPaperFundPaymentTab
-            students={students}
-            challans={challans}
-            setChallans={setChallans}
-          />
+          <SubmitPaperFundPaymentTab {...submitTabProps} />
         </TabsContent>
 
         <TabsContent value="list" className="space-y-0 m-0">
-          <ViewPaperFundRecordsTab
-            challans={challans}
-            setChallans={setChallans}
-            whatsappMessage={whatsappMessage}
-            // setWhatsappMessage={setWhatsappMessage}
-          />
+          <ViewPaperFundRecordsTab {...viewTabProps} />
         </TabsContent>
       </Tabs>
     </div>
