@@ -281,7 +281,7 @@ export default function StudentDiscountPage({
       const res = await axios.post(`${BACKEND}/api/student-discounts`, payload, {
         withCredentials: true,
       });
-
+      res.data;
       // Clear cache and force refresh
       cacheManager.delete("student_discounts");
       await fetchDiscounts(true);
