@@ -165,13 +165,16 @@ export default function StudentDiscountPage({
 
   // Memoized filtered discounts (for discount list)
   const filteredDiscounts = useMemo(() => {
+    // Filter out discounts with null studentId (deleted students)
+    const validDiscounts = discounts.filter((d) => d.studentId);
+
     if (!debouncedDiscountSearch || debouncedDiscountSearch.length < 2) {
-      return discounts;
+      return validDiscounts;
     }
 
     const query = debouncedDiscountSearch.toLowerCase();
 
-    return discounts.filter(
+    return validDiscounts.filter(
       (d) =>
         d.studentId?.studentName?.toLowerCase().includes(query) ||
         d.studentId?.fatherName?.toLowerCase().includes(query) ||
@@ -645,22 +648,22 @@ export default function StudentDiscountPage({
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <h3 className="font-semibold text-sm sm:text-base text-gray-900 truncate">
-                                    {discount.studentId.studentName}
+                                    {discount.studentId?.studentName || "Student (Deleted)"}
                                   </h3>
                                   <div className="space-y-0.5 mt-1">
                                     <p className="text-xs sm:text-sm text-gray-600">
-                                      Roll: {discount.studentId.rollNumber}
+                                      Roll: {discount.studentId?.rollNumber || "N/A"}
                                     </p>
                                     <p className="text-xs sm:text-sm text-gray-600 truncate">
-                                      Father: {discount.studentId.fatherName}
+                                      Father: {discount.studentId?.fatherName || "N/A"}
                                     </p>
                                     <p className="text-xs sm:text-sm text-gray-600">
-                                      Class: {discount.studentId.class}
+                                      Class: {discount.studentId?.class || "N/A"}
                                     </p>
                                     <div className="flex items-center gap-2 mt-1">
                                       <Phone className="w-3 h-3 text-gray-400 flex-shrink-0" />
                                       <span className="text-xs text-gray-500">
-                                        {discount.studentId.mPhoneNumber}
+                                        {discount.studentId?.mPhoneNumber || "N/A"}
                                       </span>
                                     </div>
                                   </div>
