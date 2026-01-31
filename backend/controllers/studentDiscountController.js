@@ -46,11 +46,11 @@ export const getAllDiscounts = async (req, res) => {
     // Execute query with pagination
     const [discounts, total] = await Promise.all([
       StudentDiscount.find(searchQuery)
+        .lean()
         .populate("studentId", "rollNumber studentName fatherName mPhoneNumber class section")
         .sort(sortObj)
         .skip(skip)
-        .limit(limitNum)
-        .lean(),
+        .limit(limitNum),
       StudentDiscount.countDocuments(searchQuery),
     ]);
 
@@ -85,9 +85,9 @@ export const getAllDiscounts = async (req, res) => {
 export const getAllDiscountsNoPagination = async (req, res) => {
   try {
     const discounts = await StudentDiscount.find()
+      .lean()
       .populate("studentId", "rollNumber studentName fatherName mPhoneNumber class section")
-      .sort({ createdAt: -1 })
-      .lean();
+      .sort({ createdAt: -1 });
 
     res.status(200).json(discounts);
   } catch (error) {
