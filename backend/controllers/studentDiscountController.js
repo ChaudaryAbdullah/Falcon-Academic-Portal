@@ -1,4 +1,15 @@
 import { StudentDiscount } from "../models/studentDiscount.js";
+import { clearCachePattern } from "../middleware/redisCache.js";
+
+// Helper function to clear all discount-related caches
+const clearDiscountCache = async () => {
+  try {
+    await clearCachePattern("cache:/api/student-discounts*");
+    console.log("✅ Discount cache cleared");
+  } catch (error) {
+    console.error("❌ Error clearing discount cache:", error);
+  }
+};
 
 // ============ GET ALL DISCOUNTS WITH PAGINATION ============
 export const getAllDiscounts = async (req, res) => {
@@ -136,6 +147,9 @@ export const createOrUpdateDiscount = async (req, res) => {
       { new: true, upsert: true, setDefaultsOnInsert: true }
     ).populate("studentId", "rollNumber studentName fatherName mPhoneNumber class section");
 
+     // Clear cache after mutation
+  await clearDiscountCache();
+  
     res.status(200).json({
       success: true,
       data: discountDoc,

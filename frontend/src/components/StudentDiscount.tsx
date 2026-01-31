@@ -104,11 +104,16 @@ export default function StudentDiscountPage({
       }
     }
 
+     // Add cache-busting parameter
+  
+
     try {
       setIsLoadingDiscounts(true);
-      const res = await axios.get(`${BACKEND}/api/student-discounts`, {
-        withCredentials: true,
-      });
+      const url = forceRefresh 
+    ? `${BACKEND}/api/student-discounts?_t=${Date.now()}`
+    : `${BACKEND}/api/student-discounts`;
+  
+  const res = await axios.get(url, { withCredentials: true });
 
       const data = res.data || [];
       setDiscounts(data);
@@ -276,21 +281,12 @@ export default function StudentDiscountPage({
       const res = await axios.post(`${BACKEND}/api/student-discounts`, payload, {
         withCredentials: true,
       });
-
-      if (editingDiscount) {
-        // Update existing discount
-        setDiscounts((prev) =>
-          prev.map((d) => (d._id === editingDiscount._id ? res.data : d))
-        );
-        toast.success("Discount updated successfully");
-      } else {
-        // Add new discount
-        setDiscounts((prev) => [res.data, ...prev]);
-        toast.success("Discount added successfully");
-      }
-
-      // Clear cache
+      res.data;
+      // Clear cache and force refresh
       cacheManager.delete("student_discounts");
+      await fetchDiscounts(true);
+
+      toast.success(editingDiscount ? "Discount updated successfully" : "Discount added successfully");
 
       // Reset form
       setEditingDiscount(null);
@@ -301,7 +297,7 @@ export default function StudentDiscountPage({
       console.error("Error saving discount:", error);
       toast.error(error.response?.data?.message || "Failed to save discount");
     }
-  }, [selectedStudent, discountAmount, editingDiscount, clearStudentSelection]);
+  }, [selectedStudent, discountAmount, editingDiscount, clearStudentSelection, fetchDiscounts]);
 
   // Delete Discount
   const handleDeleteDiscount = useCallback(async (id: string) => {
@@ -314,14 +310,16 @@ export default function StudentDiscountPage({
         withCredentials: true,
       });
 
-      setDiscounts((prev) => prev.filter((d) => d._id !== id));
+      // Clear cache and force refresh
       cacheManager.delete("student_discounts");
+      await fetchDiscounts(true);
+
       toast.success("Discount removed successfully");
     } catch (error: any) {
       console.error("Error deleting discount:", error);
       toast.error(error.response?.data?.message || "Failed to delete discount");
     }
-  }, []);
+  }, [fetchDiscounts]);
 
   // Edit Discount
   const handleEditDiscount = useCallback(
